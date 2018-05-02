@@ -29,8 +29,8 @@ class Serializable:
         for k in self.__mapper__.columns.keys():
             if k not in ignore: results[k] = getattr(self, k)
 
-        parsed_ralated = self.parse_args(related)
-        parsed_ignore = self.parse_args(ignore)
+        parsed_ralated = self._parse_args(related)
+        parsed_ignore = self._parse_args(ignore)
 
         for k, v in self.__mapper__.relationships.items():
             # k为关系的属性名，v为关系对象sqlalchemy.orm.relationship
@@ -68,7 +68,7 @@ class Serializable:
     def to_json(self, related=[], ignore=[]):
         return json.dumps(self.pre_serialize(related=related, ignore=ignore))
 
-    def parse_args(self, args):
+    def _parse_args(self, args):
         # 解析参数，按键值对分开，key为当前需要转换的属性，value为下一步迭代的参数
         parsed = {}
         for i in args:

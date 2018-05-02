@@ -4,9 +4,10 @@ from sqlalchemy.orm.exc import NoResultFound
 
 
 
-class BaseView(View):
+class BaseView(MethodView):
     """Basic view for dispatching diffirent http method."""
-    allowed_http_method = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace']
+    # allowed_http_method = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace']
+    methods = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace']
 
     def dispatch_request(self, *args, **kwargs):
         # Try to dispatch to the right method; if a method doesn't exist,
@@ -14,7 +15,8 @@ class BaseView(View):
         # request method isn't on the approved list.
         self.args = args
         self.kwargs = kwargs
-        if request.method.lower() in self.allowed_http_method:
+        return super().dispatch_request()
+        '''if request.method.lower() in self.methods:
             handler = getattr(self, request.method.lower(), self.http_method_not_allowed)
         else:
             handler = self.http_method_not_allowed
@@ -22,7 +24,7 @@ class BaseView(View):
 
     def http_method_not_allowed(self, *args, **kwargs):
         abort(405)
-
+'''
 
 class ContextMixin:
     """
@@ -37,14 +39,17 @@ class ContextMixin:
         return kwargs
 
 
-class SingleObjectMixin:
+class SingleObjectMixin(ContextMixin):
     """
     Provide the ability to retrieve a single object for further manipulation.
     """
     model = None
     query = None
     id_url_kwarg = 'id'
-    # context_object_name = 'object'
+
+    def get(self, *args, **kwargs):
+        self.object = self.get_object()
+        return self.make_response(self.get_context_data())
 
     def get_query(self):
         """
@@ -83,7 +88,7 @@ class SingleObjectMixin:
             query = query.filter(self.model.id==obj_id)
         else:
             raise AttributeError("No object id")
-
+        
         try:
             # Get the single item from the filtered query
             obj = query.one()
@@ -91,38 +96,41 @@ class SingleObjectMixin:
             raise abort(404)
         return obj
 
-    '''def get_context_object_name(self, obj):
-        """Get the name to use for the object."""
-        if self.context_object_name:
-            return self.context_object_name
-        else:
-            return obj.__class__.__name__.lower()
-
     def get_context_data(self, **kwargs):
         """Insert the single object into the context dict."""
         context = {}
         if self.object:
-            context_object_name = self.get_context_object_name(self.object)
-            context[context_object_name] = self.object
+            context['object'] = self.object
         context.update(kwargs)
-        return super().get_context_data(**context)'''
+        return super().get_context_data(**context)
 
 
 class CreateMixin:
     """Create a single object."""
+    db = None
+
     def post(self, *args, **kwargs):
-        form = self.get_form()
+        obj = self.get_object()
+        session = self.db.session
+        session.add(obj)
+        data = request.get_json()
+        for k in data:
+            setattr(obj, k, data[k])
+        if session.dirty:
+            session.commit()
+        return self.make_response(obj.pre_serialize())
+        '''form = self.get_form()
         if form.validate():
             return self.form_valid(form)
         else:
-            return self.form_invalid(form)
+            return self.form_invalid(form)'''
 
     def get_form(self):
         pass
 
     def form_valid(self, form):
         pass
-    
+
     def form_invalid(self, form):
         pass
 

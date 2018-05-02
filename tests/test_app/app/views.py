@@ -2,7 +2,7 @@ from flask import Blueprint
 from flask_fossen.views.rest import SingleResource
 from wtforms.ext.sqlalchemy.orm import model_form
 
-from .database import User, Article
+from .database import User, Article, db
 
 # ArticleForm = model_form(Article, db.session)
 # af = ArticleForm(author=admin,title='tset',content='tset')
@@ -15,6 +15,7 @@ def index():
 
 class ArticleView(SingleResource):
     model = Article
+    db = db
 
 
 
