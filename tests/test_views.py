@@ -22,19 +22,25 @@ class ViewTest(FlaskTestCase):
         self.assertEqual(rsp.status_code, 200)
         self.assertEqual(rsp.get_data(True), 'Test.')
 
-    def test_GET_SingleSource(self):
+    def test_GET_Resource(self):
         rsp = self.client.get('/api/articles/1')
         self.assertEqual(rsp.status_code, 200)
         self.assertEqual(rsp.get_data(True), '{"id": 1, "title": "article:0", "content": "test article:0", "author_id": 1}')
 
-    def test_GET_SingleSource_404(self):
+    def test_GET_Resource_404(self):
         rsp = self.client.get('/api/articles/10')
         self.assertEqual(rsp.status_code, 404)
-        #self.assertEqual(rsp.get_data(True), '')
+        self.assertEqual(rsp.get_data(True), '{"code": 404, "message": "The requested URL was not found on the server.  If you entered the URL manually please check your spelling and try again."}')
 
-    def test_PUT_SingleSource(self):
-        rsp = self.client.put('/api/articles/1', json={'title': 'edited title', 'content': 'edited content', 'author_id':1}, follow_redirects=True)
+    def test_PUT_Resource(self):
+        rsp = self.client.put('/api/articles/1', json={'title': 'edited title', 'content': 'edited content', 'author_id':1})
+        self.assertEqual(rsp.status_code, 201)
+        self.assertEqual(rsp.get_json(), {'id': 1, 'title': 'edited title', 'content': 'edited content', 'author_id': 1})
+        edited = Article.query.filter_by(id=1).one()
+        self.assertEqual(edited.pre_serialize(), {'id': 1, 'title': 'edited title', 'content': 'edited content', 'author_id': 1})
+
+    '''def test_POST_ResourceList(self):
+        rsp = self.client.post('/api/articles', json={'title': 'new article', 'content': 'some content', 'author_id':1})
         edited = Article.query.filter_by(id=1).one()
         self.assertEqual(rsp.status_code, 200)
-        self.assertEqual(rsp.get_json(), edited.pre_serialize())
-
+        self.assertEqual(rsp.get_json(), edited.pre_serialize())'''

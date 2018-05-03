@@ -5,26 +5,12 @@ from sqlalchemy.orm.exc import NoResultFound
 
 
 class BaseView(MethodView):
-    """Basic view for dispatching diffirent http method."""
-    # allowed_http_method = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace']
-    methods = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace']
-
     def dispatch_request(self, *args, **kwargs):
-        # Try to dispatch to the right method; if a method doesn't exist,
-        # defer to the error handler. Also defer to the error handler if the
-        # request method isn't on the approved list.
+        # add attributes
         self.args = args
         self.kwargs = kwargs
         return super().dispatch_request()
-        '''if request.method.lower() in self.methods:
-            handler = getattr(self, request.method.lower(), self.http_method_not_allowed)
-        else:
-            handler = self.http_method_not_allowed
-        return handler(*args, **kwargs)
 
-    def http_method_not_allowed(self, *args, **kwargs):
-        abort(405)
-'''
 
 class ContextMixin:
     """
@@ -105,6 +91,39 @@ class SingleObjectMixin(ContextMixin):
         return super().get_context_data(**context)
 
 
+class UpdateMixin:
+    """Update a single object."""
+    db = None
+
+    def put(self, *args, **kwargs):
+        obj = self.get_object()
+        session = self.db.session
+        session.add(obj)
+        data = request.get_json()
+        for k in data:
+            setattr(obj, k, data[k])
+        if obj.is_valid():
+            return self.data_valid(obj)
+        else:
+            return self.data_invalid(obj)
+
+        '''form = self.get_form()
+        if form.validate():
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)'''
+
+    def validate_data(self):
+        return True
+
+    def data_valid(self, data):
+        self.db.session.commit()
+        return self.make_response(data.pre_serialize(), status=201)
+
+    def data_invalid(self, data):
+        raise abort(400, 'invalid data')
+
+
 class CreateMixin:
     """Create a single object."""
     db = None
@@ -118,7 +137,7 @@ class CreateMixin:
             setattr(obj, k, data[k])
         if session.dirty:
             session.commit()
-        return self.make_response(obj.pre_serialize())
+        return self.make_response(obj.pre_serialize(), status=201)
         '''form = self.get_form()
         if form.validate():
             return self.form_valid(form)
@@ -133,4 +152,6 @@ class CreateMixin:
 
     def form_invalid(self, form):
         pass
+
+
 

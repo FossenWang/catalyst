@@ -16,6 +16,7 @@ class BaseModel:
     def __str__(self):
         return hex(id(self))
 
+
 class Serializable:
     '为sqlalchemy的模型提供可序列化方法'
     def to_dict(self, related=[], ignore=[]):
@@ -69,7 +70,7 @@ class Serializable:
         return json.dumps(self.pre_serialize(related=related, ignore=ignore))
 
     def _parse_args(self, args):
-        # 解析参数，按键值对分开，key为当前需要转换的属性，value为下一步迭代的参数
+        '解析参数，按键值对分开，key为当前需要转换的属性，value为下一步迭代的参数'
         parsed = {}
         for i in args:
             if ':' in i:
@@ -83,6 +84,27 @@ class Serializable:
                 else: parsed[temp[0]] = []
         return parsed
 
+    def is_valid(self):
+        '校验数据有效性'
+        return True
+
 
 class SerializableModel(Serializable, BaseModel):
     pass
+
+
+class MaxLengthValidator:
+    def __init__(self, max_length):
+        self.max_length = max_length
+        self.message = 'String length must be less than %d' % max_length
+
+    def __call__(self, key, string):
+        assert len(string) <= self.max_length, self.message
+        return string
+
+
+class IntegerValidator:
+    def __call__(self, key, value):
+        return int(value)
+
+

@@ -1,7 +1,7 @@
 
 from flask_fossen.http import JSONResponse
 from flask_fossen.models import Serializable
-from .base import SingleObjectMixin, CreateMixin, MethodView, BaseView
+from .base import SingleObjectMixin, CreateMixin, MethodView, BaseView, UpdateMixin
 
 
 class JSONResponseMixin:
@@ -10,16 +10,12 @@ class JSONResponseMixin:
         return JSONResponse(context, **response_kwargs)
 
 
-class BaseSingleResource(SingleObjectMixin, CreateMixin, BaseView):
+class BaseResource(SingleObjectMixin, UpdateMixin, BaseView):
     """Restful base single resource view"""
 
-    # PUT is a valid HTTP verb for creating (with a known URL) or editing an
-    # object, note that some browsers only support POST for now.
-    def put(self, *args, **kwargs):
-        return self.post(*args, **kwargs)
 
 
-class SingleResource(JSONResponseMixin, BaseSingleResource):
+class Resource(JSONResponseMixin, BaseResource):
 
     def get_context_data(self, **kwargs):
         """Convert object to serializable python data structure"""

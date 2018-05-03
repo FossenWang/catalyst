@@ -55,3 +55,8 @@ class SerializableModelTest(FlaskTestCase):
         admin = self.admin.to_json(ignore=['name', 'email', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:name','articles:author:email'],related=['articles:author'])
         self.assertEqual(admin, '{"id": 1, "articles": [{"id": 1, "author": {"id": 1}}]}')
 
+    def test_validator(self):
+        u=User(name='adsadasdsa')
+        print(u.name)
+        self.assertRaises(AssertionError, User, email='wrong email', name='asdqwasdsdasdas'*10)
+
