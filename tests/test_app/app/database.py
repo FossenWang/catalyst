@@ -4,8 +4,6 @@ from sqlalchemy.orm import relationship, validates
 
 from flask_fossen.models import SerializableModel, IdMixin
 
-class ValidationError(ValueError):
-    pass
 
 db = SQLAlchemy(model_class=SerializableModel)
 
@@ -20,6 +18,7 @@ class User(IdMixin, db.Model):
     @validates('name')
     def validate_name(self, key, string):
         col = self.__mapper__.columns[key]
+        assert isinstance(string, str), 'need str'
         assert len(string)<=col.type.length, 'str too long'
         return string
 

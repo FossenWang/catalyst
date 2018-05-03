@@ -92,19 +92,3 @@ class Serializable:
 class SerializableModel(Serializable, BaseModel):
     pass
 
-
-class MaxLengthValidator:
-    def __init__(self, max_length):
-        self.max_length = max_length
-        self.message = 'String length must be less than %d' % max_length
-
-    def __call__(self, key, string):
-        assert len(string) <= self.max_length, self.message
-        return string
-
-
-class IntegerValidator:
-    def __call__(self, key, value):
-        return int(value)
-
-
