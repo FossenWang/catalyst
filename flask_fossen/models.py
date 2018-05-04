@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer
 import json
 from collections import Iterable
+from .validators import generate_validators_from_mapper
 
 
 class IdMixin:
@@ -89,6 +90,61 @@ class Serializable:
         return True
 
 
-class SerializableModel(Serializable, BaseModel):
+#class SerializableModel(Serializable, BaseModel):
+#    pass
+
+
+class ValidationMixin:
+    """
+    提供校验模型数据有效性的方法
+    默认根据模型定义自动生成校验器
+    通过extra_validators添加校验器
+    如果要完全自己定义校验器
+    则需提供default_validators
+    default_validators = {'id': [integer_validator, ...], ...}
+    """
+    default_validators = None
+    extra_validators = None
+    required_fields = []
+
+    @classmethod
+    def validate_data(cls, data):
+        '校验数据的有效性，有效则返回(True, obj), 无效则返回(False, errors)'
+        if cls.default_validators is None:
+            # 从模型定义自动生成校验器
+            cls.default_validators, required = generate_validators_from_mapper(cls.__mapper__)
+            cls.required_fields += required
+
+        if cls.extra_validators is not None:
+            # 收集额外的校验器
+            for k, v in cls.extra_validators.items():
+                cls.default_validators[k] = v + cls.default_validators.get(k, [])
+            cls.extra_validators = None
+
+        errors = {}
+        # 校验数据并收集错误信息，无错则生成实例
+        for k in data:
+            results = []
+            for validator in cls.default_validators.get(k, []):
+                try:
+                    data[k] = validator(k, data[k])
+                except Exception as e:
+                    results.append(type(e).__name__+': '+str(e))
+            if results: errors[k] = results
+        for field in cls.required_fields:
+            value = data.get(field)
+            if value is None:
+                errors.get(field, []).append('ValueError: Ensure value is not None')
+        if errors:
+            return False, errors
+        else:
+            return True, cls(**data)
+
+
+class ValidationModel(ValidationMixin, BaseModel):
+    pass
+
+
+class SerializableModel(Serializable, ValidationModel):
     pass
 

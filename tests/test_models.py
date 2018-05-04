@@ -55,8 +55,19 @@ class SerializableModelTest(FlaskTestCase):
         admin = self.admin.to_json(ignore=['name', 'email', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:name','articles:author:email'],related=['articles:author'])
         self.assertEqual(admin, '{"id": 1, "articles": [{"id": 1, "author": {"id": 1}}]}')
 
-    def test_validator(self):
-        u=User(name='adsadasdsa')
-        print(u.name)
-        self.assertRaises(AssertionError, User, email='wrong email', name='asdqwasdsdasdas'*10)
+    def test_validate_data(self):
+        invalid_data = {'name':'adsadasdsa'*20, 'email': []}
+        valid, errors = User.validate_data(invalid_data)
+        self.assertEqual(valid, False)
+        self.assertEqual(errors, {'name': ['AssertionError: Ensure string length is less than or equal to 80'], 'email': ["AssertionError: Enter a string, not <class 'list'>"]})
+
+        valid, obj = User.validate_data(self.admin.pre_serialize())
+        self.assertEqual(valid, True)
+        self.assertIsInstance(obj, User)
+
+        valid_data = {'name':'admin', 'email': 'admin@fossen.cn'}
+        valid, obj = User.validate_data(valid_data)
+        self.assertEqual(valid, True)
+        self.assertIsInstance(obj, User)
+        self.assertEqual(obj.id, None)
 
