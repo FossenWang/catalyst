@@ -105,15 +105,16 @@ class ValidationMixin:
     """
     default_validators = None
     extra_validators = None
-    required_fields = []
+    required_fields = None
 
     @classmethod
     def validate_data(cls, data):
-        '校验数据的有效性，有效则返回(True, obj), 无效则返回(False, errors)'
+        '校验数据的有效性，有效则返回(True, errors), 无效则返回(False, errors)'
         if cls.default_validators is None:
             # 从模型定义自动生成校验器
             cls.default_validators, required = generate_validators_from_mapper(cls.__mapper__)
-            cls.required_fields += required
+            if cls.required_fields is None:
+                cls.required_fields = required
 
         if cls.extra_validators is not None:
             # 收集额外的校验器
@@ -132,13 +133,22 @@ class ValidationMixin:
                     results.append(type(e).__name__+': '+str(e))
             if results: errors[k] = results
         for field in cls.required_fields:
-            value = data.get(field)
-            if value is None:
-                errors.get(field, []).append('ValueError: Ensure value is not None')
-        if errors:
-            return False, errors
-        else:
-            return True, cls(**data)
+            if data.get(field) is None:
+                errors[field] = ['ValueError: Ensure value is not None']
+
+        return not errors, errors
+
+    @classmethod
+    def create(cls, validated_data):
+        return cls(**validated_data)
+
+    @classmethod
+    def update(cls, instance, validated_data):
+        assert isinstance(instance, cls)
+        for k, v in validated_data.items():
+            setattr(instance, k, v)
+        return instance
+
 
 
 class ValidationModel(ValidationMixin, BaseModel):

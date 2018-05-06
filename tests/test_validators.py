@@ -31,7 +31,7 @@ class ValidatorsTest(FlaskTestCase):
 
     def test_ValidatorMapper(self):
         _validators, required = generate_validators_from_mapper(User.__mapper__)
-        print(required)
+        self.assertEqual(required, ['name', 'email'])
         for vld in _validators['id']:
             self.assertIsInstance(vld, IntegerValidator)
         for vld in _validators['name']:

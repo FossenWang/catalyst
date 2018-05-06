@@ -15,17 +15,6 @@ class User(IdMixin, db.Model):
     def __str__(self):
         return self.name
 
-    ''' @validates('name')
-    def validate_name(self, key, string):
-        col = self.__mapper__.columns[key]
-        assert isinstance(string, str), 'need str'
-        assert len(string)<=col.type.length, 'str too long'
-        return string
-
-    @validates('email')
-    def validate_email(self, key, address):
-        assert '@' in address, 'Invalid email'
-        return address'''
 
 class Article(IdMixin, db.Model):
     title = Column(String(64), nullable=False)

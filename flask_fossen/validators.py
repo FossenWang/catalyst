@@ -37,8 +37,7 @@ class ValidatorMapper:
         cols = mapper.columns
         rels = mapper.relationships
         for k, col in cols.items():
-            print(col.nullable)
-            if not col.nullable:
+            if not col.nullable and not col.primary_key:
                 required_fields.append(k)
             get_validator = self.column_validator_map.get(type(col.type))
             if get_validator:

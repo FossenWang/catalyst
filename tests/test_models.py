@@ -61,13 +61,17 @@ class SerializableModelTest(FlaskTestCase):
         self.assertEqual(valid, False)
         self.assertEqual(errors, {'name': ['AssertionError: Ensure string length is less than or equal to 80'], 'email': ["AssertionError: Enter a string, not <class 'list'>"]})
 
-        valid, obj = User.validate_data(self.admin.pre_serialize())
-        self.assertEqual(valid, True)
-        self.assertIsInstance(obj, User)
+        invalid_data = {'name':'adsadasdsa'*20,}
+        valid, errors = User.validate_data(invalid_data)
+        self.assertEqual(valid, False)
+        self.assertEqual(errors, {'name': ['AssertionError: Ensure string length is less than or equal to 80'], 'email': ['ValueError: Ensure value is not None']})
 
         valid_data = {'name':'admin', 'email': 'admin@fossen.cn'}
-        valid, obj = User.validate_data(valid_data)
+        valid, errors = User.validate_data(valid_data)
         self.assertEqual(valid, True)
-        self.assertIsInstance(obj, User)
-        self.assertEqual(obj.id, None)
+        self.assertEqual(errors, {})
+
+        valid, errors = User.validate_data(self.admin.pre_serialize())
+        self.assertEqual(valid, True)
+        self.assertEqual(errors, {})
 

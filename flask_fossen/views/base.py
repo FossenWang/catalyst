@@ -96,32 +96,27 @@ class UpdateMixin:
     db = None
 
     def put(self, *args, **kwargs):
-        obj = self.get_object()
-        session = self.db.session
-        session.add(obj)
+        self.validator = self.get_validator()
         data = request.get_json()
-        for k in data:
-            setattr(obj, k, data[k])
-        if obj.is_valid():
-            return self.data_valid(obj)
+        is_valid, errors = self.validator.validate_data(data)
+        if is_valid:
+            return self.data_valid(data)
         else:
-            return self.data_invalid(obj)
+            return self.data_invalid(data, errors)
 
-        '''form = self.get_form()
-        if form.validate():
-            return self.form_valid(form)
-        else:
-            return self.form_invalid(form)'''
-
-    def validate_data(self):
-        return True
+    def get_validator(self):
+        '获取校验器，这里默认用的校验模型，需要用别的校验器覆盖此方法即可'
+        return self.model
 
     def data_valid(self, data):
+        obj = self.get_object()
+        self.validator.update(obj, data)
+        self.db.session.add(obj)
         self.db.session.commit()
-        return self.make_response(data.pre_serialize(), status=201)
+        return self.make_response(obj.pre_serialize(), status=201)
 
-    def data_invalid(self, data):
-        raise abort(400, 'invalid data')
+    def data_invalid(self, data, errors):
+        raise abort(400, {'errors': errors})
 
 
 class CreateMixin:
