@@ -97,21 +97,22 @@ class UpdateMixin:
 
     def put(self, *args, **kwargs):
         self.validator = self.get_validator()
-        data = request.get_json()
-        is_valid, errors = self.validator.validate_data(data)
+        self.data = request.get_json()
+        is_valid, errors = self.validator.validate_data(self.data)
         if is_valid:
-            return self.data_valid(data)
+            return self.data_valid(self.data)
         else:
-            return self.data_invalid(data, errors)
+            return self.data_invalid(self.data, errors)
 
     def get_validator(self):
-        '获取校验器，这里默认用的校验模型，需要用别的校验器覆盖此方法即可'
+        '''Get the validator, which is ValidationModel by default.
+        Override this method to get another validator.'''
         return self.model
 
     def data_valid(self, data):
         obj = self.get_object()
-        self.validator.update(obj, data)
         self.db.session.add(obj)
+        self.validator.update(obj, data)
         self.db.session.commit()
         return self.make_response(obj.pre_serialize(), status=201)
 

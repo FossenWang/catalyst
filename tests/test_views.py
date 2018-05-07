@@ -38,6 +38,14 @@ class ViewTest(FlaskTestCase):
         self.assertEqual(rsp.get_json(), {'id': 1, 'title': 'edited title', 'content': 'edited content', 'author_id': 1})
         edited = Article.query.filter_by(id=1).one()
         self.assertEqual(edited.pre_serialize(), {'id': 1, 'title': 'edited title', 'content': 'edited content', 'author_id': 1})
+        
+    def test_PUT_Resource_400(self):
+        before_put = Article.query.filter_by(id=1).one()
+        rsp = self.client.put('/api/articles/1', json={'invalid':'invalid', 'title': 'edited title', 'content': 'edited content', 'author_id':1})
+        self.assertEqual(rsp.status_code, 400)
+        self.assertEqual(rsp.get_json(), {'code': 400, 'message': {'errors': {'invalid': ["TypeError: 'invalid' is not a field of Article"]}}})
+        after_put = Article.query.filter_by(id=1).one()
+        self.assertEqual(before_put.pre_serialize(), after_put.pre_serialize())
 
     '''def test_POST_ResourceList(self):
         rsp = self.client.post('/api/articles', json={'title': 'new article', 'content': 'some content', 'author_id':1})

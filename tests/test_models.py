@@ -1,4 +1,5 @@
 from flask_fossen.testcases import FlaskTestCase
+from flask_fossen.validators import IntegerValidator, StringValidator, MaxLengthValidator
 
 from .test_app.app import create_app, db
 from .test_app.app.database import User, Article
@@ -75,3 +76,40 @@ class SerializableModelTest(FlaskTestCase):
         self.assertEqual(valid, True)
         self.assertEqual(errors, {})
 
+        invalid_data = {'email': []}
+        valid, errors = Article.validate_data(invalid_data)
+        self.assertEqual(valid, False)
+        self.assertEqual(errors, {'email': ["TypeError: 'email' is not a field of Article"],'title': ['ValueError: Ensure value is not None'], 'content': ['ValueError: Ensure value is not None'], 'author_id': ['ValueError: Ensure value is not None']})
+
+    def test_ValidationMeta_param(self):
+        self.assertIsInstance(Article._default_validators.get('id')[0], IntegerValidator)
+        self.assertIsInstance(Article._default_validators.get('title')[0], MaxLengthValidator)
+        self.assertIsInstance(Article._default_validators.get('author_id')[0], IntegerValidator)
+        self.assertEqual(Article._default_validators.get('author'), [])
+        self.assertEqual(Article._required_fields, ['title', 'content', 'author_id'])
+        self.assertEqual(hasattr(Article, '_extra_validators'), False)
+    
+        class A1(Article):
+            _default_validators = {'id': [IntegerValidator()], 'title': [StringValidator()]}
+            _extra_validators = {'title': [MaxLengthValidator]}
+            _required_fields = ['title']
+        self.assertIsInstance(A1._default_validators.get('id')[0], IntegerValidator)
+        self.assertIsInstance(A1._default_validators.get('title')[0], StringValidator)
+        self.assertEqual(A1._required_fields, ['title'])
+        self.assertEqual(hasattr(A1, '_extra_validators'), True)
+
+    def test_create_and_update_object(self):
+        valid_data = {'title':'Fossen is awesome!', 'content':'Fossen is awesome!', 'author_id':1}
+        valid, errors = Article.validate_data(valid_data)
+        self.assertEqual(valid, True)
+        self.assertEqual(errors, {})
+        a = Article.create(valid_data)
+        self.assertIsInstance(a, Article)
+        self.assertEqual(a.pre_serialize(), {'id': None, 'title':'Fossen is awesome!', 'content':'Fossen is awesome!', 'author_id':1})
+
+        a = self.articles[0]
+        old_value = a.pre_serialize()
+        Article.update(a, {'title':'Fossen is awesome!', 'content':'Fossen is awesome!', 'author_id':1})
+        new_value = a.pre_serialize()
+        self.assertNotEqual(old_value, new_value)
+        self.assertEqual(new_value, {'id': 1, 'title': 'Fossen is awesome!', 'content': 'Fossen is awesome!', 'author_id': 1})

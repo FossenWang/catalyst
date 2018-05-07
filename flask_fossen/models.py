@@ -1,6 +1,10 @@
-from sqlalchemy import Column, Integer
 import json
 from collections import Iterable
+
+from flask_sqlalchemy.model import DefaultMeta
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer
+
 from .validators import generate_validators_from_mapper
 
 
@@ -19,13 +23,21 @@ class BaseModel:
 
 
 class Serializable:
-    '为sqlalchemy的模型提供可序列化方法'
+    'Provide a serializable method for the sqlalchemy Model.'
     def to_dict(self, related=[], ignore=[]):
         '''
-        将模型转换为dict，默认转换所有数据属性和对象属性
-        并忽略对象中包含的对象，避免循环嵌套
-        ignore定义需要忽略的数据属性，':'后表示关联对象的数据属性，如ignore = ['id', 'related:id']
-        related指定要转为字典的关联对象，':'后表示嵌套的关联对象，如related = ['related:related']
+        Convert the model to dict. By default, it converts all
+        basic data attributes and ignores object attributes.
+
+        :param ignore: optional, specifies the data attributes
+        that need to be ignored, ':' to represent the data
+        attributes of the related object. Such as:
+        ignore = ['article_id', 'book:book_id']
+
+        :param related: optional, specifies the related object
+        to be converted to a dict, ':' to indicate the nested
+        related object. Such as:
+        related = ['book', 'book:author']
         '''
         results = {}
         for k in self.__mapper__.columns.keys():
@@ -52,10 +64,12 @@ class Serializable:
 
     def pre_serialize(self, related=[], ignore=[]):
         """
-        pre serialize objects to list or dict
+        Pre serialize objects to list or dict.
         two usages：
         1 handle one object: serializable.pre_serialize()
         2 handle objects list: Serializable.pre_serialize([serializable])
+
+        Other params are as same as self.to_dict.
         """
         if isinstance(self, Iterable):
             results = []
@@ -71,7 +85,11 @@ class Serializable:
         return json.dumps(self.pre_serialize(related=related, ignore=ignore))
 
     def _parse_args(self, args):
-        '解析参数，按键值对分开，key为当前需要转换的属性，value为下一步迭代的参数'
+        '''
+        Parsing params to key value pairs. Key is the attribute
+        that needs to be converted at present, and value is
+        the parameter of the next iteration.
+        '''
         parsed = {}
         for i in args:
             if ':' in i:
@@ -85,76 +103,95 @@ class Serializable:
                 else: parsed[temp[0]] = []
         return parsed
 
-    def is_valid(self):
-        '校验数据有效性'
-        return True
+
+class BaseSerializableModel(Serializable, BaseModel):
+    pass
 
 
-#class SerializableModel(Serializable, BaseModel):
-#    pass
+def _validate_data(cls, data):
+    '''
+    Validate data and collect the error information
+    if valid return (True, errors), else return (False, errors)
+    '''
+    errors = {}
+    for k in data:
+        results = []
+        validators = cls._default_validators.get(k)
 
-
-class ValidationMixin:
-    """
-    提供校验模型数据有效性的方法
-    默认根据模型定义自动生成校验器
-    通过extra_validators添加校验器
-    如果要完全自己定义校验器
-    则需提供default_validators
-    default_validators = {'id': [integer_validator, ...], ...}
-    """
-    default_validators = None
-    extra_validators = None
-    required_fields = None
-
-    @classmethod
-    def validate_data(cls, data):
-        '校验数据的有效性，有效则返回(True, errors), 无效则返回(False, errors)'
-        if cls.default_validators is None:
-            # 从模型定义自动生成校验器
-            cls.default_validators, required = generate_validators_from_mapper(cls.__mapper__)
-            if cls.required_fields is None:
-                cls.required_fields = required
-
-        if cls.extra_validators is not None:
-            # 收集额外的校验器
-            for k, v in cls.extra_validators.items():
-                cls.default_validators[k] = v + cls.default_validators.get(k, [])
-            cls.extra_validators = None
-
-        errors = {}
-        # 校验数据并收集错误信息，无错则生成实例
-        for k in data:
-            results = []
-            for validator in cls.default_validators.get(k, []):
+        if validators is None:
+            results.append("TypeError: '%s' is not a field of %s" % (k, cls.__name__))
+        else:
+            for validator in validators:
                 try:
                     data[k] = validator(k, data[k])
                 except Exception as e:
                     results.append(type(e).__name__+': '+str(e))
-            if results: errors[k] = results
-        for field in cls.required_fields:
-            if data.get(field) is None:
-                errors[field] = ['ValueError: Ensure value is not None']
+        
+        if results: errors[k] = results
 
-        return not errors, errors
+    for field in cls._required_fields:
+        if data.get(field) is None:
+            errors[field] = ['ValueError: Ensure value is not None']
 
-    @classmethod
-    def create(cls, validated_data):
-        return cls(**validated_data)
+    return not errors, errors
 
-    @classmethod
-    def update(cls, instance, validated_data):
-        assert isinstance(instance, cls)
-        for k, v in validated_data.items():
+def _create(cls, validated_data):
+    return cls(**validated_data)
+
+def _update(cls, instance, validated_data):
+    assert isinstance(instance, cls)
+    for k, v in validated_data.items():
+        if hasattr(instance, k):
             setattr(instance, k, v)
-        return instance
+        else:
+            raise TypeError("'%s' is not a field of %s" % (k, cls.__name__))
+    return instance
+
+class ValidationMeta(DefaultMeta):
+    """
+    Provides a method for validating the model data.
+    By default, validators are automatically generated
+    according to the model definition.
+
+    :param _default_validators: optional, customize default
+    validators. It must be a dict, in which key is
+    model field name, and value is a list of validators.
+    Example:
+    _default_validators = {'id': [integer_validator, ...], ...}
+    
+    :param _extra_validators: optional, add extra validators
+    to default validators.
+    Same structure as _default_validators.
+
+    :param _required_fields: optional, customize default
+    required fields. A list of model field names.
+    """
+    def __init__(cls, name, bases, d):
+        super().__init__(name, bases, d)
+        if hasattr(cls, '__mapper__'):
+            # Generate validators from Model definition
+            validators, required = generate_validators_from_mapper(cls.__mapper__)
+
+            if not hasattr(cls, '_default_validators'):
+                cls._default_validators = validators
+
+            if not hasattr(cls, '_required_fields'):
+                cls._required_fields = required
+
+            if hasattr(cls, '_extra_validators'):
+                # Collect additional validators
+                for k, v in cls._extra_validators.items():
+                    cls._default_validators[k] = cls._default_validators.get(k, []) + v
+
+            # Bind class method
+            cls.validate_data = classmethod(_validate_data)
+            cls.create = classmethod(_create)
+            cls.update = classmethod(_update)
 
 
 
-class ValidationModel(ValidationMixin, BaseModel):
-    pass
-
-
-class SerializableModel(Serializable, ValidationModel):
-    pass
-
+SerializableModel = declarative_base(
+    cls=BaseSerializableModel,
+    name='SerializableModel',
+    metaclass=ValidationMeta
+)

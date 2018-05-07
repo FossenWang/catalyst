@@ -26,12 +26,15 @@ class IntegerValidator:
 
 class ValidatorMapper:
     """
-    从mapper中读取模型字段定义，生成相应的校验器
-    返回两个参数
-    属性和校验器列表的字典 validator_map = {'id': [integer_validator, ...], ...}
-    必填属性列表 required_fields
+    Get model field definitions from the mapper
+    and generate the corresponding validator.
     """
     def __call__(self, mapper):
+        '''
+        Return a tuple of two values.
+        validator_map: mapping of model fields and validators list.
+        required_fields: required fields list.
+        '''
         validator_map = {}
         required_fields = []
         cols = mapper.columns
@@ -42,6 +45,8 @@ class ValidatorMapper:
             get_validator = self.column_validator_map.get(type(col.type))
             if get_validator:
                 validator_map[k] = get_validator(self, col)
+            else:
+                validator_map[k] = []
         # 关联字段的校验器
         for k, rel in rels.items():
             validator_map[k] = self.get_relationship_validator(rel)
