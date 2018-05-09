@@ -1,7 +1,7 @@
 
 from flask_fossen.http import JSONResponse
 from flask_fossen.models import Serializable
-from .base import SingleObjectMixin, CreateMixin, MethodView, BaseView, UpdateMixin
+from .base import SingleObjectMixin, CreateMixin, BaseView, UpdateMixin, DeleteMixin, MultipleObjectMixin
 
 
 class JSONResponseMixin:
@@ -10,13 +10,24 @@ class JSONResponseMixin:
         return JSONResponse(context, **response_kwargs)
 
 
-class BaseResource(SingleObjectMixin, UpdateMixin, BaseView):
-    """Restful base single resource view"""
-
+class BaseResource(SingleObjectMixin, UpdateMixin, DeleteMixin, BaseView):
+    """Base single resource view"""
 
 
 class Resource(JSONResponseMixin, BaseResource):
+    """
+    Restful single resource view which can
+    show, edit and delete a single resource.
+    """
 
-    def get_context_data(self, **kwargs):
-        """Convert object to serializable python data structure"""
-        return self.object.pre_serialize()
+
+class BaseResourceList(MultipleObjectMixin, CreateMixin, BaseView):
+    """Base resource list view"""
+
+
+class ResourceList(JSONResponseMixin, BaseResourceList):
+    """
+    Restful resource list view which can show a
+    list of resources and create a new resource.
+    """
+

@@ -1,7 +1,7 @@
 from flask import Blueprint
 from wtforms.ext.sqlalchemy.orm import model_form
 
-from flask_fossen.views.rest import Resource
+from flask_fossen.views.rest import Resource, ResourceList
 from flask_fossen.http import register_json_error_handle
 
 from .database import User, Article, db
@@ -19,12 +19,16 @@ class ArticleView(Resource):
     model = Article
     db = db
 
-
+class ArticleList(ResourceList):
+    model = Article
+    db = db
 
 # url config
 bp = Blueprint('api', __name__, url_prefix='/api')
 bp.add_url_rule('/', view_func=index)
 bp.add_url_rule('/articles/<int:id>', view_func=ArticleView.as_view('article'))
+bp.add_url_rule('/articles', view_func=ArticleList.as_view('article_list'))
+
 
 register_json_error_handle(bp)
 

@@ -1,7 +1,7 @@
 from flask import request, abort
 from flask.views import View, MethodView
 from sqlalchemy.orm.exc import NoResultFound
-
+from sqlalchemy.orm.query import Query
 
 
 class BaseView(MethodView):
@@ -45,16 +45,18 @@ class SingleObjectMixin(ContextMixin):
         may not be called if get_object() is overridden.
         """
         if self.query is None:
-            if self.model:
+            if self.model is not None:
                 return self.model.query
             else:
-                raise ValueError(
+                raise TypeError(
                     "%(cls)s is missing a query. Define "
                     "%(cls)s.model, %(cls)s.query, or override "
                     "%(cls)s.get_query()." % {
                         'cls': self.__class__.__name__
                     }
                 )
+        assert isinstance(self.query, Query), \
+        "'query' Must be an instance of 'sqlalchemy.orm.query.Query'"
         return self.query
 
     def get_object(self, query=None):
@@ -79,19 +81,114 @@ class SingleObjectMixin(ContextMixin):
             # Get the single item from the filtered query
             obj = query.one()
         except NoResultFound:
-            raise abort(404)
+            raise abort(404, 'Resource not found')
         return obj
 
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **context):
         """Insert the single object into the context dict."""
-        context = {}
         if self.object:
-            context['object'] = self.object
-        context.update(kwargs)
+            context.update(self.object.pre_serialize())
         return super().get_context_data(**context)
 
 
-class UpdateMixin:
+class MultipleObjectMixin(ContextMixin):
+    """A mixin for views manipulating multiple objects."""
+    model = None
+    query = None
+    limit = None
+    offset = None
+    ordering = None
+    _total = None
+
+    def get(self, *args, **kwargs):
+        self.object_list = self.get_object_list()
+        return self.make_response(self.get_context_data())
+
+    def get_query(self):
+        """
+        Return the list of items for this view.
+        Must be an instance of 'Query'.
+        """
+        if self.query is None:
+            if self.model is not None:
+                query = self.model.query
+            else:
+                raise TypeError(
+                    "%(cls)s is missing a query. Define "
+                    "%(cls)s.model, %(cls)s.query, or override "
+                    "%(cls)s.get_query()." % {
+                        'cls': self.__class__.__name__
+                    }
+                )
+        assert isinstance(query, Query), \
+        "'query' Must be an instance of 'sqlalchemy.orm.query.Query'"
+
+        if self.ordering:
+            query = query.order_by(self.ordering)
+
+        return query
+
+
+    def paginate_query(self, query):
+        """
+        paginate query by offset and limit,
+        override this method to provide other pagination method
+        """
+        offset = request.args.get('offset', self.offset)
+        query = query.offset(offset)
+
+        limit = request.args.get('limit', self.limit)
+        query = query.limit(limit)
+
+        total = self.get_total()
+        if limit is None: limit = -1
+        if offset is None: offset = 0
+        try:
+            self.paging = {'total': total, 'next': False if int(limit)<0 else total > (int(limit) + int(offset))}
+        except ValueError:
+            raise abort(400, "Offset or limit must an integer")
+
+        if int(offset) > total or limit == 0:
+            # 减少不必要的数据库访问
+            query.all = lambda:[]
+        return query
+
+    def get_total(self):
+        cls = self.__class__
+        if cls._total is None:
+            cls._total = self.get_query().count()
+        return cls._total
+
+    def get_object_list(self):
+        return self.paginate_query(self.get_query()).all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.paging is not None:
+            context['paging'] = self.paging
+        if self.object_list is not None:
+            context['data'] = self.model.pre_serialize(self.object_list)
+        return context
+
+
+
+class ValidatorMixin:
+    def get_validator(self):
+        '''Get the validator, which is ValidationModel by default.
+        Override this method to get another validator.'''
+        return self.model
+
+    def data_valid(self, data, extra={}):
+        obj = self.save_object(data)
+        context = obj.pre_serialize()
+        context.update(extra)
+        return self.make_response(context, status=201)
+
+    def data_invalid(self, data, errors, **kwargs):
+        raise abort(400, {'invalid data': data, 'errors': errors})
+
+
+class UpdateMixin(ValidatorMixin):
     """Update a single object."""
     db = None
 
@@ -104,50 +201,40 @@ class UpdateMixin:
         else:
             return self.data_invalid(self.data, errors)
 
-    def get_validator(self):
-        '''Get the validator, which is ValidationModel by default.
-        Override this method to get another validator.'''
-        return self.model
-
-    def data_valid(self, data):
+    def save_object(self, data):
         obj = self.get_object()
         self.db.session.add(obj)
         self.validator.update(obj, data)
         self.db.session.commit()
-        return self.make_response(obj.pre_serialize(), status=201)
-
-    def data_invalid(self, data, errors):
-        raise abort(400, {'errors': errors})
+        return obj
 
 
-class CreateMixin:
+class CreateMixin(ValidatorMixin):
     """Create a single object."""
     db = None
 
     def post(self, *args, **kwargs):
-        obj = self.get_object()
-        session = self.db.session
-        session.add(obj)
-        data = request.get_json()
-        for k in data:
-            setattr(obj, k, data[k])
-        if session.dirty:
-            session.commit()
-        return self.make_response(obj.pre_serialize(), status=201)
-        '''form = self.get_form()
-        if form.validate():
-            return self.form_valid(form)
+        self.validator = self.get_validator()
+        self.data = request.get_json()
+        is_valid, errors = self.validator.validate_data(self.data)
+        if is_valid:
+            return self.data_valid(self.data)
         else:
-            return self.form_invalid(form)'''
+            return self.data_invalid(self.data, errors)
 
-    def get_form(self):
-        pass
-
-    def form_valid(self, form):
-        pass
-
-    def form_invalid(self, form):
-        pass
+    def save_object(self, data):
+        obj = self.validator.create(data)
+        self.db.session.add(obj)
+        self.db.session.commit()
+        return obj
 
 
+class DeleteMixin:
+    """Delete a single object."""
+    db = None
+    def delete(self, *args, **kwargs):
+        obj = self.get_object()
+        self.db.session.delete(obj)
+        self.db.session.commit()
+        return self.make_response('', status=204)
 
