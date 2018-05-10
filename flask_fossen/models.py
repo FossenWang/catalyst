@@ -116,7 +116,7 @@ def _validate_data(cls, data):
     errors = {}
     for k in data:
         results = []
-        validators = cls._default_validators.get(k)
+        validators = cls._meta.default_validators.get(k)
 
         if validators is None:
             results.append("TypeError: '%s' is not a field of %s" % (k, cls.__name__))
@@ -129,7 +129,7 @@ def _validate_data(cls, data):
         
         if results: errors[k] = results
 
-    for field in cls._required_fields:
+    for field in cls._meta.required_fields:
         if data.get(field) is None:
             errors[field] = ['ValueError: Ensure value is not None']
 
@@ -153,41 +153,54 @@ class ValidationMeta(DefaultMeta):
     By default, validators are automatically generated
     according to the model definition.
 
-    :param _default_validators: optional, customize default
+    Params below must be defined in an inner class Meta
+
+    :param default_validators: optional, customize default
     validators. It must be a dict, in which key is
     model field name, and value is a list of validators.
     Example:
-    _default_validators = {'id': [integer_validator, ...], ...}
+    default_validators = {'id': [integer_validator, ...], ...}
     
-    :param _extra_validators: optional, add extra validators
+    :param extra_validators: optional, add extra validators
     to default validators.
-    Same structure as _default_validators.
+    Same structure as default_validators.
 
-    :param _required_fields: optional, customize default
+    :param required_fields: optional, customize default
     required fields. A list of model field names.
     """
     def __init__(cls, name, bases, d):
         super().__init__(name, bases, d)
+        
+        if hasattr(cls, 'Meta'):
+            meta = cls.Meta
+            del cls.Meta
+        else:
+            meta = type('Meta', (object,), {})
+
+        if not hasattr(meta, 'total'):
+            meta.total = None
+
         if hasattr(cls, '__mapper__'):
             # Generate validators from Model definition
             validators, required = generate_validators_from_mapper(cls.__mapper__)
 
-            if not hasattr(cls, '_default_validators'):
-                cls._default_validators = validators
+            if not hasattr(meta, 'default_validators'):
+                meta.default_validators = validators
 
-            if not hasattr(cls, '_required_fields'):
-                cls._required_fields = required
-
-            if hasattr(cls, '_extra_validators'):
+            if not hasattr(meta, 'required_fields'):
+                meta.required_fields = required
+            
+            if hasattr(meta, 'extra_validators'):
                 # Collect additional validators
-                for k, v in cls._extra_validators.items():
-                    cls._default_validators[k] = cls._default_validators.get(k, []) + v
-
-            # Bind class method
+                for k, v in meta.extra_validators.items():
+                    meta.default_validators[k] = meta.default_validators.get(k, []) + v
+            
+            # Bind class method and attribute
             cls.validate_data = classmethod(_validate_data)
             cls.create = classmethod(_create)
             cls.update = classmethod(_update)
-
+        
+        cls._meta = meta
 
 
 SerializableModel = declarative_base(

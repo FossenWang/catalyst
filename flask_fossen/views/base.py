@@ -98,7 +98,7 @@ class MultipleObjectMixin(ContextMixin):
     limit = None
     offset = None
     ordering = None
-    _total = None
+    serialize_object_list = True
 
     def get(self, *args, **kwargs):
         self.object_list = self.get_object_list()
@@ -128,54 +128,74 @@ class MultipleObjectMixin(ContextMixin):
 
         return query
 
-
     def paginate_query(self, query):
         """
         paginate query by offset and limit,
         override this method to provide other pagination method
         """
-        offset = request.args.get('offset', self.offset)
-        query = query.offset(offset)
-
-        limit = request.args.get('limit', self.limit)
-        query = query.limit(limit)
-
         total = self.get_total()
-        if limit is None: limit = -1
-        if offset is None: offset = 0
-        try:
-            self.paging = {'total': total, 'next': False if int(limit)<0 else total > (int(limit) + int(offset))}
-        except ValueError:
-            raise abort(400, "Offset or limit must an integer")
+        limit = self.get_limit()
+        offset = self.get_offset()
 
-        if int(offset) > total or limit == 0:
-            # 减少不必要的数据库访问
+        query = query.limit(limit).offset(offset)
+
+        if offset >= total or limit == 0:
+            # Reduce unnecessary database access.
             query.all = lambda:[]
+        
+        self.paging = {'total': total, 'next': total > (limit + offset) and limit >= 0}
         return query
 
+    def get_limit(self):
+        limit = request.args.get('limit', self.limit)
+        try:
+            if limit is None:
+                limit = -1
+            else:
+                limit = int(limit)
+        except ValueError:
+            raise abort(400, "Offset or limit must an integer")
+        return limit
+
+    def get_offset(self):
+        offset = request.args.get('offset', self.offset)
+        try:
+            if offset is None:
+                offset = 0
+            else:
+                offset = int(offset)
+        except ValueError:
+            raise abort(400, "Offset or limit must an integer")
+        return offset
+
     def get_total(self):
-        cls = self.__class__
-        if cls._total is None:
-            cls._total = self.get_query().count()
-        return cls._total
+        meta = self.model._meta
+        if meta.total is None:
+            meta.total = self.get_query().count()
+        return meta.total
 
     def get_object_list(self):
-        return self.paginate_query(self.get_query()).all()
+        object_list = self.paginate_query(self.get_query()).all()
+        if self.serialize_object_list:
+            object_list = self.pre_serialize_object_list(object_list)
+        return object_list
+
+    def pre_serialize_object_list(self, object_list, related=[], ignore=[]):
+        return self.model.pre_serialize(object_list, related=related, ignore=ignore)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if self.paging is not None:
             context['paging'] = self.paging
         if self.object_list is not None:
-            context['data'] = self.model.pre_serialize(self.object_list)
+            context['data'] = self.object_list
         return context
-
 
 
 class ValidatorMixin:
     def get_validator(self):
         '''Get the validator, which is ValidationModel by default.
-        Override this method to get another validator.'''
+        Override this method to use custom validator.'''
         return self.model
 
     def data_valid(self, data, extra={}):
@@ -226,6 +246,7 @@ class CreateMixin(ValidatorMixin):
         obj = self.validator.create(data)
         self.db.session.add(obj)
         self.db.session.commit()
+        self.model._meta.total = None    # 清空总数的缓存
         return obj
 
 
@@ -236,5 +257,6 @@ class DeleteMixin:
         obj = self.get_object()
         self.db.session.delete(obj)
         self.db.session.commit()
+        self.model._meta.total = None    # 清空总数的缓存
         return self.make_response('', status=204)
 

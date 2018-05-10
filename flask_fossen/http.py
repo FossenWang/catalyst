@@ -14,16 +14,12 @@ class JSONResponse(Response):
         super().__init__(response=response, status=status, content_type=content_type, **kwargs)
 
 
-class JSONResponseBadRequest(JSONResponse):
-    default_status = 400
-
-
 def handle_http_exception(e):
     if e.description and e.code in default_exceptions:
         description = e.description
     else:
         description = default_exceptions[e.code].description
-    return JSONResponse({'code': e.code, 'message': description}, status=e.code)
+    return JSONResponse(description, status=e.code)
 
 
 def register_json_error_handle(app):

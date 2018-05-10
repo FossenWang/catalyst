@@ -82,21 +82,22 @@ class SerializableModelTest(FlaskTestCase):
         self.assertEqual(errors, {'email': ["TypeError: 'email' is not a field of Article"],'title': ['ValueError: Ensure value is not None'], 'content': ['ValueError: Ensure value is not None'], 'author_id': ['ValueError: Ensure value is not None']})
 
     def test_ValidationMeta_param(self):
-        self.assertIsInstance(Article._default_validators.get('id')[0], IntegerValidator)
-        self.assertIsInstance(Article._default_validators.get('title')[0], MaxLengthValidator)
-        self.assertIsInstance(Article._default_validators.get('author_id')[0], IntegerValidator)
-        self.assertEqual(Article._default_validators.get('author'), [])
-        self.assertEqual(Article._required_fields, ['title', 'content', 'author_id'])
-        self.assertEqual(hasattr(Article, '_extra_validators'), False)
+        self.assertIsInstance(Article._meta.default_validators.get('id')[0], IntegerValidator)
+        self.assertIsInstance(Article._meta.default_validators.get('title')[0], MaxLengthValidator)
+        self.assertIsInstance(Article._meta.default_validators.get('author_id')[0], IntegerValidator)
+        self.assertEqual(Article._meta.default_validators.get('author'), [])
+        self.assertEqual(Article._meta.required_fields, ['title', 'content', 'author_id'])
+        self.assertEqual(hasattr(Article._meta, 'extra_validators'), False)
     
         class A1(Article):
-            _default_validators = {'id': [IntegerValidator()], 'title': [StringValidator()]}
-            _extra_validators = {'title': [MaxLengthValidator]}
-            _required_fields = ['title']
-        self.assertIsInstance(A1._default_validators.get('id')[0], IntegerValidator)
-        self.assertIsInstance(A1._default_validators.get('title')[0], StringValidator)
-        self.assertEqual(A1._required_fields, ['title'])
-        self.assertEqual(hasattr(A1, '_extra_validators'), True)
+            class Meta:
+                default_validators = {'id': [IntegerValidator()], 'title': [StringValidator()]}
+                extra_validators = {'title': [MaxLengthValidator]}
+                required_fields = ['title']
+        self.assertIsInstance(A1._meta.default_validators.get('id')[0], IntegerValidator)
+        self.assertIsInstance(A1._meta.default_validators.get('title')[0], StringValidator)
+        self.assertEqual(A1._meta.required_fields, ['title'])
+        self.assertEqual(hasattr(A1._meta, 'extra_validators'), True)
 
     def test_create_and_update_object(self):
         valid_data = {'title':'Fossen is awesome!', 'content':'Fossen is awesome!', 'author_id':1}

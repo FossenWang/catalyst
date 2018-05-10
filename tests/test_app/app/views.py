@@ -23,6 +23,9 @@ class ArticleList(ResourceList):
     model = Article
     db = db
 
+    def pre_serialize_object_list(self, object_list, related=['author'], ignore=['author_id']):
+        return super().pre_serialize_object_list(object_list, related=related, ignore=ignore)
+
 # url config
 bp = Blueprint('api', __name__, url_prefix='/api')
 bp.add_url_rule('/', view_func=index)
