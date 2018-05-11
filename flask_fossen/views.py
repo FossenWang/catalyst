@@ -3,6 +3,9 @@ from flask.views import View, MethodView
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.query import Query
 
+from .http import JSONResponse
+from .models import Serializable
+
 
 class BaseView(MethodView):
     def dispatch_request(self, *args, **kwargs):
@@ -32,6 +35,7 @@ class SingleObjectMixin(ContextMixin):
     model = None
     query = None
     id_url_kwarg = 'id'
+    serializing = True
 
     def get(self, *args, **kwargs):
         self.object = self.get_object()
@@ -84,10 +88,16 @@ class SingleObjectMixin(ContextMixin):
             raise abort(404, 'Resource not found')
         return obj
 
+    def serialize_object(self, obj, related=[], ignore=[]):
+        return obj.serialize(related=related, ignore=ignore)
+
     def get_context_data(self, **context):
         """Insert the single object into the context dict."""
         if self.object:
-            context.update(self.object.pre_serialize())
+            if self.serializing:
+                context.update(self.serialize_object(self.object))
+            else:
+                context['object'] = self.object
         return super().get_context_data(**context)
 
 
@@ -98,7 +108,7 @@ class MultipleObjectMixin(ContextMixin):
     limit = None
     offset = None
     ordering = None
-    serialize_object_list = True
+    serializing = True
 
     def get(self, *args, **kwargs):
         self.object_list = self.get_object_list()
@@ -169,26 +179,32 @@ class MultipleObjectMixin(ContextMixin):
         return offset
 
     def get_total(self):
+        '''
+        Only get and cache the whole rows of an table.
+        Override this to get various sums.
+        '''
         meta = self.model._meta
         if meta.total is None:
-            meta.total = self.get_query().count()
+            meta.total = self.model.query.count()
         return meta.total
 
     def get_object_list(self):
         object_list = self.paginate_query(self.get_query()).all()
-        if self.serialize_object_list:
-            object_list = self.pre_serialize_object_list(object_list)
         return object_list
 
-    def pre_serialize_object_list(self, object_list, related=[], ignore=[]):
-        return self.model.pre_serialize(object_list, related=related, ignore=ignore)
+    def serialize_object_list(self, object_list, related=[], ignore=[]):
+        return self.model.serialize(object_list, related=related, ignore=ignore)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if self.paging is not None:
             context['paging'] = self.paging
         if self.object_list is not None:
-            context['data'] = self.object_list
+            if self.serializing:
+                object_list = self.serialize_object_list(self.object_list)
+            else:
+                object_list = self.object_list
+            context['data'] = object_list
         return context
 
 
@@ -200,7 +216,7 @@ class ValidatorMixin:
 
     def data_valid(self, data, extra={}):
         obj = self.save_object(data)
-        context = obj.pre_serialize()
+        context = obj.serialize()
         context.update(extra)
         return self.make_response(context, status=201)
 
@@ -259,4 +275,32 @@ class DeleteMixin:
         self.db.session.commit()
         self.model._meta.total = None    # 清空总数的缓存
         return self.make_response('', status=204)
+
+
+class JSONResponseMixin:
+    """Return JSON response"""
+    def make_response(self, context, **response_kwargs):
+        return JSONResponse(context, **response_kwargs)
+
+
+class BaseResource(SingleObjectMixin, UpdateMixin, DeleteMixin, BaseView):
+    """Base single resource view"""
+
+
+class Resource(JSONResponseMixin, BaseResource):
+    """
+    Restful single resource view which can
+    show, edit and delete a single resource.
+    """
+
+
+class BaseResourceList(MultipleObjectMixin, CreateMixin, BaseView):
+    """Base resource list view"""
+
+
+class ResourceList(JSONResponseMixin, BaseResourceList):
+    """
+    Restful resource list view which can show a
+    list of resources and create a new resource.
+    """
 

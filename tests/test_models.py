@@ -45,12 +45,21 @@ class SerializableModelTest(FlaskTestCase):
         self.assertEqual(admin, {'id': 1, 'articles': [{'id': 1, 'author': {'id': 1}}]})
         self.assertEqual(adict,[{'id': 1, 'author': {'id': 1, 'articles': [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1}]}}])
 
-    def test_pre_serialize(self):
-        admin = self.admin.pre_serialize(ignore=['name', 'email', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:name','articles:author:email'],related=['articles:author'])
-        adict = Article.pre_serialize(self.articles, ignore=['title', 'content', 'author_id', 'author:name', 'author:email'], related=['author:articles'])
+    def test_serialize(self):
+        admin = self.admin.serialize(ignore=['name', 'email', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:name','articles:author:email'],related=['articles:author'])
+        adict = Article.serialize(self.articles, ignore=['title', 'content', 'author_id', 'author:name', 'author:email'], related=['author:articles'])
         self.assertEqual(admin, {'id': 1, 'articles': [{'id': 1, 'author': {'id': 1}}]})
         self.assertEqual(adict,[{'id': 1, 'author': {'id': 1, 'articles': [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1}]}}])
-        self.assertRaises(AssertionError, Article.pre_serialize, [self.articles[0], 0])
+        self.assertRaises(AssertionError, Article.serialize, [self.articles[0], 0])
+
+    def test_Meta_serialization_options(self):
+        class A(Article):
+            class Meta:
+                serialize_related = ['author']
+                serialize_ignore = ['id', 'author_id', 'author:id']
+        data = [A(title='article:%d'%i, content='test article:%d'%i, author_id=1, author=self.admin) for i in range(1)]
+        results = A.serialize(data)
+        self.assertEqual(results, [{'title': 'article:0', 'content': 'test article:0', 'author': {'name': 'admin', 'email': 'admin@fossen.cn'}}])
 
     def test_to_json(self):
         admin = self.admin.to_json(ignore=['name', 'email', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:name','articles:author:email'],related=['articles:author'])
@@ -72,7 +81,7 @@ class SerializableModelTest(FlaskTestCase):
         self.assertEqual(valid, True)
         self.assertEqual(errors, {})
 
-        valid, errors = User.validate_data(self.admin.pre_serialize())
+        valid, errors = User.validate_data(self.admin.serialize())
         self.assertEqual(valid, True)
         self.assertEqual(errors, {})
 
@@ -106,11 +115,11 @@ class SerializableModelTest(FlaskTestCase):
         self.assertEqual(errors, {})
         a = Article.create(valid_data)
         self.assertIsInstance(a, Article)
-        self.assertEqual(a.pre_serialize(), {'id': None, 'title':'Fossen is awesome!', 'content':'Fossen is awesome!', 'author_id':1})
+        self.assertEqual(a.serialize(), {'id': None, 'title':'Fossen is awesome!', 'content':'Fossen is awesome!', 'author_id':1})
 
         a = self.articles[0]
-        old_value = a.pre_serialize()
+        old_value = a.serialize()
         Article.update(a, {'title':'Fossen is awesome!', 'content':'Fossen is awesome!', 'author_id':1})
-        new_value = a.pre_serialize()
+        new_value = a.serialize()
         self.assertNotEqual(old_value, new_value)
         self.assertEqual(new_value, {'id': 1, 'title': 'Fossen is awesome!', 'content': 'Fossen is awesome!', 'author_id': 1})

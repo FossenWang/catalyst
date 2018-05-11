@@ -73,7 +73,7 @@ class ViewTest(FlaskTestCase):
         self.assertEqual(rsp.status_code, 400)
         self.assertEqual(rsp.get_json(), {'errors': {'invalid': ["TypeError: 'invalid' is not a field of Article"]}, 'invalid data': {'author_id': 1,'content': 'edited content','invalid': 'this is a invalid field','title': 'edited title'}})
         after_put = Article.query.filter_by(id=1).one()
-        self.assertEqual(before_put.pre_serialize(), after_put.pre_serialize())
+        self.assertEqual(before_put.serialize(), after_put.serialize())
         # POST
         rsp = self.client.post('/api/articles', json=invalid_data)
         self.assertEqual(rsp.status_code, 400)
@@ -95,7 +95,7 @@ class ViewTest(FlaskTestCase):
         data.update({'id':aid})
         self.assertEqual(rsp.get_json(), data)
         edited = Article.query.filter_by(id=aid).one()
-        self.assertEqual(edited.pre_serialize(), data)
+        self.assertEqual(edited.serialize(), data)
         # DELETE
         rsp = self.client.delete('/api/articles/%s'%aid)
         self.assertEqual(rsp.status_code, 204)

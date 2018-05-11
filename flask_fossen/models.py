@@ -40,34 +40,38 @@ class Serializable:
         related = ['book', 'book:author']
         '''
         results = {}
-        for k in self.__mapper__.columns.keys():
-            if k not in ignore: results[k] = getattr(self, k)
+        for name in self.__mapper__.columns.keys():
+            if name not in ignore:
+                value = getattr(self, name)
+                if isinstance(value, (int, str, float, type(None), bool)):
+                    results[name] = value
+                else:
+                    results[name] = str(value)
 
         parsed_ralated = self._parse_args(related)
         parsed_ignore = self._parse_args(ignore)
 
-        for k, v in self.__mapper__.relationships.items():
-            # k为关系的属性名，v为关系对象sqlalchemy.orm.relationship
-            if k not in parsed_ralated: continue
-            if v.uselist:
-                results[k] = [i.to_dict(
-                    ignore=parsed_ignore.get(k,[]),
-                    related=parsed_ralated.get(k,[]),
+        for name, relationship in self.__mapper__.relationships.items():
+            if name not in parsed_ralated: continue
+            if relationship.uselist:
+                results[name] = [i.to_dict(
+                    ignore=parsed_ignore.get(name,[]),
+                    related=parsed_ralated.get(name,[]),
                     )
-                    for i in getattr(self, k)]
+                    for i in getattr(self, name)]
             else:
-                results[k] = getattr(self, k).to_dict(
-                    ignore=parsed_ignore.get(k,[]),
-                    related=parsed_ralated.get(k,[]),
+                results[name] = getattr(self, name).to_dict(
+                    ignore=parsed_ignore.get(name,[]),
+                    related=parsed_ralated.get(name,[]),
                     )
         return results
 
-    def pre_serialize(self, related=[], ignore=[]):
+    def serialize(self, related=[], ignore=[]):
         """
-        Pre serialize objects to list or dict.
+        Serialize objects to list or dict.
         two usages：
-        1 handle one object: serializable.pre_serialize()
-        2 handle objects list: Serializable.pre_serialize([serializable])
+        1 handle one object: serializable.serialize()
+        2 handle objects list: Serializable.serialize([serializable])
 
         Other params are as same as self.to_dict.
         """
@@ -75,14 +79,18 @@ class Serializable:
             results = []
             for i in self:
                 assert isinstance(i, Serializable), 'The object is not Serializable.'
+                if not related: related = getattr(i.__class__._meta, 'serialize_related', [])
+                if not ignore: ignore = getattr(i.__class__._meta, 'serialize_ignore', [])
                 results.append(i.to_dict(related=related, ignore=ignore))
             return results
         else:
             assert isinstance(self, Serializable), 'The object is not Serializable.'
+            if not related: related = getattr(self.__class__._meta, 'serialize_related', [])
+            if not ignore: ignore = getattr(self.__class__._meta, 'serialize_ignore', [])
             return self.to_dict(related=related, ignore=ignore)
 
     def to_json(self, related=[], ignore=[]):
-        return json.dumps(self.pre_serialize(related=related, ignore=ignore))
+        return json.dumps(self.serialize(related=related, ignore=ignore))
 
     def _parse_args(self, args):
         '''
