@@ -11,7 +11,7 @@ from .validators import generate_validators_from_mapper
 class IdMixin:
     id = Column(Integer, primary_key=True)
     def __str__(self):
-        return self.id
+        return str(self.id)
 
 
 class BaseModel:

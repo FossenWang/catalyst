@@ -66,6 +66,7 @@ class ValidatorMapper:
         cols = mapper.columns
         rels = mapper.relationships
         for k, col in cols.items():
+            k = col.name
             if not col.nullable and not col.primary_key:
                 required_fields.append(k)
             get_validator = column_validator_map.get(type(col.type), get_empty_validator)

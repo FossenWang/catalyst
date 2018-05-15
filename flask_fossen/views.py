@@ -209,6 +209,9 @@ class MultipleObjectMixin(ContextMixin):
 
 
 class ValidatorMixin:
+    def get_data(self):
+        return request.get_json()
+
     def get_validator(self):
         '''Get the validator, which is ValidationModel by default.
         Override this method to use custom validator.'''
@@ -230,7 +233,7 @@ class UpdateMixin(ValidatorMixin):
 
     def put(self, *args, **kwargs):
         self.validator = self.get_validator()
-        self.data = request.get_json()
+        self.data = self.get_data()
         is_valid, errors = self.validator.validate_data(self.data)
         if is_valid:
             return self.data_valid(self.data)
@@ -251,7 +254,7 @@ class CreateMixin(ValidatorMixin):
 
     def post(self, *args, **kwargs):
         self.validator = self.get_validator()
-        self.data = request.get_json()
+        self.data = self.get_data()
         is_valid, errors = self.validator.validate_data(self.data)
         if is_valid:
             return self.data_valid(self.data)
