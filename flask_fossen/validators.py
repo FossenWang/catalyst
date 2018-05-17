@@ -1,4 +1,5 @@
-from sqlalchemy.sql.sqltypes import Integer, String, Boolean
+import re
+from .coltypes import Integer, String, Boolean, EmailType, PasswordType
 
 
 class StringValidator:
@@ -18,6 +19,45 @@ class MaxLengthValidator(StringValidator):
         return string
 
 
+class RegexValidator(StringValidator):
+    def __init__(self):
+        self.message = "Enter a valid value"
+        self.regex = ''
+
+    def __call__(self, key, value):
+        super().__call__(key, value)
+        assert re.match(self.regex, value), self.message
+        return value
+
+
+class EmailValidator(RegexValidator):
+    def __init__(self):
+        self.message = "Enter a valid email address"
+        self.regex = r'^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$'
+
+
+class PasswordValidator(StringValidator):
+    def __init__(self, minlength, maxlength):
+        self.minlength = minlength
+        self.maxlength = maxlength
+
+    def __call__(self, key, password):
+        super().__call__(key, password)
+        assert len(password) >= 6 and len(password)<=20, 'Password length must be greater than 6 and less than 20'
+        have_number, have_letter, have_special= False, False, False
+        for c in password:
+            if c in '1234567890':
+                have_number = True
+            elif re.match('[a-z]', c):
+                have_letter = True
+            elif c in ',.?;_!@#$%^&*?':
+                have_special = True
+            else:
+                assert False, 'Invalid char %s'%c
+        assert have_number and have_letter, "Password must contain both number and letter"
+        return password
+
+
 class IntegerValidator:
     def __call__(self, key, value):
         return int(value)
@@ -35,19 +75,21 @@ def get_string_validator(col):
     else:
         return [StringValidator()]
 
-def get_integer_validator(col):
-    return [IntegerValidator()]
+def get_email_validator(col):
+    validators = [EmailValidator()]
+    if col.type.length:
+        validators.append(MaxLengthValidator(col.type.length))
+    return validators
 
-def get_boolean_validator(col):
-    return [BooleanValidator()]
-
-def get_empty_validator(col):
-    return []
+def get_password_validator(col):
+    return [PasswordValidator()]
 
 column_validator_map = {
     String: get_string_validator,
-    Integer: get_integer_validator,
-    Boolean: get_boolean_validator,
+    Integer: lambda col: [IntegerValidator()],
+    Boolean: lambda col: [BooleanValidator()],
+    EmailType: get_email_validator,
+    PasswordType: get_password_validator,
 }
 
 class ValidatorMapper:
@@ -69,7 +111,7 @@ class ValidatorMapper:
             k = col.name
             if not col.nullable and not col.primary_key:
                 required_fields.append(k)
-            get_validator = column_validator_map.get(type(col.type), get_empty_validator)
+            get_validator = column_validator_map.get(type(col.type), lambda col: [])
             validator_map[k] = get_validator(col)
             
         # 关联字段的校验器

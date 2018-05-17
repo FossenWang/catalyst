@@ -31,23 +31,22 @@ class ViewTest(FlaskTestCase):
         rsp = self.client.get('/api/articles')
         self.assertEqual(rsp.status_code, 200)
         rsp_data = rsp.get_json()
-        self.assertEqual(rsp_data['paging'], {'total': 100, 'next': False})
-        self.assertEqual(Article._meta.total, 100)
+        self.assertEqual(rsp_data['paging'], {'total': 100, 'limit': -1, 'offset': 0, 'next': False})
 
         rsp = self.client.get('/api/articles?limit=20&offset=20')
         self.assertEqual(rsp.status_code, 200)
         rsp_data = rsp.get_json()
-        self.assertEqual(rsp_data['paging'], {'total': 100, 'next': True})
+        self.assertEqual(rsp_data['paging'], {'total': 100, 'limit': 20, 'offset': 20, 'next': True})
 
         rsp = self.client.get('/api/articles?limit=20&offset=200')
         self.assertEqual(rsp.status_code, 200)
         rsp_data = rsp.get_json()
-        self.assertEqual(rsp_data, {'paging': {'total': 100, 'next': False}, 'data': []})
+        self.assertEqual(rsp_data, {'paging': {'total': 100, 'limit': 20, 'offset': 200, 'next': False}, 'data': []})
 
         rsp = self.client.get('/api/articles?limit=20&offset=100')
         self.assertEqual(rsp.status_code, 200)
         rsp_data = rsp.get_json()
-        self.assertEqual(rsp_data, {'paging': {'total': 100, 'next': False}, 'data': []})
+        self.assertEqual(rsp_data, {'paging': {'total': 100, 'limit': 20, 'offset': 100, 'next': False}, 'data': []})
 
         rsp = self.client.get('/api/articles?limit=20&offset=asd')
         self.assertEqual(rsp.status_code, 400)
@@ -84,7 +83,6 @@ class ViewTest(FlaskTestCase):
         data = {'title': 'new article', 'content': 'some content', 'author_id':1}
         rsp = self.client.post('/api/articles', json=data)
         self.assertEqual(rsp.status_code, 201)
-        self.assertEqual(Article._meta.total, None)
         rsp_data = rsp.get_json()
         self.assertTrue('id' in rsp_data)
         aid = rsp_data['id']
@@ -99,7 +97,6 @@ class ViewTest(FlaskTestCase):
         # DELETE
         rsp = self.client.delete('/api/articles/%s'%aid)
         self.assertEqual(rsp.status_code, 204)
-        self.assertEqual(Article._meta.total, None)
         self.assertEqual(rsp.get_data(), b'')
         q = self.session.query(Article.query.filter_by(id=aid).exists()).scalar()
         self.assertEqual(q, False)

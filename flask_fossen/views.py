@@ -122,6 +122,8 @@ class MultipleObjectMixin(ContextMixin):
         if self.query is None:
             if self.model is not None:
                 query = self.model.query
+                if self.ordering:
+                    query = query.order_by(self.ordering)
             else:
                 raise TypeError(
                     "%(cls)s is missing a query. Define "
@@ -132,10 +134,6 @@ class MultipleObjectMixin(ContextMixin):
                 )
         assert isinstance(query, Query), \
         "'query' Must be an instance of 'sqlalchemy.orm.query.Query'"
-
-        if self.ordering:
-            query = query.order_by(self.ordering)
-
         return query
 
     def paginate_query(self, query):
@@ -153,7 +151,7 @@ class MultipleObjectMixin(ContextMixin):
             # Reduce unnecessary database access.
             query.all = lambda:[]
         
-        self.paging = {'total': total, 'next': total > (limit + offset) and limit >= 0}
+        self.paging = {'total': total, 'limit':limit, 'offset':offset, 'next': total > (limit + offset) and limit >= 0}
         return query
 
     def get_limit(self):
@@ -179,14 +177,7 @@ class MultipleObjectMixin(ContextMixin):
         return offset
 
     def get_total(self):
-        '''
-        Only get and cache the whole rows of an table.
-        Override this to get various sums.
-        '''
-        meta = self.model._meta
-        if meta.total is None:
-            meta.total = self.model.query.count()
-        return meta.total
+        return self.get_query().count()
 
     def get_object_list(self):
         object_list = self.paginate_query(self.get_query()).all()
@@ -212,14 +203,12 @@ class ValidatorMixin:
     def get_data(self):
         return request.get_json()
 
-    def get_validator(self):
-        '''Get the validator, which is ValidationModel by default.
-        Override this method to use custom validator.'''
-        return self.model
+    def validate_data(self, data):
+        return self.model.validate_data(data)
 
     def data_valid(self, data, extra={}):
-        obj = self.save_object(data)
-        context = obj.serialize()
+        self.object = self.save_object(data)
+        context = self.object.serialize()
         context.update(extra)
         return self.make_response(context, status=201)
 
@@ -232,9 +221,8 @@ class UpdateMixin(ValidatorMixin):
     db = None
 
     def put(self, *args, **kwargs):
-        self.validator = self.get_validator()
         self.data = self.get_data()
-        is_valid, errors = self.validator.validate_data(self.data)
+        is_valid, errors = self.validate_data(self.data)
         if is_valid:
             return self.data_valid(self.data)
         else:
@@ -243,7 +231,7 @@ class UpdateMixin(ValidatorMixin):
     def save_object(self, data):
         obj = self.get_object()
         self.db.session.add(obj)
-        self.validator.update(obj, data)
+        self.model.update(obj, data)
         self.db.session.commit()
         return obj
 
@@ -253,19 +241,17 @@ class CreateMixin(ValidatorMixin):
     db = None
 
     def post(self, *args, **kwargs):
-        self.validator = self.get_validator()
         self.data = self.get_data()
-        is_valid, errors = self.validator.validate_data(self.data)
+        is_valid, errors = self.validate_data(self.data)
         if is_valid:
             return self.data_valid(self.data)
         else:
             return self.data_invalid(self.data, errors)
 
     def save_object(self, data):
-        obj = self.validator.create(data)
+        obj = self.model.create(data)
         self.db.session.add(obj)
         self.db.session.commit()
-        self.model._meta.total = None    # 清空总数的缓存
         return obj
 
 
@@ -276,13 +262,17 @@ class DeleteMixin:
         obj = self.get_object()
         self.db.session.delete(obj)
         self.db.session.commit()
-        self.model._meta.total = None    # 清空总数的缓存
         return self.make_response('', status=204)
 
 
 class JSONResponseMixin:
     """Return JSON response"""
     def make_response(self, context, **response_kwargs):
+        """
+        Return a JSON Response
+        :param response: an object that can be serialized as JSON by json.dumps()
+        :param status: a string with a status or an integer with the status code
+        """
         return JSONResponse(context, **response_kwargs)
 
 

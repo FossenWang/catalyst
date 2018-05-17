@@ -40,9 +40,10 @@ class Serializable:
         related = ['book', 'book:author']
         '''
         results = {}
-        for name in self.__mapper__.columns.keys():
+        for key, col in self.__mapper__.columns.items():
+            name = col.name
             if name not in ignore:
-                value = getattr(self, name)
+                value = getattr(self, key)
                 if isinstance(value, (int, str, float, type(None), bool)):
                     results[name] = value
                 else:
@@ -185,8 +186,8 @@ class ValidationMeta(DefaultMeta):
         else:
             meta = type('Meta', (object,), {})
 
-        if not hasattr(meta, 'total'):
-            meta.total = None
+        #if not hasattr(meta, 'total'):
+        #    meta.total = None
 
         if hasattr(cls, '__mapper__'):
             # Generate validators from Model definition
