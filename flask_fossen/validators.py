@@ -1,5 +1,5 @@
 import re
-from .coltypes import Integer, String, Boolean, EmailType, PasswordType
+from .coltypes import Integer, String, Boolean, Enum, EmailType, PasswordType
 
 
 class StringValidator:
@@ -37,23 +37,29 @@ class EmailValidator(RegexValidator):
 
 
 class PasswordValidator(StringValidator):
-    def __init__(self, minlength, maxlength):
+    def __init__(self, minlength, maxlength, special_chars='_'):
         self.minlength = minlength
         self.maxlength = maxlength
+        self.special_chars = special_chars
 
     def __call__(self, key, password):
         super().__call__(key, password)
-        assert len(password) >= 6 and len(password)<=20, 'Password length must be greater than 6 and less than 20'
-        have_number, have_letter, have_special= False, False, False
+        assert len(password) >= self.minlength and len(password)<=self.maxlength, \
+        'Password length must be greater than %d and less than %d' \
+        % (self.minlength, self.maxlength)
+
+        have_number, have_letter = False, False
         for c in password:
             if c in '1234567890':
                 have_number = True
-            elif re.match('[a-z]', c):
+            elif re.match('[a-zA-z]', c):
                 have_letter = True
-            elif c in ',.?;_!@#$%^&*?':
-                have_special = True
+            elif c in self.special_chars:
+                pass
             else:
-                assert False, 'Invalid char %s'%c
+                assert False, \
+                'Invalid char "%s", password only contains numbers, letters or "%s"' \
+                % (c, self.special_chars)
         assert have_number and have_letter, "Password must contain both number and letter"
         return password
 
@@ -69,6 +75,17 @@ class BooleanValidator:
         return value
 
 
+class EnumValidator:
+    def __init__(self, valid_lookup):
+        self.valid_lookup = valid_lookup
+
+    def __call__(self, key, value):
+        if value in self.valid_lookup:
+            return self.valid_lookup[value]
+        else:
+            raise LookupError('"%s" is not among the defined enum values' % value)
+
+
 def get_string_validator(col):
     if col.type.length:
         return [MaxLengthValidator(col.type.length)]
@@ -81,15 +98,15 @@ def get_email_validator(col):
         validators.append(MaxLengthValidator(col.type.length))
     return validators
 
-def get_password_validator(col):
-    return [PasswordValidator()]
 
 column_validator_map = {
     String: get_string_validator,
+    EmailType: get_email_validator,
     Integer: lambda col: [IntegerValidator()],
     Boolean: lambda col: [BooleanValidator()],
-    EmailType: get_email_validator,
-    PasswordType: get_password_validator,
+    Enum: lambda col: [EnumValidator(col.type._valid_lookup)],
+    PasswordType: lambda col: [PasswordValidator(
+        *col.type.raw_password_length, col.type.special_chars)],
 }
 
 class ValidatorMapper:
@@ -111,16 +128,20 @@ class ValidatorMapper:
             k = col.name
             if not col.nullable and not col.primary_key:
                 required_fields.append(k)
-            get_validator = column_validator_map.get(type(col.type), lambda col: [])
-            validator_map[k] = get_validator(col)
+            validator_map[k] = self.get_column_validator(col)
             
         # 关联字段的校验器
         for k, rel in rels.items():
             validator_map[k] = self.get_relationship_validator(rel)
+
         return validator_map, required_fields
 
     def get_relationship_validator(self, rel):
         return []
+
+    def get_column_validator(self, col):
+        get_validator = column_validator_map.get(type(col.type), lambda col: [])
+        return get_validator(col)
 
 
 generate_validators_from_mapper = ValidatorMapper()

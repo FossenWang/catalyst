@@ -65,18 +65,18 @@ class ViewTest(FlaskTestCase):
 
 
     def test_POST_PUT_400(self):
-        invalid_data = {'invalid':'this is a invalid field','title': 'edited title', 'content': 'edited content', 'author_id':1}
+        invalid_data = {'title': None, 'content': 'edited content', 'author_id':1}
         # PUT
         before_put = Article.query.filter_by(id=1).one()
         rsp = self.client.put('/api/articles/1', json=invalid_data)
         self.assertEqual(rsp.status_code, 400)
-        self.assertEqual(rsp.get_json(), {'errors': {'invalid': ["TypeError: 'invalid' is not a field of Article"]}, 'invalid data': {'author_id': 1,'content': 'edited content','invalid': 'this is a invalid field','title': 'edited title'}})
+        self.assertEqual(rsp.get_json()['errors'], {'title': ['ValueError: Ensure value is not None']})
         after_put = Article.query.filter_by(id=1).one()
         self.assertEqual(before_put.serialize(), after_put.serialize())
         # POST
         rsp = self.client.post('/api/articles', json=invalid_data)
         self.assertEqual(rsp.status_code, 400)
-        self.assertEqual(rsp.get_json(), {'errors': {'invalid': ["TypeError: 'invalid' is not a field of Article"]}, 'invalid data': {'author_id': 1,'content': 'edited content','invalid': 'this is a invalid field','title': 'edited title'}})
+        self.assertEqual(rsp.get_json()['errors'], {'title': ['ValueError: Ensure value is not None']})
 
     def test_POST_PUT_DELETE_Resource(self):
         # POST

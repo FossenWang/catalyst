@@ -60,11 +60,13 @@ class Serializable:
                     related=parsed_ralated.get(name,[]),
                     )
                     for i in getattr(self, name)]
-            else:
+            elif getattr(self, name):
                 results[name] = getattr(self, name).to_dict(
                     ignore=parsed_ignore.get(name,[]),
                     related=parsed_ralated.get(name,[]),
                     )
+            else:
+                results[name] = None
         return results
 
     def serialize(self, related=[], ignore=[]):
@@ -123,37 +125,37 @@ def _validate_data(cls, data):
     if valid return (True, errors), else return (False, errors)
     '''
     errors = {}
-    for k in data:
+    # ignore irrelevant data
+    for name in cls._meta.default_validators:
         results = []
-        validators = cls._meta.default_validators.get(k)
-
-        if validators is None:
-            results.append("TypeError: '%s' is not a field of %s" % (k, cls.__name__))
+        value = data.get(name)
+        if value is None:
+            if name in cls._meta.required_fields:
+                results.append('ValueError: Ensure value is not None')
         else:
+            validators = cls._meta.default_validators.get(name)
             for validator in validators:
                 try:
-                    data[k] = validator(k, data[k])
+                    data[name] = validator(name, data[name])
                 except Exception as e:
                     results.append(type(e).__name__+': '+str(e))
-        
-        if results: errors[k] = results
-
-    for field in cls._meta.required_fields:
-        if data.get(field) is None:
-            errors[field] = ['ValueError: Ensure value is not None']
-
+        if results: errors[name] = results
     return not errors, errors
 
 def _create(cls, validated_data):
-    return cls(**validated_data)
+    instance = cls()
+    for k, v in validated_data.items():
+        if hasattr(instance, k):
+            setattr(instance, k, v)
+    return instance
 
 def _update(cls, instance, validated_data):
     assert isinstance(instance, cls)
     for k, v in validated_data.items():
         if hasattr(instance, k):
             setattr(instance, k, v)
-        else:
-            raise TypeError("'%s' is not a field of %s" % (k, cls.__name__))
+        #else:
+        #    raise TypeError("'%s' is not a field of %s" % (k, cls.__name__))
     return instance
 
 class ValidationMeta(DefaultMeta):
