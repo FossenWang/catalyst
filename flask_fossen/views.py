@@ -276,22 +276,18 @@ class JSONResponseMixin:
         return JSONResponse(context, **response_kwargs)
 
 
-class BaseResource(SingleObjectMixin, UpdateMixin, DeleteMixin, BaseView):
-    """Base single resource view"""
+class JSONView(JSONResponseMixin, BaseView):
+    """Returns JSON data"""
 
 
-class Resource(JSONResponseMixin, BaseResource):
+class Resource(SingleObjectMixin, UpdateMixin, DeleteMixin, JSONView):
     """
     Restful single resource view which can
     show, edit and delete a single resource.
     """
 
 
-class BaseResourceList(MultipleObjectMixin, CreateMixin, BaseView):
-    """Base resource list view"""
-
-
-class ResourceList(JSONResponseMixin, BaseResourceList):
+class ResourceList(MultipleObjectMixin, CreateMixin, JSONView):
     """
     Restful resource list view which can show a
     list of resources and create a new resource.

@@ -1,17 +1,12 @@
 import json
 from collections import Iterable
 
+from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy.model import DefaultMeta
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer
 
 from .validators import generate_validators_from_mapper
-
-
-class IdMixin:
-    id = Column(Integer, primary_key=True)
-    def __str__(self):
-        return str(self.id)
 
 
 class BaseModel:
@@ -154,8 +149,6 @@ def _update(cls, instance, validated_data):
     for k, v in validated_data.items():
         if hasattr(instance, k):
             setattr(instance, k, v)
-        #else:
-        #    raise TypeError("'%s' is not a field of %s" % (k, cls.__name__))
     return instance
 
 class ValidationMeta(DefaultMeta):
@@ -188,9 +181,6 @@ class ValidationMeta(DefaultMeta):
         else:
             meta = type('Meta', (object,), {})
 
-        #if not hasattr(meta, 'total'):
-        #    meta.total = None
-
         if hasattr(cls, '__mapper__'):
             # Generate validators from Model definition
             validators, required = generate_validators_from_mapper(cls.__mapper__)
@@ -219,3 +209,18 @@ SerializableModel = declarative_base(
     name='SerializableModel',
     metaclass=ValidationMeta
 )
+
+
+
+db = SQLAlchemy(model_class=SerializableModel)
+
+
+class IdMixin:
+    id = Column(Integer, primary_key=True)
+    def __str__(self):
+        return str(self.id)
+
+
+class IdModel(IdMixin, db.Model):
+    __abstract__ = True
+
