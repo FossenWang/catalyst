@@ -2,30 +2,23 @@ import re
 from .coltypes import Integer, String, Boolean, Enum, EmailType, PasswordType
 
 
-class StringValidator:
-    def __call__(self, key, string):
-        assert isinstance(string, str), "Enter a string, not %s" % type(string)
-        return string
-
-
-class MaxLengthValidator(StringValidator):
+class MaxLengthValidator:
     def __init__(self, max_length):
         self.max_length = max_length
         self.message = "Ensure string length is less than or equal to %d" % max_length
 
-    def __call__(self, key, string):
-        super().__call__(key, string)
+    def __call__(self,string):
+        string = str(string)
         assert len(string) <= self.max_length, self.message
         return string
 
 
-class RegexValidator(StringValidator):
+class RegexValidator:
     def __init__(self):
         self.message = "Enter a valid value"
         self.regex = ''
 
-    def __call__(self, key, value):
-        super().__call__(key, value)
+    def __call__(self, value):
         assert re.match(self.regex, value), self.message
         return value
 
@@ -36,14 +29,13 @@ class EmailValidator(RegexValidator):
         self.regex = r'^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$'
 
 
-class PasswordValidator(StringValidator):
+class PasswordValidator:
     def __init__(self, minlength, maxlength, special_chars='_'):
         self.minlength = minlength
         self.maxlength = maxlength
         self.special_chars = special_chars
 
-    def __call__(self, key, password):
-        super().__call__(key, password)
+    def __call__(self, password):
         assert len(password) >= self.minlength and len(password)<=self.maxlength, \
         'Password length must be greater than %d and less than %d' \
         % (self.minlength, self.maxlength)
@@ -65,12 +57,12 @@ class PasswordValidator(StringValidator):
 
 
 class IntegerValidator:
-    def __call__(self, key, value):
+    def __call__(self, value):
         return int(value)
 
 
 class BooleanValidator:
-    def __call__(self, key, value):
+    def __call__(self, value):
         assert isinstance(value, bool), "Enter True or False, not %s" % value
         return value
 
@@ -79,7 +71,7 @@ class EnumValidator:
     def __init__(self, valid_lookup):
         self.valid_lookup = valid_lookup
 
-    def __call__(self, key, value):
+    def __call__(self, value):
         if value in self.valid_lookup:
             return self.valid_lookup[value]
         else:
@@ -90,7 +82,7 @@ def get_string_validator(col):
     if col.type.length:
         return [MaxLengthValidator(col.type.length)]
     else:
-        return [StringValidator()]
+        return []
 
 def get_email_validator(col):
     validators = [EmailValidator()]

@@ -1,5 +1,5 @@
 from flask_fossen.testcases import FlaskTestCase
-from flask_fossen.validators import IntegerValidator, StringValidator, MaxLengthValidator
+from flask_fossen.validators import IntegerValidator, MaxLengthValidator
 
 from .test_app.app import create_app, db
 from .test_app.app.database import User, Article
@@ -11,7 +11,7 @@ class SerializableModelTest(FlaskTestCase):
 
     def setUp(self):
         self.session = self.db.session
-        admin = User(name='admin', email='admin@fossen.cn')
+        admin = User(username='admin', email='admin@test.com', password='asd123')
         self.session.add(admin)
         self.session.commit()
         articles = [Article(title='article:%d'%i, content='test article:%d'%i, author=admin) for i in range(1)]
@@ -23,73 +23,70 @@ class SerializableModelTest(FlaskTestCase):
 
     def test_serializable_model(self):
         # test to_dict default
-        admin = self.admin.to_dict()
+        admin = self.admin.to_dict(ignore=['password'])
         adict = [a.to_dict() for a in self.articles]
-        self.assertEqual(admin, {'id': 1, 'name': 'admin', 'email': 'admin@fossen.cn'})
+        self.assertEqual(admin, {'id': 1, 'username': 'admin', 'email': 'admin@test.com'})
         self.assertEqual(adict, [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1}])
         
         # test to_dict None related
         a = Article(title='title', content='content')
         adict = a.to_dict(related=['author:articles'])
         self.assertEqual(adict['author'], None)
-        u = User(name='user', email='user@fossen.cn').to_dict(related=['articles'])
+        u = User(username='user', email='user@fossen.cn').to_dict(related=['articles'])
         self.assertEqual(u['articles'], [])
 
         # test to_dict nested related
-        admin = self.admin.to_dict(related=['articles:author'])
-        adict = [a.to_dict(related=['author:articles']) for a in self.articles]
-        self.assertEqual(admin, {'id': 1, 'name': 'admin', 'email': 'admin@fossen.cn', 'articles': [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1, 'author': {'id': 1, 'name': 'admin', 'email': 'admin@fossen.cn'}}]})
-        self.assertEqual(adict, [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1, 'author': {'id': 1, 'name': 'admin', 'email': 'admin@fossen.cn', 'articles': [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1}]}}])
+        admin = self.admin.to_dict(related=['articles:author'], ignore=['password', 'articles:author:password'])
+        adict = [a.to_dict(related=['author:articles'], ignore=['author:password']) for a in self.articles]
+        self.assertEqual(admin, {'id': 1, 'username': 'admin', 'email': 'admin@test.com', 'articles': [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1, 'author': {'id': 1, 'username': 'admin', 'email': 'admin@test.com'}}]})
+        self.assertEqual(adict, [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1, 'author': {'id': 1, 'username': 'admin', 'email': 'admin@test.com', 'articles': [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1}]}}])
 
         # test to_dict ignore
-        admin = self.admin.to_dict(ignore=['id', 'articles:id'], related=['articles'])
-        adict = [a.to_dict(ignore=['id', 'author:id'], related=['author']) for a in self.articles]
-        self.assertEqual(admin, {'name': 'admin', 'email': 'admin@fossen.cn', 'articles': [{'title': 'article:0', 'content': 'test article:0', 'author_id': 1}]})
-        self.assertEqual(adict, [{'title': 'article:0', 'content': 'test article:0', 'author_id': 1, 'author': {'name': 'admin', 'email': 'admin@fossen.cn'}}])
+        admin = self.admin.to_dict(ignore=['id', 'articles:id', 'password'], related=['articles'])
+        adict = [a.to_dict(ignore=['id', 'author:id', 'author:password'], related=['author']) for a in self.articles]
+        self.assertEqual(admin, {'username': 'admin', 'email': 'admin@test.com', 'articles': [{'title': 'article:0', 'content': 'test article:0', 'author_id': 1}]})
+        self.assertEqual(adict, [{'title': 'article:0', 'content': 'test article:0', 'author_id': 1, 'author': {'username': 'admin', 'email': 'admin@test.com'}}])
 
         # test to_dict nested
-        admin = self.admin.to_dict(ignore=['name', 'email', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:name','articles:author:email'],related=['articles:author'])
-        adict = [a.to_dict(ignore=['title', 'content', 'author_id', 'author:name', 'author:email'], related=['author:articles']) for a in self.articles]
+        admin = self.admin.to_dict(ignore=['username', 'email', 'password', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:username','articles:author:email', 'articles:author:password'],related=['articles:author'])
+        adict = [a.to_dict(ignore=['title', 'content', 'author_id', 'author:username', 'author:email', 'author:password'], related=['author:articles']) for a in self.articles]
         self.assertEqual(admin, {'id': 1, 'articles': [{'id': 1, 'author': {'id': 1}}]})
         self.assertEqual(adict,[{'id': 1, 'author': {'id': 1, 'articles': [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1}]}}])
 
         # test serialize
-        admin = self.admin.serialize(ignore=['name', 'email', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:name','articles:author:email'],related=['articles:author'])
-        adict = Article.serialize(self.articles, ignore=['title', 'content', 'author_id', 'author:name', 'author:email'], related=['author:articles'])
+        admin = self.admin.serialize(ignore=['username', 'email', 'password', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:username','articles:author:email', 'articles:author:password'],related=['articles:author'])
+        adict = Article.serialize(self.articles, ignore=['title', 'content', 'author_id', 'author:username', 'author:email', 'author:password'], related=['author:articles'])
         self.assertEqual(admin, {'id': 1, 'articles': [{'id': 1, 'author': {'id': 1}}]})
         self.assertEqual(adict,[{'id': 1, 'author': {'id': 1, 'articles': [{'id': 1, 'title': 'article:0', 'content': 'test article:0', 'author_id': 1}]}}])
         self.assertRaises(AssertionError, Article.serialize, [self.articles[0], 0])
 
         # test to_json
-        admin = self.admin.to_json(ignore=['name', 'email', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:name','articles:author:email'],related=['articles:author'])
+        admin = self.admin.to_json(ignore=['username', 'email', 'password', 'articles:title','articles:content','articles:author_id','articles:content','articles:author:username','articles:author:email', 'articles:author:password'],related=['articles:author'])
         self.assertEqual(admin, '{"id": 1, "articles": [{"id": 1, "author": {"id": 1}}]}')
 
         # test Meta serialization options
         class A(Article):
             class Meta:
                 serialize_related = ['author']
-                serialize_ignore = ['id', 'author_id', 'author:id']
+                serialize_ignore = ['id', 'author_id', 'author:id', 'author:password']
         data = [A(title='article:%d'%i, content='test article:%d'%i, author_id=1, author=self.admin) for i in range(1)]
         results = A.serialize(data)
-        self.assertEqual(results, [{'title': 'article:0', 'content': 'test article:0', 'author': {'name': 'admin', 'email': 'admin@fossen.cn'}}])
+        self.assertEqual(results, [{'title': 'article:0', 'content': 'test article:0', 'author': {'username': 'admin', 'email': 'admin@test.com'}}])
 
         # test validate data
-        invalid_data = {'name':'adsadasdsa'*20, 'email': []}
+        invalid_data = {'username':'adsadasdsa'*16, 'email': []}
         valid, errors = User.validate_data(invalid_data)
         self.assertEqual(valid, False)
-        self.assertEqual(errors, {'name': ['AssertionError: Ensure string length is less than or equal to 80'], 'email': ["AssertionError: Enter a string, not <class 'list'>"]})
+        self.assertEqual(errors, {'password': ['ValueError: Ensure value is not None'], 'username': ['AssertionError: Ensure string length is less than or equal to 150'], 'email': ['TypeError: expected string or bytes-like object']})
 
-        invalid_data = {'name':'adsadasdsa'*20,}
-        valid, errors = User.validate_data(invalid_data)
-        self.assertEqual(valid, False)
-        self.assertEqual(errors, {'name': ['AssertionError: Ensure string length is less than or equal to 80'], 'email': ['ValueError: Ensure value is not None']})
-
-        valid_data = {'name':'admin', 'email': 'admin@fossen.cn'}
+        valid_data = {'username':'admin', 'email': 'admin@test.com', 'password': 'asd123'}
         valid, errors = User.validate_data(valid_data)
         self.assertEqual(valid, True)
         self.assertEqual(errors, {})
-
-        valid, errors = User.validate_data(self.admin.serialize())
+        
+        data = self.admin.serialize()
+        data.update({'password': 'asd123'})
+        valid, errors = User.validate_data(data)
         self.assertEqual(valid, True)
         self.assertEqual(errors, {})
 
@@ -108,11 +105,11 @@ class SerializableModelTest(FlaskTestCase):
     
         class A1(Article):
             class Meta:
-                default_validators = {'id': [IntegerValidator()], 'title': [StringValidator()]}
-                extra_validators = {'title': [MaxLengthValidator]}
+                default_validators = {'id': [IntegerValidator()]}
+                extra_validators = {'title': [MaxLengthValidator(50)]}
                 required_fields = ['title']
         self.assertIsInstance(A1._meta.default_validators.get('id')[0], IntegerValidator)
-        self.assertIsInstance(A1._meta.default_validators.get('title')[0], StringValidator)
+        self.assertIsInstance(A1._meta.default_validators.get('title')[0], MaxLengthValidator)
         self.assertEqual(A1._meta.required_fields, ['title'])
         self.assertEqual(hasattr(A1._meta, 'extra_validators'), True)
 

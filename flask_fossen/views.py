@@ -1,6 +1,5 @@
 from flask import request, abort
 from flask.views import View, MethodView
-from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.query import Query
 
 from .http import JSONResponse
@@ -44,7 +43,6 @@ class SingleObjectMixin(ContextMixin):
     def get_query(self):
         """
         Return the `query` that will be used to look up the object.
-
         This method is called by the default implementation of get_object() and
         may not be called if get_object() is overridden.
         """
@@ -62,29 +60,26 @@ class SingleObjectMixin(ContextMixin):
         assert isinstance(self.query, Query), \
         "'query' Must be an instance of 'sqlalchemy.orm.query.Query'"
         return self.query
-
-    def get_object(self, query=None):
+    
+    def filter_query(self, query):
+        """Filter by id, override this method to change filter condition"""
+        obj_id = self.kwargs.get(self.id_url_kwarg)
+        if obj_id is None:
+            raise AttributeError("No object id")
+        else:
+            query = query.filter(self.model.id==obj_id)
+        return query
+    
+    def get_object(self):
         """
         Return the object the view is displaying.
-
         Require `self.query` and a `id` argument in the URLconf.
         Subclasses can override this to return any object.
         """
-        # Use a custom query if provided; this is required for subclasses
-        if query is None:
-            query = self.get_query()
-
-        # Next, try looking up by primary key.
-        obj_id = self.kwargs.get(self.id_url_kwarg)
-        if obj_id is not None:
-            query = query.filter(self.model.id==obj_id)
-        else:
-            raise AttributeError("No object id")
-        
-        try:
-            # Get the single item from the filtered query
-            obj = query.one()
-        except NoResultFound:
+        query = self.get_query()
+        query = self.filter_query(query)
+        obj = query.one_or_none()
+        if obj is None:
             raise abort(404, 'Resource not found')
         return obj
 
@@ -101,14 +96,17 @@ class SingleObjectMixin(ContextMixin):
         return super().get_context_data(**context)
 
 
-class MultipleObjectMixin(ContextMixin):
-    """A mixin for views manipulating multiple objects."""
+class BaseMultipleObjectMixin(ContextMixin):
+    """
+    Provide the ability to retrieve mutiple objects for further manipulation.
+    """
     model = None
     query = None
     limit = None
     offset = None
     ordering = None
     serializing = True
+    paging = True
 
     def get(self, *args, **kwargs):
         self.object_list = self.get_object_list()
@@ -137,9 +135,40 @@ class MultipleObjectMixin(ContextMixin):
         return query
 
     def paginate_query(self, query):
+        """Override this method to provide pagination method"""
+        return query
+    
+    def get_object_list(self):
+        query = self.get_query()
+        if self.paging:
+            query = self.paginate_query(query)
+        object_list = query.all()
+        return object_list
+
+    def serialize_object_list(self, object_list, related=[], ignore=[]):
+        return self.model.serialize(object_list, related=related, ignore=ignore)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.paging is not None:
+            context['paging'] = self.paging
+        if self.object_list is not None:
+            if self.serializing:
+                object_list = self.serialize_object_list(self.object_list)
+            else:
+                object_list = self.object_list
+            context['data'] = object_list
+        return context
+
+
+class LimitOffsetMixin:
+    """Paginate query by offset and limit"""
+    limit = None
+    offset = None
+
+    def paginate_query(self, query):
         """
-        paginate query by offset and limit,
-        override this method to provide other pagination method
+        Paginate query by offset and limit
         """
         total = self.get_total()
         limit = self.get_limit()
@@ -179,27 +208,19 @@ class MultipleObjectMixin(ContextMixin):
     def get_total(self):
         return self.get_query().count()
 
-    def get_object_list(self):
-        object_list = self.paginate_query(self.get_query()).all()
-        return object_list
 
-    def serialize_object_list(self, object_list, related=[], ignore=[]):
-        return self.model.serialize(object_list, related=related, ignore=ignore)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        if self.paging is not None:
-            context['paging'] = self.paging
-        if self.object_list is not None:
-            if self.serializing:
-                object_list = self.serialize_object_list(self.object_list)
-            else:
-                object_list = self.object_list
-            context['data'] = object_list
-        return context
+class PaginationMixin:
+    """To be implemented"""
 
 
-class ValidatorMixin:
+class MultipleObjectMixin(LimitOffsetMixin, BaseMultipleObjectMixin):
+    """
+    Provide the ability to retrieve mutiple objects for further manipulation.
+    """
+
+
+class ValidationMixin:
+    """Validate request data"""
     def get_data(self):
         return request.get_json()
 
@@ -216,7 +237,7 @@ class ValidatorMixin:
         raise abort(400, {'invalid data': data, 'errors': errors})
 
 
-class UpdateMixin(ValidatorMixin):
+class UpdateMixin(ValidationMixin):
     """Update a single object."""
     db = None
 
@@ -236,7 +257,7 @@ class UpdateMixin(ValidatorMixin):
         return obj
 
 
-class CreateMixin(ValidatorMixin):
+class CreateMixin(ValidationMixin):
     """Create a single object."""
     db = None
 
@@ -267,13 +288,13 @@ class DeleteMixin:
 
 class JSONResponseMixin:
     """Return JSON response"""
-    def make_response(self, context, **response_kwargs):
+    def make_response(self, context, status=None, is_json=False, **kwargs):
         """
         Return a JSON Response
         :param response: an object that can be serialized as JSON by json.dumps()
         :param status: a string with a status or an integer with the status code
         """
-        return JSONResponse(context, **response_kwargs)
+        return JSONResponse(context, status=status, is_json=is_json, **kwargs)
 
 
 class JSONView(JSONResponseMixin, BaseView):

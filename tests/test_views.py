@@ -10,7 +10,7 @@ class ViewTest(FlaskTestCase):
 
     def setUp(self):
         self.session = self.db.session
-        self.admin = User(name='admin', email='admin@fossen.cn')
+        self.admin = User(username='admin', email='admin@test.com', password='asd123')
         self.session.add(self.admin)
         self.session.commit()
         self.articles = [Article(title='article:%d'%i, content='test article:%d'%i, author=self.admin) for i in range(100)]
@@ -22,12 +22,12 @@ class ViewTest(FlaskTestCase):
         self.assertEqual(rsp.status_code, 200)
         self.assertEqual(rsp.get_data(True), 'Test.')
 
-    def test_GET_Resource(self):
+        # test_GET_Resource
         rsp = self.client.get('/api/articles/1')
         self.assertEqual(rsp.status_code, 200)
         self.assertEqual(rsp.get_json(), {"id": 1, "title": "article:0", "content": "test article:0", "author_id": 1})
 
-    def test_GET_Resource_List(self):
+        # test GET Resource List
         rsp = self.client.get('/api/articles')
         self.assertEqual(rsp.status_code, 200)
         rsp_data = rsp.get_json()
@@ -54,7 +54,7 @@ class ViewTest(FlaskTestCase):
         self.assertEqual(rsp_data, 'Offset or limit must an integer')
 
 
-    def test_GET_DELETE_404(self):
+        # test GET and DELETE 404
         error = 'Resource not found'
         rsp = self.client.get('/api/articles/101')
         self.assertEqual(rsp.status_code, 404)
@@ -64,7 +64,7 @@ class ViewTest(FlaskTestCase):
         self.assertEqual(rsp.get_json(), error)
 
 
-    def test_POST_PUT_400(self):
+        # test POST and PUT 400
         invalid_data = {'title': None, 'content': 'edited content', 'author_id':1}
         # PUT
         before_put = Article.query.filter_by(id=1).one()
@@ -78,7 +78,7 @@ class ViewTest(FlaskTestCase):
         self.assertEqual(rsp.status_code, 400)
         self.assertEqual(rsp.get_json()['errors'], {'title': ['ValueError: Ensure value is not None']})
 
-    def test_POST_PUT_DELETE_Resource(self):
+        # test POST & PUT & DELETE_Resource
         # POST
         data = {'title': 'new article', 'content': 'some content', 'author_id':1}
         rsp = self.client.post('/api/articles', json=data)

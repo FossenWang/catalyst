@@ -1,26 +1,32 @@
 from flask import Blueprint
-from wtforms.ext.sqlalchemy.orm import model_form
 
 from flask_fossen.views import Resource, ResourceList
 from flask_fossen.http import register_json_error_handle
+from flask_fossen.auth import auth_jwt, BaseLoginView, LogoutView, RefreshToken, BaseUserView
 
 from .database import User, Article, db
-
-# ArticleForm = model_form(Article, db.session)
-# af = ArticleForm(author=admin,title='tset',content='tset')
-# af.validate()
-# import wtforms.ext.sqlalchemy.fields.QuerySelectField
 
 
 def index():
     return 'Test.'
 
+
 class ArticleView(Resource):
     model = Article
     db = db
 
+
 class ArticleList(ResourceList):
     model = Article
+    db = db
+
+
+class LoginView(BaseLoginView):
+    model = User
+
+
+class UserView(BaseUserView):
+    model = User
     db = db
 
 
@@ -29,6 +35,11 @@ bp = Blueprint('api', __name__, url_prefix='/api')
 bp.add_url_rule('/', view_func=index)
 bp.add_url_rule('/articles/<int:id>', view_func=ArticleView.as_view('article'))
 bp.add_url_rule('/articles', view_func=ArticleList.as_view('article_list'))
+
+bp.add_url_rule('/users', view_func=UserView.as_view('users'))
+bp.add_url_rule('/login', view_func=LoginView.as_view('login'))
+bp.add_url_rule('/logout', view_func=LogoutView.as_view('logout'))
+bp.add_url_rule('/token/refresh', view_func=RefreshToken.as_view('token_refresh'))
 
 
 register_json_error_handle(bp)

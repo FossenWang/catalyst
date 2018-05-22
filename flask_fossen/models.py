@@ -1,15 +1,14 @@
 import json
 from collections import Iterable
 
-from flask_sqlalchemy import SQLAlchemy
-from flask_sqlalchemy.model import DefaultMeta
+from flask_sqlalchemy import SQLAlchemy, DefaultMeta
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer
 
 from .validators import generate_validators_from_mapper
 
 
-class BaseModel:
+class ReprMixin:
     def __repr__(self):
         return '<%s: %s>' % (self.__class__.__name__, self.__str__())
 
@@ -18,7 +17,7 @@ class BaseModel:
 
 
 class Serializable:
-    'Provide a serializable method for the sqlalchemy Model.'
+    'Provide serializable method for the sqlalchemy Model.'
     def to_dict(self, related=[], ignore=[]):
         '''
         Convert the model to dict. By default, it converts all
@@ -68,8 +67,8 @@ class Serializable:
         """
         Serialize objects to list or dict.
         two usages：
-        1 handle one object: serializable.serialize()
-        2 handle objects list: Serializable.serialize([serializable])
+        1 handle one object: instance.serialize()
+        2 handle objects list: Serializable.serialize([instance])
 
         Other params are as same as self.to_dict.
         """
@@ -110,7 +109,7 @@ class Serializable:
         return parsed
 
 
-class BaseSerializableModel(Serializable, BaseModel):
+class BaseSerializableModel(Serializable, ReprMixin):
     pass
 
 
@@ -131,7 +130,7 @@ def _validate_data(cls, data):
             validators = cls._meta.default_validators.get(name)
             for validator in validators:
                 try:
-                    data[name] = validator(name, data[name])
+                    data[name] = validator(data[name])
                 except Exception as e:
                     results.append(type(e).__name__+': '+str(e))
         if results: errors[name] = results
@@ -174,10 +173,9 @@ class ValidationMeta(DefaultMeta):
     """
     def __init__(cls, name, bases, d):
         super().__init__(name, bases, d)
-        
         if hasattr(cls, 'Meta'):
             meta = cls.Meta
-            del cls.Meta
+            # del cls.Meta
         else:
             meta = type('Meta', (object,), {})
 
@@ -211,16 +209,14 @@ SerializableModel = declarative_base(
 )
 
 
-
-db = SQLAlchemy(model_class=SerializableModel)
-
-
 class IdMixin:
     id = Column(Integer, primary_key=True)
     def __str__(self):
         return str(self.id)
 
 
-class IdModel(IdMixin, db.Model):
+class Model(IdMixin, SerializableModel):
     __abstract__ = True
 
+
+db = SQLAlchemy(model_class=SerializableModel)

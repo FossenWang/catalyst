@@ -1,22 +1,16 @@
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship, validates
+from sqlalchemy.orm import relationship
 
-from flask_fossen.models import SerializableModel, IdMixin
-
-
-db = SQLAlchemy(model_class=SerializableModel)
+from flask_fossen.models import Model, db
+from flask_fossen.auth.models import AbstractUser
 
 
-class User(IdMixin, db.Model):
-    name = Column(String(80), unique=True, nullable=False)
-    email = Column(String(120), unique=True, nullable=False)
 
-    def __str__(self):
-        return self.name
+class User(AbstractUser):
+    pass
 
 
-class Article(IdMixin, db.Model):
+class Article(Model):
     title = Column(String(64), nullable=False)
     content = Column(String(64), nullable=False)
     author_id = Column(Integer, ForeignKey('user.id'), nullable=False)
