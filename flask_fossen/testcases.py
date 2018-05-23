@@ -1,6 +1,5 @@
 import sys, unittest, code
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 
 
 class FlaskTestCase(unittest.TestCase):
@@ -47,14 +46,17 @@ class FlaskTestCase(unittest.TestCase):
             self.app_context = self.app.app_context()
             self.app_context.push()
 
-        if isinstance(self.db, SQLAlchemy):
-            self.db.create_all()
+            if self.db:
+                self.db.create_all()
+        else:
+            raise TypeError('app must be an instance of Flask')
 
     def _post_teardown(self):
         """
         Perform post-test things.
         * Pop app context.
         """
-        if self.db: self.db.drop_all()
-        if hasattr(self, 'app_context'): self.app_context.pop()
+        if hasattr(self, 'app_context'):
+            if self.db: self.db.drop_all()
+            self.app_context.pop()
 
