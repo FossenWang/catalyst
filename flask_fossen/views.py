@@ -1,9 +1,9 @@
 from flask import request, abort
-from flask.views import View, MethodView
+from flask.views import MethodView
 from sqlalchemy.orm.query import Query
+from sqlalchemy.exc import DBAPIError
 
 from .http import JSONResponse
-from .models import Serializable
 
 
 class BaseView(MethodView):
@@ -228,7 +228,10 @@ class ValidationMixin:
         return self.model.validate_data(data)
 
     def data_valid(self, data, extra={}):
-        self.object = self.save_object(data)
+        try:
+            self.object = self.save_object(data)
+        except DBAPIError:
+            raise abort(400, 'Database operation fails')
         context = self.object.serialize()
         context.update(extra)
         return self.make_response(context, status=201)

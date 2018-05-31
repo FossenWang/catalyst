@@ -58,7 +58,7 @@ class BaseLoginView(JSONView):
         password = data.get('password', None)
         user_identity = getattr(self.model, self.identity_attribute)
         user = self.model.query.filter(user_identity==identity).one_or_none()
-        if user.check_password(password):
+        if user and user.check_password(password):
             return user
 
     def login(self):

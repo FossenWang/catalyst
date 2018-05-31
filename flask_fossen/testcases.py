@@ -48,8 +48,6 @@ class FlaskTestCase(unittest.TestCase):
 
             if self.db:
                 self.db.create_all()
-        else:
-            raise TypeError('app must be an instance of Flask')
 
     def _post_teardown(self):
         """

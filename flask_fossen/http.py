@@ -15,11 +15,16 @@ class JSONResponse(Response):
 
 
 def handle_http_exception(e):
-    if e.description and e.code in default_exceptions:
-        description = e.description
+    if isinstance(e, HTTPException):
+        if e.description and e.code in default_exceptions:
+            description = e.description
+        else:
+            description = default_exceptions[e.code].description
+        return JSONResponse(description, status=e.code)
     else:
-        description = default_exceptions[e.code].description
-    return JSONResponse(description, status=e.code)
+        return JSONResponse(
+            default_exceptions[500].description,
+            status=500)
 
 
 def register_json_error_handle(app):

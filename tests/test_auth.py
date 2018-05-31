@@ -20,22 +20,26 @@ class AuthTest(FlaskTestCase):
     
     def test_views(self):
         # login required
-        rsp = self.client.get('/api/users')
+        rsp = self.client.get('/api/user')
         self.assertEqual(rsp.status_code, 401)
         self.assertEqual(rsp.get_json(), {'msg': 'Missing cookie "access_token_cookie"'})
         # register a new user
         data = {'password': 'asd123', 'username': 666, 'email': '666@666.com'}
         user_info = {'id': 2, 'username': '666', 'email': '666@666.com'}
-        rsp = self.client.post('/api/users', json=data)
+        rsp = self.client.post('/api/user', json=data)
         self.assertEqual(rsp.status_code, 201)
         self.assertEqual(rsp.get_json(), user_info)
+        # login fail
+        rsp = self.client.post('/api/login', json={})
+        self.assertEqual(rsp.status_code, 401)
+        self.assertEqual(rsp.get_json(), {'login': False})
         # login
         rsp = self.client.post('/api/login', json=data)
         self.assertEqual(rsp.status_code, 200)
         self.assertEqual(rsp.get_json(), {'login': True})
         access_cookie = rsp.headers['Set-Cookie']
         # get user info
-        rsp = self.client.get('/api/users')
+        rsp = self.client.get('/api/user')
         self.assertEqual(rsp.status_code, 200)
         self.assertEqual(rsp.get_json(), user_info)
         # refresh
