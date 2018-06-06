@@ -6,7 +6,7 @@ from ..models import Model
 
 
 class PasswordMixin:
-    _password = Column('password', PasswordType(128), nullable=False)
+    _password = Column('password', PasswordType(128))
 
     @property
     def password(self):

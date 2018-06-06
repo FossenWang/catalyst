@@ -77,7 +77,7 @@ class SerializableModelTest(FlaskTestCase):
         invalid_data = {'username':'adsadasdsa'*16, 'email': []}
         valid, errors = User.validate_data(invalid_data)
         self.assertEqual(valid, False)
-        self.assertEqual(errors, {'password': ['ValueError: Ensure value is not None'], 'username': ['AssertionError: Ensure string length is less than or equal to 150'], 'email': ['TypeError: expected string or bytes-like object']})
+        self.assertEqual(errors, {'username': ['AssertionError: Ensure string length is less than or equal to 150'], 'email': ['TypeError: expected string or bytes-like object']})
 
         valid_data = {'username':'admin', 'email': 'admin@test.com', 'password': 'asd123'}
         valid, errors = User.validate_data(valid_data)
@@ -105,13 +105,14 @@ class SerializableModelTest(FlaskTestCase):
     
         class A1(Article):
             class Meta:
-                default_validators = {'id': [IntegerValidator()]}
-                extra_validators = {'title': [MaxLengthValidator(50)]}
+                default_validators = {'id': [MaxLengthValidator(50)]}
+                extra_validators = {'title': [IntegerValidator()]}
                 required_fields = ['title']
-        self.assertIsInstance(A1._meta.default_validators.get('id')[0], IntegerValidator)
-        self.assertIsInstance(A1._meta.default_validators.get('title')[0], MaxLengthValidator)
+        self.assertIsInstance(A1._meta.default_validators.get('id')[0], MaxLengthValidator)
+        self.assertIsInstance(A1._meta.default_validators.get('title')[1], IntegerValidator)
         self.assertEqual(A1._meta.required_fields, ['title'])
-        self.assertEqual(hasattr(A1._meta, 'extra_validators'), True)
+        self.assertTrue(hasattr(A1._meta, 'extra_validators'))
+        self.assertTrue('author' in A1._meta.default_validators)
 
         # test create and update object
         valid_data = {'title':'Fossen is awesome!', 'content':'Fossen is awesome!', 'author_id':1}

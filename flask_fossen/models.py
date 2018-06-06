@@ -175,7 +175,6 @@ class ValidationMeta(DefaultMeta):
         super().__init__(name, bases, d)
         if hasattr(cls, 'Meta'):
             meta = cls.Meta
-            # del cls.Meta
         else:
             meta = type('Meta', (object,), {})
 
@@ -185,6 +184,10 @@ class ValidationMeta(DefaultMeta):
 
             if not hasattr(meta, 'default_validators'):
                 meta.default_validators = validators
+            else:
+                for k, v in validators.items():
+                    if k not in meta.default_validators:
+                        meta.default_validators[k] = v
 
             if not hasattr(meta, 'required_fields'):
                 meta.required_fields = required
