@@ -118,7 +118,7 @@ class ValidatorMapper:
         rels = mapper.relationships
         for k, col in cols.items():
             k = col.name
-            if not col.nullable and not col.primary_key:
+            if not col.nullable and col.autoincrement != True:
                 required_fields.append(k)
             validator_map[k] = self.get_column_validator(col)
             

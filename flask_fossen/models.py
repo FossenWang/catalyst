@@ -213,7 +213,7 @@ SerializableModel = declarative_base(
 
 
 class IdMixin:
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     def __str__(self):
         return str(self.id)
 
