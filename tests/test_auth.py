@@ -3,22 +3,29 @@ from flask_fossen.auth import PasswordMixin
 
 from .test_app.app import create_app, db
 from .test_app.app.database import User, Article
-from .test_app.app.views import LoginView
+
 
 class AuthTest(FlaskTestCase):
     app = create_app()
     db = db
 
     def setUp(self):
-        self.session = self.db.session
-        self.admin = User(username='admin', email='admin@test.com', password='asd123')
+        self.session = self.db.session()
+        self.admin = User(username='admin',
+                          email='admin@test.com', password='asd123')
         self.session.add(self.admin)
         self.session.commit()
-        self.articles = [Article(title='article:%d'%i, content='test article:%d'%i, author=self.admin) for i in range(100)]
+        self.articles = [Article(title='article:%d' % i, content='test article:%d' %
+                                 i, author=self.admin) for i in range(100)]
         self.session.add_all(self.articles)
         self.session.commit()
-    
+
     def test_views(self):
+        # test passwordmixin
+        raw = 'asd123'
+        psw = PasswordMixin()
+        psw.password = raw
+        self.assertTrue(psw.check_password(raw))
         # login required
         rsp = self.client.get('/api/user')
         self.assertEqual(rsp.status_code, 401)
@@ -52,11 +59,5 @@ class AuthTest(FlaskTestCase):
         rsp = self.client.post('/api/logout')
         self.assertEqual(rsp.status_code, 200)
         self.assertEqual(rsp.get_json(), {'logout': True})
-        self.assertEqual(rsp.headers['Set-Cookie'], 'access_token_cookie=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; HttpOnly; Path=/')
-
-    def test_models(self):
-        raw = 'asd123'
-        psw = PasswordMixin()
-        psw.password = raw
-        self.assertTrue(psw.check_password(raw))
-
+        self.assertEqual(
+            rsp.headers['Set-Cookie'], 'access_token_cookie=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; HttpOnly; Path=/')

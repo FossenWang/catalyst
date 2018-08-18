@@ -1,4 +1,5 @@
-import sys, unittest, code
+import sys
+import unittest
 from flask import Flask
 
 
@@ -48,6 +49,11 @@ class FlaskTestCase(unittest.TestCase):
 
             if self.db:
                 self.db.create_all()
+                # when there were mutiple apps and tests,
+                # it's may cause error below
+                # sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such table: xxx
+                # reason unknow, but remove session could avoid this
+                self.db.session.remove()
 
     def _post_teardown(self):
         """
@@ -55,6 +61,8 @@ class FlaskTestCase(unittest.TestCase):
         * Pop app context.
         """
         if hasattr(self, 'app_context'):
-            if self.db: self.db.drop_all()
+            if self.db:
+                self.db.session.remove()
+                self.db.drop_all()
+                self.db.engine.dispose()
             self.app_context.pop()
-

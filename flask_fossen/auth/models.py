@@ -32,4 +32,3 @@ class AbstractUser(PasswordMixin, Model):
 
     class Meta:
         serialize_ignore = ['password']
-

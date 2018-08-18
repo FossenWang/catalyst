@@ -1,7 +1,7 @@
 from flask import request, abort
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token, \
-jwt_refresh_token_required, create_refresh_token, get_jwt_identity, \
-set_access_cookies, set_refresh_cookies, unset_jwt_cookies, decode_token, get_jwt_identity
+from flask_jwt_extended import jwt_required, create_access_token, \
+    jwt_refresh_token_required, create_refresh_token, get_jwt_identity, \
+    set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 
 from ..views import JSONView, CreateMixin, SingleObjectMixin
 
@@ -26,7 +26,7 @@ class BaseUserView(SingleObjectMixin, CreateMixin, JSONView):
     def filter_query(self, query):
         identity = get_jwt_identity()
         user_identity = getattr(self.model, self.identity_attribute)
-        return query.filter(user_identity==identity)
+        return query.filter(user_identity == identity)
 
     def get_object(self):
         query = self.get_query()
@@ -57,14 +57,14 @@ class BaseLoginView(JSONView):
         identity = data.get(self.identity_attribute, None)
         password = data.get('password', None)
         user_identity = getattr(self.model, self.identity_attribute)
-        user = self.model.query.filter(user_identity==identity).one_or_none()
+        user = self.model.query.filter(user_identity == identity).one_or_none()
         if user and user.check_password(password):
             return user
 
     def login(self):
-            rsp = self.make_response({'login': True})
-            set_jwt_cookies(rsp, getattr(self.user, self.identity_attribute))
-            return rsp
+        rsp = self.make_response({'login': True})
+        set_jwt_cookies(rsp, getattr(self.user, self.identity_attribute))
+        return rsp
 
     def login_failed(self):
         return self.make_response({'login': False}, status=401)
@@ -83,8 +83,15 @@ class RefreshToken(JSONView):
 
 class LogoutView(JSONView):
     """Log out the user by setting empty token cookie"""
+
     def post(self):
         rsp = self.make_response({'logout': True})
         unset_jwt_cookies(rsp)
         return rsp
 
+
+class LoginRequiredMixin:
+    @jwt_required
+    def dispatch_request(self, *args, **kwargs):
+        self.get_jwt_identity = get_jwt_identity
+        return super().dispatch_request(*args, **kwargs)

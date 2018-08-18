@@ -1,9 +1,9 @@
 import datetime
-from flask_jwt_extended import JWTManager
 from .models import AbstractUser, PasswordMixin
-from .views import BaseLoginView, LogoutView, RefreshToken, BaseUserView, set_jwt_cookies
+from .views import BaseLoginView, LogoutView, \
+RefreshToken, BaseUserView, LoginRequiredMixin, \
+set_jwt_cookies
 
-auth_jwt = JWTManager()
 
 class AuthConfig:
     # JWT Configuration
@@ -18,7 +18,7 @@ class AuthConfig:
 
 
 __all__ = [
-    'auth_jwt', 'AbstractUser', 'PasswordMixin', \
-    'BaseLoginView', 'LogoutView', 'RefreshToken', 'BaseUserView', 'set_jwt_cookies',
+    'AbstractUser', 'PasswordMixin', 'BaseLoginView', \
+    'LogoutView', 'RefreshToken', 'BaseUserView', \
+    'LoginRequiredMixin', 'set_jwt_cookies',
     ]
-

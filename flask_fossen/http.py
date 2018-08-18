@@ -1,6 +1,8 @@
 import json
 from werkzeug.wrappers import Response
 from werkzeug.exceptions import HTTPException, default_exceptions
+from werkzeug.routing import RequestRedirect
+
 
 class JSONResponse(Response):
     """
@@ -8,22 +10,32 @@ class JSONResponse(Response):
     :param response: an object that can be serialized as JSON by json.dumps()
     :param status: a string with a status or an integer with the status code
     """
-    def __init__(self, response=None, is_json=False, status=None, content_type='application/json', **kwargs):
+
+    def __init__(self, response=None, is_json=False, status=None,
+                 content_type='application/json', **kwargs):
+
         if not is_json:
-            response=json.dumps(response)
-        super().__init__(response=response, status=status, content_type=content_type, **kwargs)
+            response = json.dumps(response)
+
+        super().__init__(response=response, status=status,
+                         content_type=content_type, **kwargs)
 
 
 def handle_http_exception(e):
     if isinstance(e, HTTPException):
-        if e.description and e.code in default_exceptions:
+        description = ''
+        if e.description:
             description = e.description
+        elif e.code in default_exceptions:
+            description = {'msg': default_exceptions[e.code].description}
+        elif isinstance(e, RequestRedirect):
+            return e
         else:
-            description = default_exceptions[e.code].description
+            description = str(e)
         return JSONResponse(description, status=e.code)
     else:
         return JSONResponse(
-            default_exceptions[500].description,
+            {'msg': default_exceptions[500].description},
             status=500)
 
 

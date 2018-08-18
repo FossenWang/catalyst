@@ -31,7 +31,7 @@ class ViewTest(FlaskTestCase):
         rsp = self.client.get('/api/articles')
         self.assertEqual(rsp.status_code, 200)
         rsp_data = rsp.get_json()
-        self.assertEqual(rsp_data['paging'], {'total': 100, 'limit': -1, 'offset': 0, 'next': False})
+        self.assertEqual(rsp_data['paging'], {'total': 100, 'limit': None, 'offset': 0, 'next': False})
 
         rsp = self.client.get('/api/articles?limit=20&offset=20')
         self.assertEqual(rsp.status_code, 200)
@@ -51,17 +51,21 @@ class ViewTest(FlaskTestCase):
         rsp = self.client.get('/api/articles?limit=20&offset=asd')
         self.assertEqual(rsp.status_code, 400)
         rsp_data = rsp.get_json()
-        self.assertEqual(rsp_data, 'Offset or limit must an integer')
+        self.assertEqual(rsp_data['msg'], 'Offset must be an Positive integer or 0')
+        rsp = self.client.get('/api/articles?limit=-1&offset=0')
+        self.assertEqual(rsp.status_code, 400)
+        self.assertEqual(rsp.get_json()['msg'], 'Limit must be an Positive integer or 0')
+
 
 
         # test GET and DELETE 404
         error = 'Resource not found'
         rsp = self.client.get('/api/articles/101')
         self.assertEqual(rsp.status_code, 404)
-        self.assertEqual(rsp.get_json(), error)
+        self.assertEqual(rsp.get_json()['msg'], error)
         rsp = self.client.delete('/api/articles/101')
         self.assertEqual(rsp.status_code, 404)
-        self.assertEqual(rsp.get_json(), error)
+        self.assertEqual(rsp.get_json()['msg'], error)
 
 
         # test POST and PUT 400
@@ -70,13 +74,13 @@ class ViewTest(FlaskTestCase):
         before_put = Article.query.filter_by(id=1).one()
         rsp = self.client.put('/api/articles/1', json=invalid_data)
         self.assertEqual(rsp.status_code, 400)
-        self.assertEqual(rsp.get_json()['errors'], {'title': ['ValueError: Ensure value is not None']})
+        self.assertEqual(rsp.get_json()['errors'], {'title': ['Ensure value is not None']})
         after_put = Article.query.filter_by(id=1).one()
         self.assertEqual(before_put.serialize(), after_put.serialize())
         # POST
         rsp = self.client.post('/api/articles', json=invalid_data)
         self.assertEqual(rsp.status_code, 400)
-        self.assertEqual(rsp.get_json()['errors'], {'title': ['ValueError: Ensure value is not None']})
+        self.assertEqual(rsp.get_json()['errors'], {'title': ['Ensure value is not None']})
 
         # test POST & PUT & DELETE_Resource
         # POST
@@ -100,5 +104,3 @@ class ViewTest(FlaskTestCase):
         self.assertEqual(rsp.get_data(), b'')
         q = self.session.query(Article.query.filter_by(id=aid).exists()).scalar()
         self.assertEqual(q, False)
-        
-

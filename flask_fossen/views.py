@@ -4,6 +4,7 @@ from sqlalchemy.orm.query import Query
 from sqlalchemy.exc import DBAPIError
 
 from .http import JSONResponse
+from .models import SerializableModel
 
 
 class BaseView(MethodView):
@@ -11,7 +12,7 @@ class BaseView(MethodView):
         # add attributes
         self.args = args
         self.kwargs = kwargs
-        return super().dispatch_request()
+        return super().dispatch_request(*args, **kwargs)
 
 
 class ContextMixin:
@@ -37,7 +38,6 @@ class SingleObjectMixin(ContextMixin):
     serializing = True
 
     def get(self, *args, **kwargs):
-        self.object = self.get_object()
         return self.make_response(self.get_context_data())
 
     def get_query(self):
@@ -47,8 +47,8 @@ class SingleObjectMixin(ContextMixin):
         may not be called if get_object() is overridden.
         """
         if self.query is None:
-            if self.model is not None:
-                return self.model.query
+            if self.db is not None and self.model is not None:
+                return self.db.session.query(self.model)
             else:
                 raise TypeError(
                     "%(cls)s is missing a query. Define "
@@ -58,18 +58,19 @@ class SingleObjectMixin(ContextMixin):
                     }
                 )
         assert isinstance(self.query, Query), \
-        "'query' Must be an instance of 'sqlalchemy.orm.query.Query'"
+            "'query' Must be an instance of 'sqlalchemy.orm.query.Query'"
         return self.query
-    
+
     def filter_query(self, query):
         """Filter by id, override this method to change filter condition"""
-        obj_id = self.kwargs.get(self.id_url_kwarg)
+        obj_id = self.kwargs.get(self.id_url_kwarg) \
+            or request.args.get(self.id_url_kwarg)
         if obj_id is None:
-            raise AttributeError("No object id")
+            abort(400, {'msg': "No object id"})
         else:
-            query = query.filter(self.model.id==obj_id)
+            query = query.filter(self.model.id == obj_id)
         return query
-    
+
     def get_object(self):
         """
         Return the object the view is displaying.
@@ -80,7 +81,7 @@ class SingleObjectMixin(ContextMixin):
         query = self.filter_query(query)
         obj = query.one_or_none()
         if obj is None:
-            raise abort(404, 'Resource not found')
+            abort(404, {'msg': 'Resource not found'})
         return obj
 
     def serialize_object(self, obj, related=[], ignore=[]):
@@ -88,6 +89,7 @@ class SingleObjectMixin(ContextMixin):
 
     def get_context_data(self, **context):
         """Insert the single object into the context dict."""
+        self.object = self.get_object()
         if self.object:
             if self.serializing:
                 context.update(self.serialize_object(self.object))
@@ -106,10 +108,10 @@ class BaseMultipleObjectMixin(ContextMixin):
     offset = None
     ordering = None
     serializing = True
+    paging_data = None
     paging = True
 
     def get(self, *args, **kwargs):
-        self.object_list = self.get_object_list()
         return self.make_response(self.get_context_data())
 
     def get_query(self):
@@ -118,9 +120,9 @@ class BaseMultipleObjectMixin(ContextMixin):
         Must be an instance of 'Query'.
         """
         if self.query is None:
-            if self.model is not None:
-                query = self.model.query
-                if self.ordering:
+            if self.db is not None and self.model is not None:
+                query = self.db.session.query(self.model)
+                if self.ordering is not None:
                     query = query.order_by(self.ordering)
             else:
                 raise TypeError(
@@ -131,13 +133,13 @@ class BaseMultipleObjectMixin(ContextMixin):
                     }
                 )
         assert isinstance(query, Query), \
-        "'query' Must be an instance of 'sqlalchemy.orm.query.Query'"
+            "'query' Must be an instance of 'sqlalchemy.orm.query.Query'"
         return query
 
     def paginate_query(self, query):
         """Override this method to provide pagination method"""
         return query
-    
+
     def get_object_list(self):
         query = self.get_query()
         if self.paging:
@@ -150,14 +152,15 @@ class BaseMultipleObjectMixin(ContextMixin):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.paging is not None:
-            context['paging'] = self.paging
+        self.object_list = self.get_object_list()
         if self.object_list is not None:
             if self.serializing:
                 object_list = self.serialize_object_list(self.object_list)
             else:
                 object_list = self.object_list
             context['data'] = object_list
+        if self.paging_data is not None:
+            context['paging'] = self.paging_data
         return context
 
 
@@ -174,24 +177,31 @@ class LimitOffsetMixin:
         limit = self.get_limit()
         offset = self.get_offset()
 
-        query = query.limit(limit).offset(offset)
+        if limit:
+            query = query.limit(limit)
+
+        if offset:
+            query = query.offset(offset)
 
         if offset >= total or limit == 0:
             # Reduce unnecessary database access.
-            query.all = lambda:[]
-        
-        self.paging = {'total': total, 'limit':limit, 'offset':offset, 'next': total > (limit + offset) and limit >= 0}
+            query.all = lambda: []
+
+        self.paging_data = {
+            'total': total, 'limit': limit, 'offset': offset,
+            'next': bool(limit) and total > (limit + offset)
+        }
         return query
 
     def get_limit(self):
         limit = request.args.get('limit', self.limit)
         try:
-            if limit is None:
-                limit = -1
-            else:
+            if limit:
                 limit = int(limit)
+                if limit < 0:
+                    raise ValueError
         except ValueError:
-            raise abort(400, "Offset or limit must an integer")
+            abort(400, {'msg': "Limit must be an Positive integer or 0"})
         return limit
 
     def get_offset(self):
@@ -201,8 +211,10 @@ class LimitOffsetMixin:
                 offset = 0
             else:
                 offset = int(offset)
+                if offset < 0:
+                    raise ValueError
         except ValueError:
-            raise abort(400, "Offset or limit must an integer")
+            abort(400, {'msg': "Offset must be an Positive integer or 0"})
         return offset
 
     def get_total(self):
@@ -221,23 +233,43 @@ class MultipleObjectMixin(LimitOffsetMixin, BaseMultipleObjectMixin):
 
 class ValidationMixin:
     """Validate request data"""
+    validator_set = None
+
     def get_data(self):
-        return request.get_json()
+        if request.is_json:
+            return request.get_json()
+        else:
+            abort(406, {'msg': 'Only accept JSON data'})
+
+    def get_validator_set(self):
+        if self.validator_set:
+            return self.validator_set
+        else:
+            assert issubclass(self.model, SerializableModel), \
+                'Need validator_set or SerializableModel'
+            return self.model
 
     def validate_data(self, data):
-        return self.model.validate_data(data)
+        return self.get_validator_set().validate_data(data)
 
-    def data_valid(self, data, extra={}):
+    def data_valid(self, data):
         try:
             self.object = self.save_object(data)
         except DBAPIError:
-            raise abort(400, 'Database operation fails')
-        context = self.object.serialize()
-        context.update(extra)
-        return self.make_response(context, status=201)
+            abort(400, {'msg': 'Database operation fails'})
+        return self.make_response(self.get_success_data(data), status=201)
+
+    def get_success_data(self, data):
+        if self.object:
+            return self.object.serialize()
+        else:
+            return data
 
     def data_invalid(self, data, errors, **kwargs):
-        raise abort(400, {'invalid data': data, 'errors': errors})
+        abort(400, {
+            'msg': 'Invalid data',
+            'invalid data': data, 'errors': errors
+        })
 
 
 class UpdateMixin(ValidationMixin):
@@ -246,15 +278,14 @@ class UpdateMixin(ValidationMixin):
 
     def put(self, *args, **kwargs):
         self.data = self.get_data()
-        is_valid, errors = self.validate_data(self.data)
-        if is_valid:
-            return self.data_valid(self.data)
+        result = self.validate_data(self.data)
+        if result.is_valid:
+            return self.data_valid(result.valid_data)
         else:
-            return self.data_invalid(self.data, errors)
+            return self.data_invalid(result.invalid_data, result.errors)
 
     def save_object(self, data):
         obj = self.get_object()
-        self.db.session.add(obj)
         self.model.update(obj, data)
         self.db.session.commit()
         return obj
@@ -266,11 +297,11 @@ class CreateMixin(ValidationMixin):
 
     def post(self, *args, **kwargs):
         self.data = self.get_data()
-        is_valid, errors = self.validate_data(self.data)
-        if is_valid:
-            return self.data_valid(self.data)
+        result = self.validate_data(self.data)
+        if result.is_valid:
+            return self.data_valid(result.valid_data)
         else:
-            return self.data_invalid(self.data, errors)
+            return self.data_invalid(result.invalid_data, result.errors)
 
     def save_object(self, data):
         obj = self.model.create(data)
@@ -282,6 +313,7 @@ class CreateMixin(ValidationMixin):
 class DeleteMixin:
     """Delete a single object."""
     db = None
+
     def delete(self, *args, **kwargs):
         obj = self.get_object()
         self.db.session.delete(obj)
@@ -291,6 +323,7 @@ class DeleteMixin:
 
 class JSONResponseMixin:
     """Return JSON response"""
+
     def make_response(self, context, status=None, is_json=False, **kwargs):
         """
         Return a JSON Response
@@ -316,4 +349,3 @@ class ResourceList(MultipleObjectMixin, CreateMixin, JSONView):
     Restful resource list view which can show a
     list of resources and create a new resource.
     """
-

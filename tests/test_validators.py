@@ -1,19 +1,26 @@
 import enum
 
-from flask_fossen.testcases import FlaskTestCase
-from flask_fossen.validators import generate_validators_from_mapper, column_validator_map, \
-MaxLengthValidator, IntegerValidator, EnumValidator, \
-PasswordValidator, EmailValidator
+from sqlalchemy.sql.sqltypes import Enum
 
-from flask_fossen.coltypes import Enum, PasswordType, EmailType
+from flask_fossen.testcases import FlaskTestCase
+from flask_fossen.validators import generate_validators_from_mapper, \
+    MaxLengthValidator, IntegerValidator, EnumValidator, \
+    PasswordValidator, EmailValidator, BooleanValidator
 
 from .test_app.app.database import User
 
 
 class ValidatorsTest(FlaskTestCase):
+    def test_BooleanValidator(self):
+        validator = BooleanValidator()
+        self.assertEqual(validator(None), None)
+        self.assertEqual(validator(True), True)
+        self.assertEqual(validator(False), False)
+        self.assertRaises(AssertionError, validator, 'asdzxc')
+
     def test_MaxLengthValidator(self):
         maxLength_validator = MaxLengthValidator(3)
-        self.assertEqual(maxLength_validator('asd'),'asd')
+        self.assertEqual(maxLength_validator('asd'), 'asd')
         self.assertRaises(AssertionError, maxLength_validator, 'asdzxc')
 
     def test_IntegerValidator(self):
@@ -27,9 +34,9 @@ class ValidatorsTest(FlaskTestCase):
 
     def test_EnumValidator(self):
         class TestEnum(enum.Enum):
-            qqq=1
-            www=2
-            eee=3
+            qqq = 1
+            www = 2
+            eee = 3
         enum_type = Enum(TestEnum)
         enum_validator = EnumValidator(enum_type._valid_lookup)
         self.assertEqual(enum_validator('qqq'), 'qqq')
@@ -48,7 +55,7 @@ class ValidatorsTest(FlaskTestCase):
         self.assertRaises(TypeError, email_validator, [])
 
     def test_PasswordValidator(self):
-        password_validator = PasswordValidator(6,20, '_,./')
+        password_validator = PasswordValidator(6, 20, '_,./')
         self.assertEqual(password_validator('asd123'), 'asd123')
         self.assertEqual(password_validator('asd_,./123'), 'asd_,./123')
         self.assertRaises(AssertionError, password_validator, 'asd45')
@@ -61,6 +68,5 @@ class ValidatorsTest(FlaskTestCase):
         self.assertEqual(required, ['username', 'email'])
         self.assertIsInstance(validators['id'][0], IntegerValidator)
         self.assertIsInstance(validators['username'][0], MaxLengthValidator)
-        self.assertIsInstance(validators['email'][0], EmailValidator)
+        self.assertIsInstance(validators['email'][1], EmailValidator)
         self.assertIsInstance(validators['password'][0], PasswordValidator)
-

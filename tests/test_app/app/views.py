@@ -2,9 +2,10 @@ from flask import Blueprint
 
 from flask_fossen.views import Resource, ResourceList
 from flask_fossen.http import register_json_error_handle
-from flask_fossen.auth import auth_jwt, BaseLoginView, LogoutView, RefreshToken, BaseUserView
+from flask_fossen.auth import BaseLoginView, LogoutView, RefreshToken, BaseUserView
 
-from .database import User, Article, db
+from .database import User, Article
+from .ext import db
 
 
 def index():
@@ -43,4 +44,3 @@ bp.add_url_rule('/token/refresh', view_func=RefreshToken.as_view('token_refresh'
 
 
 register_json_error_handle(bp)
-

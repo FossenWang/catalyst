@@ -3,10 +3,10 @@ from setuptools import setup
 setup(
     name='Flask_Fossen',
     version='0.1',
-    description = "Fossen's restful flask extension",
+    description="Fossen's restful flask extension",
     long_description=__doc__,
-    author = "Fosssen",
-    author_email = "fossen@fossen.cn",
+    author="Fosssen",
+    author_email="fossen@fossen.cn",
     packages=['flask_fossen'],
     include_package_data=False,
     zip_safe=False,
