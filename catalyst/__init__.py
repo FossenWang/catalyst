@@ -1,13 +1,19 @@
-from flask_sqlalchemy import Model
-from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship
 
 
-from marshmallow import Schema
+class ValidationResult:
+    def __init__(self, valid_data, errors, invalid_data):
+        self.valid_data = valid_data
+        self.is_valid = not errors
+        self.errors = errors
+        self.invalid_data = invalid_data
+
+
+class ValidationError(Exception):
+    pass
 
 
 def from_attribute(obj, name):
-    return obj.name
+    return getattr(obj, name)
 
 
 class Field:
@@ -26,26 +32,38 @@ class Field:
             value = self.formatter(value)
         return value
 
-    def validate(self, data):
-        value = data[self.key]
+    def validate(self, value):
         if self.validator:
             value = self.validator(value)
         return value
 
+class StringValidator:
+    def __init__(self, max_length=None, min_length=None, allow_blank=False):
+        self.max_length = max_length
+        self.min_length = min_length
+        self.allow_blank = allow_blank
 
-class ValidationResult:
-    def __init__(self, valid_data, errors, invalid_data):
-        self.valid_data = valid_data
-        self.is_valid = not errors
-        self.errors = errors
-        self.invalid_data = invalid_data
+    def __call__(self, value):
+        value = str(value)
+        if not self.allow_blank and value == '':
+            raise ValidationError("Ensure string is not empty")
+        if self.max_length is not None and len(value) > self.max_length:
+            raise ValidationError("Ensure string length <= %d" % self.max_length)
+        if self.min_length is not None and len(value) < self.min_length:
+            raise ValidationError("Ensure string length >= %d" % self.min_length)
+        return value
 
-    def __str__(self):
-        return '<Validation Result>'
 
+class StringField(Field):
+    def __init__(self, name=None, key=None, source=from_attribute,
+                 formatter=str, validator=None, required=False,
+                 max_length=None, min_length=None, allow_blank=False):
+        if validator is None and \
+            (max_length is not None or min_length is not None):
+            validator = StringValidator(max_length, min_length, allow_blank)
 
-class ValidationError(Exception):
-    pass
+        super().__init__(name=name, key=key, source=source,
+            formatter=formatter, validator=validator, required=required)
 
 
 class Catalyst:
@@ -58,6 +76,7 @@ class Catalyst:
         for field in self.fields.values():
             # key和name的默认值需要用别的办法设置
             obj_dict[field.key] = field.extract(obj)
+        return obj_dict
 
     def validate(self, data):
         invalid_data = {}
@@ -76,29 +95,3 @@ class Catalyst:
 
 
 
-
-
-class Article(Model):
-    title = Column(String(64), nullable=False)
-    content = Column(String(64), nullable=False)
-
-
-class ArticleCatalyst(Catalyst):
-    title = StringField(name='title', key='title_key', source=None, formatter=None, validator=None, required=True)
-    content = StringField(name='content', key='content_key', source=None, formatter=None, validator=None, required=True)
-
-article_catalyst = ArticleCatalyst()
-
-article = Article(title='xxx', content='xxxxxx')
-
-article_dict = article_catalyst.extract(article)
-
-result = article_catalyst.validate(article_dict)
-article = article_catalyst.create(article_dict)
-
-
-# Article -> 
-# {
-#     'title_key': 'xxx',
-#     'content_key': 'xxxxxx',
-# }
