@@ -27,7 +27,6 @@ class Catalyst(metaclass=CatalystMeta):
     def extract(self, obj):
         obj_dict = {}
         for field in self._fields.values():
-            # key和name的默认值需要用别的办法设置
             obj_dict[field.key] = field.extract(obj)
         return obj_dict
 
@@ -56,6 +55,3 @@ class Catalyst(metaclass=CatalystMeta):
             else:
                 valid_data[field.key] = value
         return ValidationResult(valid_data, errors, invalid_data)
-
-
-

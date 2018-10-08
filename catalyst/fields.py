@@ -30,12 +30,12 @@ class Field:
 class StringField(Field):
     def __init__(self, name=None, key=None, source=from_attribute,
                  formatter=str, validator=None, required=False,
-                 max_length=None, min_length=None):
-        self.max_length = max_length
+                 min_length=None, max_length=None):
         self.min_length = min_length
+        self.max_length = max_length
         if validator is None and \
-            (max_length is not None or min_length is not None):
-            validator = StringValidator(max_length, min_length)
+            (min_length is not None or max_length is not None):
+            validator = StringValidator(min_length, max_length)
 
         super().__init__(name=name, key=key, source=source,
             formatter=formatter, validator=validator, required=required)
@@ -44,12 +44,12 @@ class StringField(Field):
 class IntegerField(Field):
     def __init__(self, name=None, key=None, source=from_attribute,
                  formatter=int, validator=None, required=False,
-                 max_value=None, min_value=None):
+                 min_value=None, max_value=None):
         self.max_value = max_value
         self.min_value = min_value
         if validator is None and \
-            (max_value is not None or min_value is not None):
-            validator = IntegerValidator(max_value, min_value)
+            (min_value is not None or max_value is not None):
+            validator = IntegerValidator(min_value, max_value)
 
         super().__init__(name=name, key=key, source=source,
             formatter=formatter, validator=validator, required=required)

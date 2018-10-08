@@ -21,29 +21,34 @@ class Validator:
 
 class StringValidator(Validator):
     'string validator'
-    def __init__(self, max_length=None, min_length=None):
-        self.max_length = max_length
+    def __init__(self, min_length=None, max_length=None):
         self.min_length = min_length
+        self.max_length = max_length
 
     def __call__(self, value):
         value = str(value)
-        if self.max_length is not None and len(value) > self.max_length:
-            raise ValidationError("Ensure string length <= %d" % self.max_length)
         if self.min_length is not None and len(value) < self.min_length:
             raise ValidationError("Ensure string length >= %d" % self.min_length)
+        if self.max_length is not None and len(value) > self.max_length:
+            raise ValidationError("Ensure string length <= %d" % self.max_length)
         return value
 
 
 class IntegerValidator(Validator):
     'integer validator'
-    def __init__(self, max_value, min_value):
-        self.max_value = max_value
+    def __init__(self, min_value=None, max_value=None):
         self.min_value = min_value
+        self.max_value = max_value
 
     def __call__(self, value):
-        value = int(value)
-        if self.max_value is not None and value > self.max_value:
-            raise ValidationError("Ensure value <= %d" % self.max_value)
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            raise ValidationError('Ensure value is integer')
+
         if self.min_value is not None and value < self.min_value:
             raise ValidationError("Ensure value >= %d" % self.min_value)
+
+        if self.max_value is not None and value > self.max_value:
+            raise ValidationError("Ensure value <= %d" % self.max_value)
         return value
