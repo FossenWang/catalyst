@@ -34,17 +34,20 @@ class StringValidator(Validator):
         return value
 
 
-class IntegerValidator(Validator):
-    'integer validator'
+class ScalarValidator(Validator):
+    'compare scalar'
+    scalar_type = None
+    scalar_name = None
+
     def __init__(self, min_value=None, max_value=None):
         self.min_value = min_value
         self.max_value = max_value
 
     def __call__(self, value):
         try:
-            value = int(value)
+            value = self.scalar_type(value)
         except (TypeError, ValueError):
-            raise ValidationError('Ensure value is integer')
+            raise ValidationError('Ensure value is %s' % self.scalar_name)
 
         if self.min_value is not None and value < self.min_value:
             raise ValidationError("Ensure value >= %d" % self.min_value)
@@ -52,3 +55,15 @@ class IntegerValidator(Validator):
         if self.max_value is not None and value > self.max_value:
             raise ValidationError("Ensure value <= %d" % self.max_value)
         return value
+
+
+class IntegerValidator(ScalarValidator):
+    'integer validator'
+    scalar_type = int
+    scalar_name = 'integer'
+
+
+class FloatValidator(ScalarValidator):
+    'float validator'
+    scalar_type = float
+    scalar_name = 'float'
