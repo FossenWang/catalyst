@@ -5,7 +5,7 @@ from unittest import TestCase
 # from marshmallow import Schema, fields
 
 from . import Catalyst, StringField, IntegerField
-from .validators import ValidationError, StringValidator, IntegerValidator
+from .validators import ValidationError, Validator, StringValidator, IntegerValidator
 
 
 from pprint import pprint
@@ -60,6 +60,25 @@ class CatalystTest(TestCase):
 
 
 class ValidationTest(TestCase):
+
+    def test_vase_validator(self):
+        class NewValidator(Validator):
+            default_error_msg = {'msg': 'default'}
+            def __call__(self, value):
+                raise ValidationError(self.error_msg['msg'])
+
+        default_validator = NewValidator()
+        custom_msg_validator = NewValidator(error_msg={'msg': 'custom'})
+        try:
+            default_validator(0)
+        except ValidationError as e:
+            self.assertEqual(str(e), 'default')
+        try:
+            custom_msg_validator(0)
+        except ValidationError as e:
+            self.assertEqual(str(e), 'custom')
+
+        self.assertDictEqual(NewValidator.default_error_msg, {'msg': 'default'})
 
     def test_integer_validator(self):
         validator = IntegerValidator(0, 100)
