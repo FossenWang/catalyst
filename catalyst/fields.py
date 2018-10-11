@@ -1,6 +1,6 @@
 "Fields"
 
-from .validators import StringValidator, IntegerValidator
+from .validators import StringValidator, IntegerValidator, FloatValidator
 
 from_attribute = getattr
 
@@ -41,6 +41,20 @@ class StringField(Field):
             formatter=formatter, validator=validator, required=required)
 
 
+class NumberField(Field):
+    def __init__(self, name=None, key=None, source=from_attribute,
+                 formatter=int, validator=None, required=False,
+                 min_value=None, max_value=None):
+        self.max_value = max_value
+        self.min_value = min_value
+        if validator is None and \
+            (min_value is not None or max_value is not None):
+            validator = IntegerValidator(min_value, max_value)
+
+        super().__init__(name=name, key=key, source=source,
+            formatter=formatter, validator=validator, required=required)
+
+
 class IntegerField(Field):
     def __init__(self, name=None, key=None, source=from_attribute,
                  formatter=int, validator=None, required=False,
@@ -54,3 +68,16 @@ class IntegerField(Field):
         super().__init__(name=name, key=key, source=source,
             formatter=formatter, validator=validator, required=required)
 
+
+class FloatField(Field):
+    def __init__(self, name=None, key=None, source=from_attribute,
+                 formatter=float, validator=None, required=False,
+                 min_value=None, max_value=None):
+        self.max_value = max_value
+        self.min_value = min_value
+        if validator is None and \
+            (min_value is not None or max_value is not None):
+            validator = FloatValidator(min_value, max_value)
+
+        super().__init__(name=name, key=key, source=source,
+            formatter=formatter, validator=validator, required=required)

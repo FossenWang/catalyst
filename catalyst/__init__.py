@@ -21,6 +21,8 @@ class CatalystMeta(type):
 
 
 class Catalyst(metaclass=CatalystMeta):
+    _fields = None
+
     def __init__(self):
         pass
 
