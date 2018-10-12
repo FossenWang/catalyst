@@ -50,7 +50,7 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
         self.assertDictEqual(result.valid_data, {})
 
-        # test param: required
+        # test required field
         # ignore other fields
         invalid_data = valid_data.copy()
         invalid_data.pop('integer')
@@ -60,6 +60,11 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {'integer'})
         self.assertDictEqual(result.valid_data, invalid_data)
 
+        # test raise_error
+        raise_err_catalyst = TestDataCatalyst(raise_error=True)
+        self.assertRaises(ValidationError, raise_err_catalyst.validate, invalid_data)
+        result = raise_err_catalyst.validate(valid_data)
+        self.assertTrue(result.is_valid)
         # pprint((result.errors, result.invalid_data, result.valid_data))
 
 

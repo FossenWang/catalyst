@@ -23,8 +23,8 @@ class CatalystMeta(type):
 class Catalyst(metaclass=CatalystMeta):
     _fields = None
 
-    def __init__(self):
-        pass
+    def __init__(self, raise_error=False):
+        self.raise_error = raise_error
 
     def extract(self, obj):
         obj_dict = {}
@@ -56,4 +56,8 @@ class Catalyst(metaclass=CatalystMeta):
                 invalid_data[field.key] = value
             else:
                 valid_data[field.key] = value
-        return ValidationResult(valid_data, errors, invalid_data)
+
+        validation_result = ValidationResult(valid_data, errors, invalid_data)
+        if not validation_result.is_valid and self.raise_error:
+            raise ValidationError(validation_result)
+        return validation_result
