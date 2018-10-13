@@ -1,6 +1,8 @@
 "Fields"
 
-from .validators import StringValidator, IntegerValidator, FloatValidator
+from .validators import StringValidator, IntegerValidator, FloatValidator, \
+    BooleanValidator
+
 
 from_attribute = getattr
 
@@ -42,42 +44,41 @@ class StringField(Field):
 
 
 class NumberField(Field):
+    type_ = None
+    validator_class = None
+
     def __init__(self, name=None, key=None, source=from_attribute,
-                 formatter=int, validator=None, required=False,
+                 formatter=None, validator=None, required=False,
                  min_value=None, max_value=None):
         self.max_value = max_value
         self.min_value = min_value
+
+        if not formatter:
+            formatter = self.type_
+
         if validator is None and \
             (min_value is not None or max_value is not None):
-            validator = IntegerValidator(min_value, max_value)
+            validator = self.validator_class(min_value, max_value)
 
         super().__init__(name=name, key=key, source=source,
             formatter=formatter, validator=validator, required=required)
 
 
-class IntegerField(Field):
+class IntegerField(NumberField):
+    type_ = int
+    validator_class = IntegerValidator
+
+
+class FloatField(NumberField):
+    type_ = float
+    validator_class = FloatValidator
+
+
+class BoolField(Field):
     def __init__(self, name=None, key=None, source=from_attribute,
-                 formatter=int, validator=None, required=False,
-                 min_value=None, max_value=None):
-        self.max_value = max_value
-        self.min_value = min_value
-        if validator is None and \
-            (min_value is not None or max_value is not None):
-            validator = IntegerValidator(min_value, max_value)
-
-        super().__init__(name=name, key=key, source=source,
-            formatter=formatter, validator=validator, required=required)
-
-
-class FloatField(Field):
-    def __init__(self, name=None, key=None, source=from_attribute,
-                 formatter=float, validator=None, required=False,
-                 min_value=None, max_value=None):
-        self.max_value = max_value
-        self.min_value = min_value
-        if validator is None and \
-            (min_value is not None or max_value is not None):
-            validator = FloatValidator(min_value, max_value)
+                 formatter=bool, validator=None, required=False):
+        if not validator:
+            validator = BooleanValidator()
 
         super().__init__(name=name, key=key, source=source,
             formatter=formatter, validator=validator, required=required)

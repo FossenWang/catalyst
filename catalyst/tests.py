@@ -60,7 +60,7 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {'integer'})
         self.assertDictEqual(result.valid_data, invalid_data)
 
-        # test raise_error
+        # test raise error while validating
         raise_err_catalyst = TestDataCatalyst(raise_error=True)
         self.assertRaises(ValidationError, raise_err_catalyst.validate, invalid_data)
         result = raise_err_catalyst.validate(valid_data)

@@ -40,27 +40,39 @@ class Validator:
 
 class StringValidator(Validator):
     """string validator"""
-    def __init__(self, min_length=None, max_length=None):
+    def __init__(self, min_length=None, max_length=None, error_msg=None):
         self.min_length = min_length
         self.max_length = max_length
 
+        if self.default_error_msg is None:
+            self.default_error_msg = {
+                'wrong_type': 'Ensure value is string or can be converted to a string',
+                'too_small': "Ensure string length >= %d" % self.min_length,
+                'too_large': "Ensure string length <= %d" % self.max_length,
+            }
+        super().__init__(error_msg=error_msg)
+
     def __call__(self, value):
-        value = str(value)
+        try:
+            value = str(value)
+        except Exception:
+            raise ValidationError(self.error_msg['wrong_type'])
+
         if self.min_length is not None and len(value) < self.min_length:
-            raise ValidationError("Ensure string length >= %d" % self.min_length)
+            raise ValidationError(self.error_msg['too_small'])
         if self.max_length is not None and len(value) > self.max_length:
-            raise ValidationError("Ensure string length <= %d" % self.max_length)
+            raise ValidationError(self.error_msg['too_large'])
         return value
 
 
-class ScalarValidator(Validator):
+class NumberValidator(Validator):
     """
-    compare scalar
+    compare number
     error_msg:
     includ keys ('wrong_type', 'too_small', 'too_large')
     """
     name = None
-    type = None
+    type_ = None
 
     def __init__(self, min_value=None, max_value=None, error_msg=None):
         self.min_value = min_value
@@ -77,7 +89,7 @@ class ScalarValidator(Validator):
 
     def __call__(self, value):
         try:
-            value = self.type(value)
+            value = self.type_(value)
         except (TypeError, ValueError):
             raise ValidationError(self.error_msg['wrong_type'])
 
@@ -89,13 +101,30 @@ class ScalarValidator(Validator):
         return value
 
 
-class IntegerValidator(ScalarValidator):
+class IntegerValidator(NumberValidator):
     """integer validator"""
     name = 'integer'
-    type = int
+    type_ = int
 
 
-class FloatValidator(ScalarValidator):
+class FloatValidator(NumberValidator):
     """float validator"""
     name = 'float'
-    type = float
+    type_ = float
+
+
+class BooleanValidator(Validator):
+    """bool validator"""
+    default_error_msg = {
+        'wrong_type': 'Ensure value is bool or can be converted to a bool',
+    }
+
+    def __init__(self, error_msg=None):
+        super().__init__(error_msg=error_msg)
+
+    def __call__(self, value):
+        try:
+            value = bool(value)
+        except Exception:
+            raise ValidationError(self.error_msg['wrong_type'])
+        return value
