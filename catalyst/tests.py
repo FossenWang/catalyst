@@ -3,9 +3,10 @@
 from unittest import TestCase
 
 # from marshmallow import Schema, fields
+# from django.forms import fields
 
 from . import Catalyst, StringField, IntegerField, FloatField
-from .validators import ValidationError, Validator, StringValidator, IntegerValidator, \
+from .validators import ValidationError, Validator, LengthValidator, IntegerValidator, \
     FloatValidator
 
 
@@ -72,13 +73,13 @@ class ValidationTest(TestCase):
 
     def test_vase_validator(self):
         class NewValidator(Validator):
-            default_error_msg = {'msg': 'default'}
+            default_error_messages = {'msg': 'default'}
             def __call__(self, value):
-                raise ValidationError(self.error_msg['msg'])
+                raise ValidationError(self.error_messages['msg'])
 
         # test alterable error messages
         default_validator = NewValidator()
-        custom_msg_validator = NewValidator(error_msg={'msg': 'custom'})
+        custom_msg_validator = NewValidator(error_messages={'msg': 'custom'})
         try:
             default_validator(0)
         except ValidationError as e:
@@ -87,51 +88,65 @@ class ValidationTest(TestCase):
             custom_msg_validator(0)
         except ValidationError as e:
             self.assertEqual(str(e), 'custom')
-        self.assertDictEqual(NewValidator.default_error_msg, {'msg': 'default'})
+        self.assertDictEqual(NewValidator.default_error_messages, {'msg': 'default'})
 
     def test_integer_validator(self):
         validator = IntegerValidator(0, 100)
 
-        self.assertEqual(validator(1), 1)
-        self.assertEqual(validator(0), 0)
-        self.assertEqual(validator(100), 100)
-        self.assertEqual(validator('1'), 1)
-        self.assertEqual(validator('0'), 0)
-        self.assertEqual(validator('100'), 100)
+        # self.assertEqual(validator(1), 1)
+        # self.assertEqual(validator(0), 0)
+        # self.assertEqual(validator(100), 100)
+        # self.assertEqual(validator('1'), 1)
+        # self.assertEqual(validator('0'), 0)
+        # self.assertEqual(validator('100'), 100
 
+        validator(1)
+        validator(0)
+        validator(100)
         self.assertRaises(ValidationError, validator, -1)
         self.assertRaises(ValidationError, validator, 101)
-        self.assertRaises(ValidationError, validator, None)
-        self.assertRaises(ValidationError, validator, [])
+        # self.assertRaises(ValidationError, validator, None)
+        # self.assertRaises(ValidationError, validator, [])
 
     def test_float_validator(self):
         validator = FloatValidator(-1.1, 1.1)
 
-        self.assertEqual(validator(1), 1.0)
-        self.assertEqual(validator(0), 0.0)
-        self.assertEqual(validator(0.1), 0.1)
-        self.assertEqual(validator(1.1), 1.1)
-        self.assertEqual(validator(-1.1), -1.1)
-        self.assertEqual(validator('1'), 1.0)
-
+        # self.assertEqual(validator(1), 1.0)
+        # self.assertEqual(validator(0), 0.0)
+        # self.assertEqual(validator(0.1), 0.1)
+        # self.assertEqual(validator(1.1), 1.1)
+        # self.assertEqual(validator(-1.1), -1.1)
+        # self.assertEqual(validator('1'), 1.0)
+        
+        validator(1)
+        validator(0)
+        validator(0.1)
+        validator(1.1)
+        validator(-1.1)
         self.assertRaises(ValidationError, validator, -2)
         self.assertRaises(ValidationError, validator, 2)
-        self.assertRaises(ValidationError, validator, None)
-        self.assertRaises(ValidationError, validator, [])
+        # self.assertRaises(ValidationError, validator, None)
+        # self.assertRaises(ValidationError, validator, [])
 
 
     def test_string_validator(self):
-        validator = StringValidator(2, 10)
+        validator = LengthValidator(2, 10)
 
-        self.assertEqual(validator('x' * 2), 'x' * 2)
-        self.assertEqual(validator('x' * 5), 'x' * 5)
-        self.assertEqual(validator('x' * 10), 'x' * 10)
-        self.assertEqual(validator(['xzc', 1]), "['xzc', 1]")
-        self.assertEqual(validator(None), 'None')
-
+        # self.assertEqual(validator('x' * 2), 'x' * 2)
+        # self.assertEqual(validator('x' * 5), 'x' * 5)
+        # self.assertEqual(validator('x' * 10), 'x' * 10)
+        # self.assertEqual(validator(['xzc', 1]), ['xzc', 1])
+        
+        validator('x' * 2)
+        validator('x' * 5)
+        validator('x' * 10)
+        validator(['xzc', 1])
         self.assertRaises(ValidationError, validator, 'x')
         self.assertRaises(ValidationError, validator, 'x' * 11)
         self.assertRaises(ValidationError, validator, '')
+        self.assertRaises(TypeError, validator, None)
+        # self.assertRaises(ValidationError, validator, ['xzc', 1])
 
-        validator = StringValidator(0, 1)
-        self.assertEqual(validator(''), '')
+        validator = LengthValidator(0, 1)
+        validator('')
+        validator([])

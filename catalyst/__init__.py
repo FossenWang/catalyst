@@ -50,7 +50,7 @@ class Catalyst(metaclass=CatalystMeta):
                 continue
 
             try:
-                value = field.validate(value)
+                value = field.deserialize(value)
             except Exception as e:
                 errors[field.key] = e
                 invalid_data[field.key] = value

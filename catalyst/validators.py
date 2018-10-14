@@ -18,113 +18,94 @@ class ValidationError(Exception):
 
 class Validator:
     """
-    default_error_msg
+    default_error_messages
     """
-    default_error_msg = None
+    default_error_messages = None
 
-    def __init__(self, error_msg=None):
+    def __init__(self, error_messages=None):
         """
         params:
-        error_msg  type: dict
+        error_messages  type: dict
         stores msg of errors raised by validator
         change the dict data to custom error msg
-        data will update a copy of default_error_msg
+        data will update a copy of default_error_messages
         """
-        self.error_msg = self.default_error_msg.copy() if self.default_error_msg else {}
-        self.error_msg.update(error_msg if error_msg else {})
+        self.error_messages = self.default_error_messages.copy() \
+            if self.default_error_messages else {}
+        self.error_messages.update(error_messages if error_messages else {})
 
     def __call__(self, value):
         raise NotImplementedError('Validate the given value and \
             return the valid value or raise any exception if invalid')
 
 
-class StringValidator(Validator):
-    """string validator"""
-    def __init__(self, min_length=None, max_length=None, error_msg=None):
+class LengthValidator(Validator):
+    """length validator"""
+    def __init__(self, min_length=None, max_length=None, error_messages=None):
         self.min_length = min_length
         self.max_length = max_length
 
-        if self.default_error_msg is None:
-            self.default_error_msg = {
-                'wrong_type': 'Ensure value is string or can be converted to a string',
+        if self.default_error_messages is None:
+            self.default_error_messages = {
                 'too_small': "Ensure string length >= %d" % self.min_length,
                 'too_large': "Ensure string length <= %d" % self.max_length,
             }
-        super().__init__(error_msg=error_msg)
+        super().__init__(error_messages=error_messages)
 
     def __call__(self, value):
-        try:
-            value = str(value)
-        except Exception:
-            raise ValidationError(self.error_msg['wrong_type'])
-
         if self.min_length is not None and len(value) < self.min_length:
-            raise ValidationError(self.error_msg['too_small'])
+            raise ValidationError(self.error_messages['too_small'])
         if self.max_length is not None and len(value) > self.max_length:
-            raise ValidationError(self.error_msg['too_large'])
-        return value
+            raise ValidationError(self.error_messages['too_large'])
 
 
 class NumberValidator(Validator):
     """
     compare number
-    error_msg:
-    includ keys ('wrong_type', 'too_small', 'too_large')
+    error_messages:
+    includ keys ('type_error', 'too_small', 'too_large')
     """
-    name = None
     type_ = None
 
-    def __init__(self, min_value=None, max_value=None, error_msg=None):
+    def __init__(self, min_value=None, max_value=None, error_messages=None):
         self.min_value = min_value
         self.max_value = max_value
 
-        if self.default_error_msg is None:
-            self.default_error_msg = {
-                'wrong_type': 'Ensure value is %s' % self.name,
+        if self.default_error_messages is None:
+            self.default_error_messages = {
                 'too_small': "Ensure value >= %d" % self.min_value,
                 'too_large': "Ensure value <= %d" % self.max_value,
             }
 
-        super().__init__(error_msg=error_msg)
+        super().__init__(error_messages=error_messages)
 
     def __call__(self, value):
-        try:
-            value = self.type_(value)
-        except (TypeError, ValueError):
-            raise ValidationError(self.error_msg['wrong_type'])
-
         if self.min_value is not None and value < self.min_value:
-            raise ValidationError(self.error_msg['too_small'])
+            raise ValidationError(self.error_messages['too_small'])
 
         if self.max_value is not None and value > self.max_value:
-            raise ValidationError(self.error_msg['too_large'])
-        return value
+            raise ValidationError(self.error_messages['too_large'])
 
 
 class IntegerValidator(NumberValidator):
     """integer validator"""
-    name = 'integer'
     type_ = int
 
 
 class FloatValidator(NumberValidator):
     """float validator"""
-    name = 'float'
     type_ = float
 
 
-class BooleanValidator(Validator):
+class BoolValidator(Validator):
     """bool validator"""
-    default_error_msg = {
-        'wrong_type': 'Ensure value is bool or can be converted to a bool',
+    default_error_messages = {
+        'type_error': 'Ensure value is bool or can be converted to a bool',
     }
 
-    def __init__(self, error_msg=None):
-        super().__init__(error_msg=error_msg)
+    def __init__(self, error_messages=None):
+        super().__init__(error_messages=error_messages)
 
     def __call__(self, value):
-        try:
-            value = bool(value)
-        except Exception:
-            raise ValidationError(self.error_msg['wrong_type'])
-        return value
+        if not isinstance(value, bool):
+            raise ValidationError(self.error_messages['type_error'])
