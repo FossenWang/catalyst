@@ -90,7 +90,7 @@ class ComparisonValidator(Validator):
 class BoolValidator(Validator):
     """bool validator"""
     default_error_messages = {
-        'type_error': 'Ensure value is bool or can be converted to a bool',
+        'type_error': 'Ensure value is bool',
     }
 
     def __init__(self, error_messages=None):

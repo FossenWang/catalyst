@@ -2,10 +2,10 @@
 
 from unittest import TestCase
 
-# from marshmallow import Schema, fields
+from marshmallow import Schema, fields
 # from django.forms import fields
 
-from . import Catalyst, StringField, IntegerField, FloatField
+from . import Catalyst, StringField, IntegerField, FloatField, BoolField
 from .validators import ValidationError, Validator, LengthValidator, ComparisonValidator, \
     BoolValidator
 
@@ -14,32 +14,37 @@ from pprint import pprint
 
 
 class TestData:
-    def __init__(self, string, integer, _float):
+    def __init__(self, string=None, integer=None, float_=None, bool_=None):
         self.string = string
         self.integer = integer
-        self.float = _float
+        self.float = float_
+        self.bool = bool_
 
 
 class TestDataCatalyst(Catalyst):
     string = StringField(min_length=2, max_length=12)
     integer = IntegerField(min_value=0, max_value=12, required=True)
-    _float = FloatField(name='float', key='float', min_value=-1.1, max_value=1.1)
+    float_field = FloatField(name='float', key='float', min_value=-1.1, max_value=1.1)
+    bool_field = BoolField(name='bool', key='bool')
 
 
 test_data_catalyst = TestDataCatalyst()
-test_data = TestData(string='xxx', integer=1, _float=1.1)
 
 
 class CatalystTest(TestCase):
 
-    def test_extract(self):
-        test_data_dict = test_data_catalyst.extract(test_data)
-        self.assertDictEqual(test_data_dict, {'float': 1.1, 'integer': 1, 'string': 'xxx'})
+    def test_serialize(self):
+        test_data = TestData(string='xxx', integer=1, float_=1.1, bool_=True)
+        test_data_dict = test_data_catalyst.serialize(test_data)
+        self.assertDictEqual(test_data_dict, {
+            'float': 1.1, 'integer': 1, 'string': 'xxx',
+            'bool': True,
+            })
 
-    def test_validate(self):
+    def test_deserialize(self):
         # test valid_data
-        valid_data = {'string': 'xxx', 'integer': 1, 'float': 1.1}
-        result = test_data_catalyst.validate(valid_data)
+        valid_data = {'string': 'xxx', 'integer': 1, 'float': 1.1, 'bool': True}
+        result = test_data_catalyst.deserialize(valid_data)
         self.assertTrue(result.is_valid)
         self.assertDictEqual(result.invalid_data, {})
         self.assertDictEqual(result.errors, {})
@@ -47,7 +52,7 @@ class CatalystTest(TestCase):
 
         # test invalid_data: validate errors
         invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
-        result = test_data_catalyst.validate(invalid_data)
+        result = test_data_catalyst.deserialize(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
@@ -55,7 +60,7 @@ class CatalystTest(TestCase):
 
         # test invalid_data: parse errors
         invalid_data = {'string': 'x', 'integer': 'str', 'float': []}
-        result = test_data_catalyst.validate(invalid_data)
+        result = test_data_catalyst.deserialize(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
@@ -67,7 +72,7 @@ class CatalystTest(TestCase):
         # ignore other fields
         invalid_data = valid_data.copy()
         invalid_data.pop('integer')
-        result = test_data_catalyst.validate(invalid_data)
+        result = test_data_catalyst.deserialize(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, {})
         self.assertEqual(set(result.errors), {'integer'})
@@ -75,14 +80,39 @@ class CatalystTest(TestCase):
 
         # test raise error while validating
         raise_err_catalyst = TestDataCatalyst(raise_error=True)
-        self.assertRaises(ValidationError, raise_err_catalyst.validate, invalid_data)
-        result = raise_err_catalyst.validate(valid_data)
+        self.assertRaises(ValidationError, raise_err_catalyst.deserialize, invalid_data)
+        result = raise_err_catalyst.deserialize(valid_data)
         self.assertTrue(result.is_valid)
+
+
+class FieldTest(TestCase):
+    def test_bool_field(self):
+        test_data = TestData(string='xxx')
+        string_field = StringField(name='string', key='string', min_length=2, max_length=12)
+        # serialize
+        self.assertEqual(string_field.serialize(test_data), 'xxx')
+        test_data.string = 1
+        self.assertEqual(string_field.serialize(test_data), '1')
+        test_data.string = []
+        self.assertEqual(string_field.serialize(test_data), '[]')
+        test_data.string = None
+        self.assertEqual(string_field.serialize(test_data), None)
+
+        # deserialize
+        self.assertEqual(string_field.deserialize('xxx'), 'xxx')
+        self.assertEqual(string_field.deserialize(123), '123')
+        self.assertEqual(string_field.deserialize([1]), '[1]')
+        self.assertRaises(ValidationError, string_field.deserialize, '')
+        # class TestSchema(Schema):
+        #     string = fields.String(allow_none=True)
+
+        # ts = TestSchema()
+        # pprint(ts.load({'string': None}))
 
 
 class ValidationTest(TestCase):
 
-    def test_vase_validator(self):
+    def test_base_validator(self):
         class NewValidator(Validator):
             default_error_messages = {'msg': 'default'}
             def __call__(self, value):
@@ -138,3 +168,13 @@ class ValidationTest(TestCase):
         validator = LengthValidator(0, 1)
         validator('')
         validator([])
+
+    def test_bool_validator(self):
+        validator = BoolValidator()
+
+        validator(True)
+        validator(False)
+        self.assertRaises(ValidationError, validator, '')
+        self.assertRaises(ValidationError, validator, 1)
+        self.assertRaises(ValidationError, validator, None)
+        self.assertRaises(ValidationError, validator, [])

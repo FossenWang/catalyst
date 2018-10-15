@@ -26,13 +26,13 @@ class Catalyst(metaclass=CatalystMeta):
     def __init__(self, raise_error=False):
         self.raise_error = raise_error
 
-    def extract(self, obj):
+    def serialize(self, obj):
         obj_dict = {}
         for field in self._fields.values():
-            obj_dict[field.key] = field.extract(obj)
+            obj_dict[field.key] = field.serialize(obj)
         return obj_dict
 
-    def validate(self, data):
+    def deserialize(self, data):
         invalid_data = {}
         valid_data = {}
         errors = {}

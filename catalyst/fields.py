@@ -24,9 +24,9 @@ class Field:
             self.parse_error_message = parse_error_message
         # 待定参数: default
 
-    def extract(self, obj):
+    def serialize(self, obj):
         value = self.source(obj, self.name)
-        if self.formatter:
+        if self.formatter and value is not None:
             value = self.formatter(value)
         return value
 
@@ -55,7 +55,7 @@ class StringField(Field):
 
     def __init__(self, name=None, key=None, source=from_attribute,
                  formatter=str, validator=None, required=False,
-                 parser=None, parse_error_message=None,
+                 parser=str, parse_error_message=None,
                  min_length=None, max_length=None, error_messages=None):
         self.min_length = min_length
         self.max_length = max_length
@@ -104,6 +104,8 @@ class FloatField(NumberField):
 
 
 class BoolField(Field):
+    parse_error_message = 'Ensure value is or can be converted to bool'
+
     def __init__(self, name=None, key=None, source=from_attribute,
                  formatter=bool, validator=None, required=False,
                  parser=bool, parse_error_message=None, error_messages=None):
