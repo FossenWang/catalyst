@@ -55,17 +55,17 @@ class LengthValidator(Validator):
     def __call__(self, value):
         if self.min_length is not None and len(value) < self.min_length:
             raise ValidationError(self.error_messages['too_small'])
+
         if self.max_length is not None and len(value) > self.max_length:
             raise ValidationError(self.error_messages['too_large'])
 
 
-class NumberValidator(Validator):
+class ComparisonValidator(Validator):
     """
-    compare number
+    comparison validator
     error_messages:
-    includ keys ('type_error', 'too_small', 'too_large')
+    includ keys ('too_small', 'too_large')
     """
-    type_ = None
 
     def __init__(self, min_value=None, max_value=None, error_messages=None):
         self.min_value = min_value
@@ -85,16 +85,6 @@ class NumberValidator(Validator):
 
         if self.max_value is not None and value > self.max_value:
             raise ValidationError(self.error_messages['too_large'])
-
-
-class IntegerValidator(NumberValidator):
-    """integer validator"""
-    type_ = int
-
-
-class FloatValidator(NumberValidator):
-    """float validator"""
-    type_ = float
 
 
 class BoolValidator(Validator):

@@ -6,8 +6,8 @@ from unittest import TestCase
 # from django.forms import fields
 
 from . import Catalyst, StringField, IntegerField, FloatField
-from .validators import ValidationError, Validator, LengthValidator, IntegerValidator, \
-    FloatValidator
+from .validators import ValidationError, Validator, LengthValidator, ComparisonValidator, \
+    BoolValidator
 
 
 from pprint import pprint
@@ -21,7 +21,7 @@ class TestData:
 
 
 class TestDataCatalyst(Catalyst):
-    string = StringField(min_length=0, max_length=12)
+    string = StringField(min_length=2, max_length=12)
     integer = IntegerField(min_value=0, max_value=12, required=True)
     _float = FloatField(name='float', key='float', min_value=-1.1, max_value=1.1)
 
@@ -37,6 +37,7 @@ class CatalystTest(TestCase):
         self.assertDictEqual(test_data_dict, {'float': 1.1, 'integer': 1, 'string': 'xxx'})
 
     def test_validate(self):
+        # test valid_data
         valid_data = {'string': 'xxx', 'integer': 1, 'float': 1.1}
         result = test_data_catalyst.validate(valid_data)
         self.assertTrue(result.is_valid)
@@ -44,12 +45,23 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.errors, {})
         self.assertDictEqual(result.valid_data, valid_data)
 
+        # test invalid_data: validate errors
         invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
         result = test_data_catalyst.validate(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
         self.assertDictEqual(result.valid_data, {})
+
+        # test invalid_data: parse errors
+        invalid_data = {'string': 'x', 'integer': 'str', 'float': []}
+        result = test_data_catalyst.validate(invalid_data)
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.invalid_data, invalid_data)
+        self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
+        self.assertIsInstance(result.errors['string'], ValidationError)
+        self.assertIsInstance(result.errors['integer'], ValueError)
+        self.assertIsInstance(result.errors['float'], ValueError)
 
         # test required field
         # ignore other fields
@@ -66,7 +78,6 @@ class CatalystTest(TestCase):
         self.assertRaises(ValidationError, raise_err_catalyst.validate, invalid_data)
         result = raise_err_catalyst.validate(valid_data)
         self.assertTrue(result.is_valid)
-        # pprint((result.errors, result.invalid_data, result.valid_data))
 
 
 class ValidationTest(TestCase):
@@ -90,53 +101,31 @@ class ValidationTest(TestCase):
             self.assertEqual(str(e), 'custom')
         self.assertDictEqual(NewValidator.default_error_messages, {'msg': 'default'})
 
-    def test_integer_validator(self):
-        validator = IntegerValidator(0, 100)
+    def test_comparison_validator(self):
+        compare_integer = ComparisonValidator(0, 100)
+        compare_integer(1)
+        compare_integer(0)
+        compare_integer(100)
+        self.assertRaises(ValidationError, compare_integer, -1)
+        self.assertRaises(ValidationError, compare_integer, 101)
+        self.assertRaises(TypeError, compare_integer, '1')
+        self.assertRaises(TypeError, compare_integer, [1])
 
-        # self.assertEqual(validator(1), 1)
-        # self.assertEqual(validator(0), 0)
-        # self.assertEqual(validator(100), 100)
-        # self.assertEqual(validator('1'), 1)
-        # self.assertEqual(validator('0'), 0)
-        # self.assertEqual(validator('100'), 100
+        compare_integer_float = ComparisonValidator(-1.1, 1.1)
 
-        validator(1)
-        validator(0)
-        validator(100)
-        self.assertRaises(ValidationError, validator, -1)
-        self.assertRaises(ValidationError, validator, 101)
-        # self.assertRaises(ValidationError, validator, None)
-        # self.assertRaises(ValidationError, validator, [])
+        compare_integer_float(1)
+        compare_integer_float(0)
+        compare_integer_float(0.1)
+        compare_integer_float(1.1)
+        compare_integer_float(-1.1)
+        self.assertRaises(ValidationError, compare_integer_float, -2)
+        self.assertRaises(ValidationError, compare_integer_float, 2)
+        self.assertRaises(TypeError, compare_integer_float, '1.1')
+        self.assertRaises(TypeError, compare_integer_float, [1.1])
 
-    def test_float_validator(self):
-        validator = FloatValidator(-1.1, 1.1)
-
-        # self.assertEqual(validator(1), 1.0)
-        # self.assertEqual(validator(0), 0.0)
-        # self.assertEqual(validator(0.1), 0.1)
-        # self.assertEqual(validator(1.1), 1.1)
-        # self.assertEqual(validator(-1.1), -1.1)
-        # self.assertEqual(validator('1'), 1.0)
-        
-        validator(1)
-        validator(0)
-        validator(0.1)
-        validator(1.1)
-        validator(-1.1)
-        self.assertRaises(ValidationError, validator, -2)
-        self.assertRaises(ValidationError, validator, 2)
-        # self.assertRaises(ValidationError, validator, None)
-        # self.assertRaises(ValidationError, validator, [])
-
-
-    def test_string_validator(self):
+    def test_length_validator(self):
         validator = LengthValidator(2, 10)
 
-        # self.assertEqual(validator('x' * 2), 'x' * 2)
-        # self.assertEqual(validator('x' * 5), 'x' * 5)
-        # self.assertEqual(validator('x' * 10), 'x' * 10)
-        # self.assertEqual(validator(['xzc', 1]), ['xzc', 1])
-        
         validator('x' * 2)
         validator('x' * 5)
         validator('x' * 10)
@@ -145,7 +134,6 @@ class ValidationTest(TestCase):
         self.assertRaises(ValidationError, validator, 'x' * 11)
         self.assertRaises(ValidationError, validator, '')
         self.assertRaises(TypeError, validator, None)
-        # self.assertRaises(ValidationError, validator, ['xzc', 1])
 
         validator = LengthValidator(0, 1)
         validator('')

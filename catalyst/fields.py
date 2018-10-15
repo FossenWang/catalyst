@@ -1,6 +1,6 @@
 "Fields"
 
-from .validators import LengthValidator, IntegerValidator, FloatValidator, \
+from .validators import LengthValidator, ComparisonValidator, \
     BoolValidator
 
 
@@ -44,7 +44,7 @@ class Field:
             if self.parser:
                 value = self.parser(value)
         except Exception as e:
-            raise TypeError(self.parse_error_message \
+            raise ValueError(self.parse_error_message \
                 if self.parse_error_message \
                 else "Can't parse value: %s" % str(e))
         return value
@@ -70,7 +70,6 @@ class StringField(Field):
 
 class NumberField(Field):
     type_ = None
-    validator_class = None
 
     def __init__(self, name=None, key=None, source=from_attribute,
                  formatter=None, validator=None, required=False,
@@ -90,7 +89,7 @@ class NumberField(Field):
 
         if validator is None and \
             (min_value is not None or max_value is not None):
-            validator = self.validator_class(min_value, max_value)
+            validator = ComparisonValidator(min_value, max_value)
 
         super().__init__(name=name, key=key, source=source,
             formatter=formatter, validator=validator, required=required,
@@ -99,12 +98,9 @@ class NumberField(Field):
 
 class IntegerField(NumberField):
     type_ = int
-    validator_class = IntegerValidator
-
 
 class FloatField(NumberField):
     type_ = float
-    validator_class = FloatValidator
 
 
 class BoolField(Field):
