@@ -65,8 +65,8 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
         self.assertIsInstance(result.errors['string'], ValidationError)
-        self.assertIsInstance(result.errors['integer'], ValueError)
-        self.assertIsInstance(result.errors['float'], ValueError)
+        self.assertIsInstance(result.errors['integer'], ValidationError)
+        self.assertIsInstance(result.errors['float'], ValidationError)
 
         # test required field
         # ignore other fields
@@ -86,7 +86,7 @@ class CatalystTest(TestCase):
 
 
 class FieldTest(TestCase):
-    def test_bool_field(self):
+    def test_string_field(self):
         test_data = TestData(string='xxx')
         string_field = StringField(name='string', key='string', min_length=2, max_length=12)
         # serialize
@@ -100,14 +100,44 @@ class FieldTest(TestCase):
 
         # deserialize
         self.assertEqual(string_field.deserialize({'string': 'xxx'}), 'xxx')
-        # self.assertEqual(string_field.deserialize(123), '123')
-        # self.assertEqual(string_field.deserialize([1]), '[1]')
-        # self.assertRaises(ValidationError, string_field.deserialize, '')
-        class TestSchema(Schema):
-            string = fields.String(allow_none=True, required=True)
+        self.assertEqual(string_field.deserialize({'string': 123}), '123')
+        self.assertEqual(string_field.deserialize({'string': [1]}), '[1]')
+        self.assertEqual(string_field.deserialize({'string': None}), None)
+        self.assertEqual(string_field.deserialize({}), None)
+        self.assertRaises(ValidationError, string_field.deserialize, {'string': ''})
 
-        ts = TestSchema()
-        pprint(ts.load({'string': None}))
+        string_field.allow_none = False
+        self.assertRaises(ValidationError, string_field.deserialize, {'string': None})
+
+        string_field.required = True
+        self.assertRaises(ValidationError, string_field.deserialize, {})
+
+    def test_int_field(self):
+        test_data = TestData(integer=1)
+        int_field = IntegerField(name='integer', key='integer', min_value=-10, max_value=100)
+        # serialize
+        self.assertEqual(int_field.serialize(test_data), 1)
+        test_data.integer = 1.6
+        self.assertEqual(int_field.serialize(test_data), 1)
+        test_data.integer = '10'
+        self.assertEqual(int_field.serialize(test_data), 10)
+
+        # deserialize
+        self.assertEqual(int_field.deserialize({'integer': 0}), 0)
+        self.assertEqual(int_field.deserialize({'integer': 1}), 1)
+        self.assertEqual(int_field.deserialize({'integer': '1'}), 1)
+        self.assertEqual(int_field.deserialize({'integer': None}), None)
+        self.assertEqual(int_field.deserialize({}), None)
+
+        self.assertRaises(ValidationError, int_field.deserialize, {'integer': ''})
+        self.assertRaises(ValidationError, int_field.deserialize, {'integer': 111})
+        self.assertRaises(ValidationError, int_field.deserialize, {'integer': 'asd'})
+        self.assertRaises(ValidationError, int_field.deserialize, {'integer': []})
+
+        # class TestSchema(Schema):
+        #     string = fields.String(allow_none=True, required=True)
+        # ts = TestSchema()
+        # pprint(ts.load({'string': None}))
 
 
 class ValidationTest(TestCase):

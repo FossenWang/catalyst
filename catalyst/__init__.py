@@ -37,25 +37,6 @@ class Catalyst(metaclass=CatalystMeta):
         valid_data = {}
         errors = {}
         for field in self._fields.values():
-            # try:
-            #     if field.key not in data:
-            #         # ignore or raise exception
-            #         if field.required:
-            #             raise ValidationError("Missing data for required field '%s'." % field.key)
-            #         continue
-            #     else:
-            #         value = data[field.key]
-            # except Exception as e:
-            #     errors[field.key] = e
-            #     continue
-
-            # try:
-            #     value = field.deserialize(value)
-            # except Exception as e:
-            #     errors[field.key] = e
-            #     invalid_data[field.key] = value
-            # else:
-            #     valid_data[field.key] = value
             try:
                 value = field.deserialize(data)
             except Exception as e:
