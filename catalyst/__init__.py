@@ -37,25 +37,36 @@ class Catalyst(metaclass=CatalystMeta):
         valid_data = {}
         errors = {}
         for field in self._fields.values():
-            try:
-                if field.key not in data:
-                    # ignore or raise exception
-                    if field.required:
-                        raise ValidationError("Key '%s' is required" % field.key)
-                    continue
-                else:
-                    value = data[field.key]
-            except Exception as e:
-                errors[field.key] = e
-                continue
+            # try:
+            #     if field.key not in data:
+            #         # ignore or raise exception
+            #         if field.required:
+            #             raise ValidationError("Missing data for required field '%s'." % field.key)
+            #         continue
+            #     else:
+            #         value = data[field.key]
+            # except Exception as e:
+            #     errors[field.key] = e
+            #     continue
 
+            # try:
+            #     value = field.deserialize(value)
+            # except Exception as e:
+            #     errors[field.key] = e
+            #     invalid_data[field.key] = value
+            # else:
+            #     valid_data[field.key] = value
             try:
-                value = field.deserialize(value)
+                value = field.deserialize(data)
             except Exception as e:
                 errors[field.key] = e
-                invalid_data[field.key] = value
+                if field.key in data:
+                    # 无效数据的应该返回原始数据，忽略原始数据中没有的字段
+                    invalid_data[field.key] = data[field.key]
             else:
-                valid_data[field.key] = value
+                if field.key in data:
+                    # 有效数据返回处理后的数据，忽略原始数据中没有的字段
+                    valid_data[field.key] = value
 
         validation_result = ValidationResult(valid_data, errors, invalid_data)
         if not validation_result.is_valid and self.raise_error:

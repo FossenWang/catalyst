@@ -1,7 +1,7 @@
 "Fields"
 
 from .validators import LengthValidator, ComparisonValidator, \
-    BoolValidator
+    BoolValidator, ValidationError
 
 
 from_attribute = getattr
@@ -12,7 +12,7 @@ class Field:
 
     def __init__(self, name=None, key=None, source=from_attribute,
                  formatter=None, validator=None, required=False,
-                 parser=None, parse_error_message=None):
+                 parser=None, parse_error_message=None, allow_none=True):
         self.name = name
         self.key = key
         self.source = source
@@ -20,6 +20,7 @@ class Field:
         self.parser = parser
         self.validator = validator
         self.required = required
+        self.allow_none = allow_none
         if parse_error_message:
             self.parse_error_message = parse_error_message
         # 待定参数: default
@@ -30,10 +31,31 @@ class Field:
             value = self.formatter(value)
         return value
 
-    def deserialize(self, value):
+    def get_value(self, data):
+        if self.key in data:
+            value = data[self.key]
+            return value
+        elif self.required:
+            raise ValidationError("Missing data for required field '%s'." % self.key)
+        else:
+            return
+
+    def deserialize(self, data):
+        value = self.get_value(data)
+        if value is None:
+            if self.allow_none:
+                return None
+            else:
+                raise ValidationError('Field value can not be none.')
+
         value = self.parse(value)
         self.validate(value)
         return value
+
+    # def deserialize(self, value):
+    #     value = self.parse(value)
+    #     self.validate(value)
+    #     return value
 
     def validate(self, value):
         if self.validator:

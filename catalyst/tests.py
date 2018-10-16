@@ -99,15 +99,15 @@ class FieldTest(TestCase):
         self.assertEqual(string_field.serialize(test_data), None)
 
         # deserialize
-        self.assertEqual(string_field.deserialize('xxx'), 'xxx')
-        self.assertEqual(string_field.deserialize(123), '123')
-        self.assertEqual(string_field.deserialize([1]), '[1]')
-        self.assertRaises(ValidationError, string_field.deserialize, '')
-        # class TestSchema(Schema):
-        #     string = fields.String(allow_none=True)
+        self.assertEqual(string_field.deserialize({'string': 'xxx'}), 'xxx')
+        # self.assertEqual(string_field.deserialize(123), '123')
+        # self.assertEqual(string_field.deserialize([1]), '[1]')
+        # self.assertRaises(ValidationError, string_field.deserialize, '')
+        class TestSchema(Schema):
+            string = fields.String(allow_none=True, required=True)
 
-        # ts = TestSchema()
-        # pprint(ts.load({'string': None}))
+        ts = TestSchema()
+        pprint(ts.load({'string': None}))
 
 
 class ValidationTest(TestCase):
