@@ -16,26 +16,25 @@ class Field:
                  parser=None, parse_error_message=None, allow_none=True):
         self.name = name
         self.key = key
-        if source:
-            self.source = source
-        else:
-            self.source = from_attribute
-
-        if formatter:
-            self.formatter = formatter
-        else:
-            self.formatter = no_processing
-
-        if parser:
-            self.parser = parser
-        else:
-            self.parser = no_processing
-        self.validator = validator
         self.required = required
         self.allow_none = allow_none
+
+        self.source = source if source else from_attribute
+
+        self.formatter = formatter if formatter else no_processing
+
+        self.parser = parser if parser else no_processing
+
+        self.validator = validator if validator else no_processing
+
         if parse_error_message:
             self.parse_error_message = parse_error_message
         # 待定参数: default
+
+    def set_formatter(self, formatter):
+        self.formatter = formatter
+        print(self, formatter)
+        return formatter
 
     def serialize(self, obj):
         value = self.source(obj, self.name)
@@ -105,8 +104,8 @@ class NumberField(Field):
                  formatter=None, validator=None, required=False,
                  parser=None, parse_error_message=None, allow_none=True,
                  min_value=None, max_value=None, error_messages=None):
-        self.max_value = max_value
-        self.min_value = min_value
+        self.max_value = self.type_(max_value)
+        self.min_value = self.type_(min_value)
 
         if not formatter:
             formatter = self.type_
@@ -129,6 +128,7 @@ class NumberField(Field):
 
 class IntegerField(NumberField):
     type_ = int
+
 
 class FloatField(NumberField):
     type_ = float

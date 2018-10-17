@@ -5,7 +5,8 @@ from unittest import TestCase
 from marshmallow import Schema, fields
 # from django.forms import fields
 
-from . import Catalyst, StringField, IntegerField, FloatField, BoolField
+from . import Catalyst
+from .fields import Field, StringField, IntegerField, FloatField, BoolField
 from .validators import ValidationError, Validator, LengthValidator, ComparisonValidator, \
     BoolValidator
 
@@ -17,15 +18,15 @@ class TestData:
     def __init__(self, string=None, integer=None, float_=None, bool_=None):
         self.string = string
         self.integer = integer
-        self.float = float_
-        self.bool = bool_
+        self.float_ = float_
+        self.bool_ = bool_
 
 
 class TestDataCatalyst(Catalyst):
     string = StringField(min_length=2, max_length=12)
     integer = IntegerField(min_value=0, max_value=12, required=True)
-    float_field = FloatField(name='float', key='float', min_value=-1.1, max_value=1.1)
-    bool_field = BoolField(name='bool', key='bool')
+    float_field = FloatField(name='float_', key='float', min_value=-1.1, max_value=1.1)
+    bool_field = BoolField(name='bool_', key='bool')
 
 
 test_data_catalyst = TestDataCatalyst()
@@ -86,10 +87,31 @@ class CatalystTest(TestCase):
 
 
 class FieldTest(TestCase):
+    def test_field(self):
+        class A(Catalyst):
+            field = Field()
+
+            @field.set_formatter
+            def field_formatter(value):
+                return 1
+
+        # test formatter
+        a = A()
+        test_data = TestData()
+        test_data.field = 'asd'
+        self.assertEqual(a.field.serialize(test_data), 1)
+        test_data.field = 1000
+        self.assertEqual(a.field.serialize(test_data), 1)
+        test_data.field = [100]
+        self.assertEqual(a.field.serialize(test_data), 1)
+
+
+
     def test_string_field(self):
-        test_data = TestData(string='xxx')
         string_field = StringField(name='string', key='string', min_length=2, max_length=12)
+
         # serialize
+        test_data = TestData(string='xxx')
         self.assertEqual(string_field.serialize(test_data), 'xxx')
         test_data.string = 1
         self.assertEqual(string_field.serialize(test_data), '1')
@@ -113,9 +135,10 @@ class FieldTest(TestCase):
         self.assertRaises(ValidationError, string_field.deserialize, {})
 
     def test_int_field(self):
-        test_data = TestData(integer=1)
         int_field = IntegerField(name='integer', key='integer', min_value=-10, max_value=100)
+
         # serialize
+        test_data = TestData(integer=1)
         self.assertEqual(int_field.serialize(test_data), 1)
         test_data.integer = 1.6
         self.assertEqual(int_field.serialize(test_data), 1)
@@ -134,10 +157,57 @@ class FieldTest(TestCase):
         self.assertRaises(ValidationError, int_field.deserialize, {'integer': 'asd'})
         self.assertRaises(ValidationError, int_field.deserialize, {'integer': []})
 
+    def test_float_field(self):
+        float_field = FloatField(name='float_', key='float', min_value=-11.1, max_value=111.1)
+
+        # serialize
+        test_data = TestData(float_=1)
+        self.assertEqual(float_field.serialize(test_data), 1.0)
+        test_data.float_ = 0
+        self.assertEqual(float_field.serialize(test_data), 0.0)
+        test_data.float_ = 5.5
+        self.assertEqual(float_field.serialize(test_data), 5.5)
+        test_data.float_ = '10'
+        self.assertEqual(float_field.serialize(test_data), 10.0)
+        test_data.float_ = None
+        self.assertEqual(float_field.serialize(test_data), None)
+
+        # deserialize
+        self.assertEqual(float_field.deserialize({'float': 0}), 0.0)
+        self.assertEqual(float_field.deserialize({'float': '1.1'}), 1.1)
+        self.assertEqual(float_field.deserialize({'float': -11.1}), -11.1)
+        self.assertEqual(float_field.deserialize({'float': 111.1}), 111.1)
+        self.assertEqual(float_field.deserialize({'float': 11}), 11)
+        self.assertEqual(float_field.deserialize({'float': None}), None)
+        self.assertEqual(float_field.deserialize({}), None)
+
+        self.assertRaises(ValidationError, float_field.deserialize, {'float': ''})
+        self.assertRaises(ValidationError, float_field.deserialize, {'float': 111.11})
+        self.assertRaises(ValidationError, float_field.deserialize, {'float': []})
+
         # class TestSchema(Schema):
         #     string = fields.String(allow_none=True, required=True)
         # ts = TestSchema()
         # pprint(ts.load({'string': None}))
+
+    def test_bool_field(self):
+        bool_field = BoolField(name='bool_', key='bool')
+
+        # serialize
+        test_data = TestData(bool_=True)
+        self.assertEqual(bool_field.serialize(test_data), True)
+        test_data.bool_ = False
+        self.assertEqual(bool_field.serialize(test_data), False)
+        test_data.bool_ = None
+        self.assertEqual(bool_field.serialize(test_data), None)
+
+        # deserialize
+        self.assertEqual(bool_field.deserialize({'bool': True}), True)
+        self.assertEqual(bool_field.deserialize({'bool': False}), False)
+        self.assertEqual(bool_field.deserialize({'bool': 'False'}), True)
+        self.assertEqual(bool_field.deserialize({'bool': 0}), False)
+        self.assertEqual(bool_field.deserialize({'bool': 1}), True)
+        self.assertEqual(bool_field.deserialize({'bool': []}), False)
 
 
 class ValidationTest(TestCase):
