@@ -66,8 +66,8 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
         self.assertIsInstance(result.errors['string'], ValidationError)
-        self.assertIsInstance(result.errors['integer'], ValidationError)
-        self.assertIsInstance(result.errors['float'], ValidationError)
+        self.assertIsInstance(result.errors['integer'], ValueError)
+        self.assertIsInstance(result.errors['float'], TypeError)
 
         # test required field
         # ignore other fields
@@ -89,21 +89,39 @@ class CatalystTest(TestCase):
 class FieldTest(TestCase):
     def test_field(self):
         class A(Catalyst):
-            field = Field()
+            fixed_value = Field()
+            key_1 = Field()
+            key_2 = Field()
 
-            @field.set_formatter
-            def field_formatter(value):
+            @key_1.set_source
+            @key_2.set_source
+            def from_dict_key(obj, name):
+                return obj[name]
+
+            @fixed_value.set_formatter
+            def fixed_value_formatter(value):
                 return 1
 
         # test formatter
+        field_1 = Field(formatter=A.fixed_value_formatter)
+        self.assertEqual(field_1.formatter, A.fixed_value_formatter)
         a = A()
         test_data = TestData()
-        test_data.field = 'asd'
-        self.assertEqual(a.field.serialize(test_data), 1)
-        test_data.field = 1000
-        self.assertEqual(a.field.serialize(test_data), 1)
-        test_data.field = [100]
-        self.assertEqual(a.field.serialize(test_data), 1)
+        test_data.fixed_value = 'asd'
+        self.assertEqual(a.fixed_value.serialize(test_data), 1)
+        test_data.fixed_value = 1000
+        self.assertEqual(a.fixed_value.serialize(test_data), 1)
+        test_data.fixed_value = [100]
+        self.assertEqual(a.fixed_value.serialize(test_data), 1)
+
+        # test source
+        field_2 = Field(source=A.from_dict_key)
+        self.assertEqual(field_2.source, A.from_dict_key)
+        test_dict = {'key_1': 1, 'key_2': 2}
+        self.assertEqual(a.key_1.serialize({'key_1': 1,}), 1)
+        self.assertEqual(a.key_2.serialize({'key_2': 2,}), 2)
+        test_data.key = 1
+        self.assertRaises(TypeError, a.key_1.serialize, test_data)
 
 
 
@@ -152,10 +170,10 @@ class FieldTest(TestCase):
         self.assertEqual(int_field.deserialize({'integer': None}), None)
         self.assertEqual(int_field.deserialize({}), None)
 
-        self.assertRaises(ValidationError, int_field.deserialize, {'integer': ''})
+        self.assertRaises(ValueError, int_field.deserialize, {'integer': ''})
         self.assertRaises(ValidationError, int_field.deserialize, {'integer': 111})
-        self.assertRaises(ValidationError, int_field.deserialize, {'integer': 'asd'})
-        self.assertRaises(ValidationError, int_field.deserialize, {'integer': []})
+        self.assertRaises(ValueError, int_field.deserialize, {'integer': 'asd'})
+        self.assertRaises(TypeError, int_field.deserialize, {'integer': []})
 
     def test_float_field(self):
         float_field = FloatField(name='float_', key='float', min_value=-11.1, max_value=111.1)
@@ -181,9 +199,9 @@ class FieldTest(TestCase):
         self.assertEqual(float_field.deserialize({'float': None}), None)
         self.assertEqual(float_field.deserialize({}), None)
 
-        self.assertRaises(ValidationError, float_field.deserialize, {'float': ''})
+        self.assertRaises(ValueError, float_field.deserialize, {'float': ''})
         self.assertRaises(ValidationError, float_field.deserialize, {'float': 111.11})
-        self.assertRaises(ValidationError, float_field.deserialize, {'float': []})
+        self.assertRaises(TypeError, float_field.deserialize, {'float': []})
 
         # class TestSchema(Schema):
         #     string = fields.String(allow_none=True, required=True)

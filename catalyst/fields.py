@@ -9,11 +9,13 @@ from_attribute = getattr
 no_processing = lambda value: value
 
 class Field:
-    parse_error_message = None
+    default_error_messages = {
+        'none_value': 'Missing data for required field.',
+    }
 
-    def __init__(self, name=None, key=None, source=None,
-                 formatter=None, validator=None, required=False,
-                 parser=None, parse_error_message=None, allow_none=True):
+    def __init__(self, name=None, key=None, source=None, formatter=None,
+                 validator=None, before_validate=None, after_validate=None,
+                 required=False, allow_none=True, error_messages=None):
         self.name = name
         self.key = key
         self.required = required
@@ -23,18 +25,37 @@ class Field:
 
         self.formatter = formatter if formatter else no_processing
 
-        self.parser = parser if parser else no_processing
+        self.before_validate = before_validate if before_validate else no_processing
 
         self.validator = validator if validator else no_processing
 
-        if parse_error_message:
-            self.parse_error_message = parse_error_message
+        self.after_validate = after_validate if after_validate else no_processing
+
+        self.error_messages = self.default_error_messages.copy() \
+            if self.default_error_messages else {}
+        self.error_messages.update(error_messages if error_messages else {})
+
         # 待定参数: default
+
+    def set_source(self, source):
+        self.source = source
+        return source
 
     def set_formatter(self, formatter):
         self.formatter = formatter
-        print(self, formatter)
         return formatter
+
+    def set_before_validate(self, before_validate):
+        self.before_validate = before_validate
+        return before_validate
+
+    def set_validator(self, validator):
+        self.validator = validator
+        return validator
+
+    def set_after_validate(self, after_validate):
+        self.after_validate = after_validate
+        return after_validate
 
     def serialize(self, obj):
         value = self.source(obj, self.name)
@@ -47,7 +68,7 @@ class Field:
             value = data[self.key]
             return value
         elif self.required:
-            raise ValidationError("Missing data for required field '%s'." % self.key)
+            raise ValidationError(self.error_messages.get('none_value'))
         else:
             return None
 
@@ -59,41 +80,33 @@ class Field:
             else:
                 raise ValidationError('Field value can not be none.')
 
-        value = self.parse(value)
+        value = self.before_validate(value)
         self.validate(value)
+        value = self.after_validate(value)
         return value
 
     def validate(self, value):
         if self.validator:
             self.validator(value)
 
-    def parse(self, value):
-        try:
-            if self.parser:
-                value = self.parser(value)
-        except Exception as e:
-            raise ValidationError(self.parse_error_message \
-                if self.parse_error_message \
-                else "Can't parse value: %s" % str(e))
-        return value
-
 
 class StringField(Field):
-    parse_error_message = 'Ensure value is string or can be converted to a string'
+    default_error_messages = {
+    }
 
     def __init__(self, name=None, key=None, source=None,
                  formatter=str, validator=None, required=False,
-                 parser=str, parse_error_message=None, allow_none=True,
-                 min_length=None, max_length=None, error_messages=None):
+                 before_validate=str, error_messages=None, allow_none=True,
+                 min_length=None, max_length=None):
         self.min_length = min_length
         self.max_length = max_length
         if validator is None and \
             (min_length is not None or max_length is not None):
-            validator = LengthValidator(min_length, max_length, error_messages)
+            validator = LengthValidator(min_length, max_length)
 
         super().__init__(name=name, key=key, source=source,
             formatter=formatter, validator=validator, required=required,
-            parser=parser, parse_error_message=parse_error_message,
+            before_validate=before_validate, error_messages=error_messages,
             allow_none=allow_none)
 
 
@@ -102,19 +115,20 @@ class NumberField(Field):
 
     def __init__(self, name=None, key=None, source=None,
                  formatter=None, validator=None, required=False,
-                 parser=None, parse_error_message=None, allow_none=True,
-                 min_value=None, max_value=None, error_messages=None):
+                 before_validate=None, error_messages=None, allow_none=True,
+                 min_value=None, max_value=None):
         self.max_value = self.type_(max_value)
         self.min_value = self.type_(min_value)
 
         if not formatter:
             formatter = self.type_
 
-        if not parser:
-            parser = self.type_
+        if not before_validate:
+            before_validate = self.type_
 
-        if not parse_error_message:
-            parse_error_message = 'Ensure value is or can be converted to %s' % self.type_
+        if not self.default_error_messages:
+            self.default_errorerror_messages = {
+            }
 
         if validator is None and \
             (min_value is not None or max_value is not None):
@@ -122,7 +136,7 @@ class NumberField(Field):
 
         super().__init__(name=name, key=key, source=source,
             formatter=formatter, validator=validator, required=required,
-            parser=parser, parse_error_message=parse_error_message,
+            before_validate=before_validate, error_messages=error_messages,
             allow_none=allow_none)
 
 
@@ -135,17 +149,16 @@ class FloatField(NumberField):
 
 
 class BoolField(Field):
-    parse_error_message = 'Ensure value is or can be converted to bool'
+    error_messages = 'Ensure value is or can be converted to bool'
 
     def __init__(self, name=None, key=None, source=None,
                  formatter=bool, validator=None, required=False,
-                 parser=bool, parse_error_message=None,  allow_none=True,
-                 error_messages=None):
+                 before_validate=bool, error_messages=None,  allow_none=True):
 
         if not validator:
             validator = BoolValidator(error_messages)
 
         super().__init__(name=name, key=key, source=source,
             formatter=formatter, validator=validator, required=required,
-            parser=parser, parse_error_message=parse_error_message,
+            before_validate=before_validate, error_messages=error_messages,
             allow_none=allow_none)
