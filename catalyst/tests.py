@@ -93,11 +93,13 @@ class FieldTest(TestCase):
             key_1 = Field()
             key_2 = Field()
 
+            @staticmethod
             @key_1.set_source
             @key_2.set_source
             def from_dict_key(obj, name):
                 return obj[name]
 
+            @staticmethod
             @fixed_value.set_formatter
             def fixed_value_formatter(value):
                 return 1
@@ -117,13 +119,10 @@ class FieldTest(TestCase):
         # test source
         field_2 = Field(source=A.from_dict_key)
         self.assertEqual(field_2.source, A.from_dict_key)
-        test_dict = {'key_1': 1, 'key_2': 2}
         self.assertEqual(a.key_1.serialize({'key_1': 1,}), 1)
         self.assertEqual(a.key_2.serialize({'key_2': 2,}), 2)
         test_data.key = 1
         self.assertRaises(TypeError, a.key_1.serialize, test_data)
-
-
 
     def test_string_field(self):
         string_field = StringField(name='string', key='string', min_length=2, max_length=12)

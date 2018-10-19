@@ -1,4 +1,5 @@
 "Fields"
+from collections import Iterable
 
 from .validators import LengthValidator, ComparisonValidator, \
     BoolValidator, ValidationError
@@ -7,6 +8,7 @@ from .validators import LengthValidator, ComparisonValidator, \
 from_attribute = getattr
 
 no_processing = lambda value: value
+
 
 class Field:
     default_error_messages = {
@@ -86,17 +88,18 @@ class Field:
         return value
 
     def validate(self, value):
-        if self.validator:
+        if isinstance(self.validator, Iterable):
+            for vld in self.validator:
+                vld(value)
+        else:
             self.validator(value)
 
 
 class StringField(Field):
-    default_error_messages = {
-    }
 
-    def __init__(self, name=None, key=None, source=None,
-                 formatter=str, validator=None, required=False,
-                 before_validate=str, error_messages=None, allow_none=True,
+    def __init__(self, name=None, key=None, source=None, formatter=str,
+                 before_validate=str, validator=None, after_validate=None,
+                 required=False, allow_none=True, error_messages=None,
                  min_length=None, max_length=None):
         self.min_length = min_length
         self.max_length = max_length
@@ -104,18 +107,19 @@ class StringField(Field):
             (min_length is not None or max_length is not None):
             validator = LengthValidator(min_length, max_length)
 
-        super().__init__(name=name, key=key, source=source,
-            formatter=formatter, validator=validator, required=required,
-            before_validate=before_validate, error_messages=error_messages,
-            allow_none=allow_none)
+        super().__init__(
+            name=name, key=key, source=source, formatter=formatter,
+            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            required=required, allow_none=allow_none, error_messages=error_messages
+            )
 
 
 class NumberField(Field):
-    type_ = None
+    type_ = float
 
-    def __init__(self, name=None, key=None, source=None,
-                 formatter=None, validator=None, required=False,
-                 before_validate=None, error_messages=None, allow_none=True,
+    def __init__(self, name=None, key=None, source=None, formatter=None,
+                 before_validate=None, validator=None, after_validate=None,
+                 required=False, allow_none=True, error_messages=None,
                  min_value=None, max_value=None):
         self.max_value = self.type_(max_value)
         self.min_value = self.type_(min_value)
@@ -134,10 +138,11 @@ class NumberField(Field):
             (min_value is not None or max_value is not None):
             validator = ComparisonValidator(min_value, max_value)
 
-        super().__init__(name=name, key=key, source=source,
-            formatter=formatter, validator=validator, required=required,
-            before_validate=before_validate, error_messages=error_messages,
-            allow_none=allow_none)
+        super().__init__(
+            name=name, key=key, source=source, formatter=formatter,
+            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            required=required, allow_none=allow_none, error_messages=error_messages
+            )
 
 
 class IntegerField(NumberField):
@@ -149,16 +154,16 @@ class FloatField(NumberField):
 
 
 class BoolField(Field):
-    error_messages = 'Ensure value is or can be converted to bool'
 
-    def __init__(self, name=None, key=None, source=None,
-                 formatter=bool, validator=None, required=False,
-                 before_validate=bool, error_messages=None,  allow_none=True):
+    def __init__(self, name=None, key=None, source=None, formatter=bool,
+                 before_validate=bool, validator=None, after_validate=None,
+                 required=False, allow_none=True, error_messages=None):
 
         if not validator:
             validator = BoolValidator(error_messages)
 
-        super().__init__(name=name, key=key, source=source,
-            formatter=formatter, validator=validator, required=required,
-            before_validate=before_validate, error_messages=error_messages,
-            allow_none=allow_none)
+        super().__init__(
+            name=name, key=key, source=source, formatter=formatter,
+            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            required=required, allow_none=allow_none, error_messages=error_messages
+            )
