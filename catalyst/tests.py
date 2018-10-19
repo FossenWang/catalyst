@@ -104,6 +104,18 @@ class FieldTest(TestCase):
             def fixed_value_formatter(value):
                 return 1
 
+            @fixed_value.set_before_validate
+            def before_validate_fixed_value(value):
+                return value + 1
+
+            @fixed_value.set_validator
+            def validate_fixed_value(value):
+                return value + 1  # 返回值无用
+
+            @fixed_value.set_after_validate
+            def after_validate_fixed_value(value):
+                return value + 1
+
         # test formatter
         field_1 = Field(formatter=A.fixed_value_formatter)
         self.assertEqual(field_1.formatter, A.fixed_value_formatter)
@@ -123,6 +135,17 @@ class FieldTest(TestCase):
         self.assertEqual(a.key_2.serialize({'key_2': 2,}), 2)
         test_data.key = 1
         self.assertRaises(TypeError, a.key_1.serialize, test_data)
+
+        # test after validate
+        self.assertEqual(a.fixed_value.deserialize({'fixed_value': 0}), 2)
+        self.assertRaises(TypeError, a.fixed_value.deserialize, {'fixed_value': '0'})
+
+        # test error msg
+        field_3 = Field(key='a', allow_none=False, error_messages={'allow_none': '666'})
+        try:
+            field_3.deserialize({'a': None})
+        except ValidationError as e:
+            self.assertEqual(e.args[0], '666')
 
     def test_string_field(self):
         string_field = StringField(name='string', key='string', min_length=2, max_length=12)

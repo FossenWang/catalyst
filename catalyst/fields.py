@@ -12,7 +12,8 @@ no_processing = lambda value: value
 
 class Field:
     default_error_messages = {
-        'none_value': 'Missing data for required field.',
+        'required': 'Missing data for required field.',
+        'allow_none': 'Field may not be None.'
     }
 
     def __init__(self, name=None, key=None, source=None, formatter=None,
@@ -70,7 +71,7 @@ class Field:
             value = data[self.key]
             return value
         elif self.required:
-            raise ValidationError(self.error_messages.get('none_value'))
+            raise ValidationError(self.error_messages.get('required'))
         else:
             return None
 
@@ -80,7 +81,7 @@ class Field:
             if self.allow_none:
                 return None
             else:
-                raise ValidationError('Field value can not be none.')
+                raise ValidationError(self.error_messages.get('allow_none'))
 
         value = self.before_validate(value)
         self.validate(value)
