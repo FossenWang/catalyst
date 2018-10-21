@@ -1,8 +1,9 @@
 "Fields"
+
 from collections import Iterable
 
-from .validators import LengthValidator, ComparisonValidator, \
-    BoolValidator, ValidationError
+from .validators import ValidationError, LengthValidator, ComparisonValidator, \
+    BoolValidator, ListValidator
 
 
 from_attribute = getattr
@@ -122,18 +123,14 @@ class NumberField(Field):
                  before_validate=None, validator=None, after_validate=None,
                  required=False, allow_none=True, error_messages=None,
                  min_value=None, max_value=None):
-        self.max_value = self.type_(max_value)
-        self.min_value = self.type_(min_value)
+        self.max_value = self.type_(max_value) if max_value is not None else max_value
+        self.min_value = self.type_(min_value) if min_value is not None else min_value
 
         if not formatter:
             formatter = self.type_
 
         if not before_validate:
             before_validate = self.type_
-
-        if not self.default_error_messages:
-            self.default_errorerror_messages = {
-            }
 
         if validator is None and \
             (min_value is not None or max_value is not None):
@@ -168,3 +165,55 @@ class BoolField(Field):
             before_validate=before_validate, validator=validator, after_validate=after_validate,
             required=required, allow_none=allow_none, error_messages=error_messages
             )
+
+class ListFormatter:
+    def __init__(self, item_field):
+        self.item_field = item_field
+
+    def __call__(self, list_):
+        for i, val in enumerate(list_):
+            list_[i] = self.item_field.formatter(val)
+        return list_
+
+
+class ListField(Field):
+    item_field = Field()
+
+    def __init__(self, name=None, key=None, source=None, formatter=None,
+                 validator=None, before_validate=None, after_validate=None,
+                 required=False, allow_none=True, error_messages=None, item_field=None):
+
+        if item_field:
+            self.item_field = item_field
+
+        if not formatter:
+            formatter = ListFormatter(item_field)
+
+        # if not validator:
+        #     validator = ListValidator(item_field)
+
+        self.default_error_messages['iterable'] = 'The field value is not Iterable.',
+
+        super().__init__(
+            name=name, key=key, source=source, formatter=formatter,
+            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            required=required, allow_none=allow_none, error_messages=error_messages
+            )
+
+    def deserialize(self, data):
+        list_ = self.get_deserializing_value(data)
+        if list_ is None:
+            if self.allow_none:
+                return None
+            else:
+                raise ValidationError(self.error_messages.get('allow_none'))
+
+        if not isinstance(list_, Iterable):
+            raise ValidationError(self.error_messages.get('iterable'))
+
+        for i, value in enumerate(list_):
+            value = self.item_field.before_validate(value)
+            self.item_field.validate(value)
+            value = self.item_field.after_validate(value)
+            list_[i] = value
+        return list_

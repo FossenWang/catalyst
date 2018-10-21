@@ -6,7 +6,7 @@ from marshmallow import Schema, fields
 # from django.forms import fields
 
 from . import Catalyst
-from .fields import Field, StringField, IntegerField, FloatField, BoolField
+from .fields import Field, StringField, IntegerField, FloatField, BoolField, ListField
 from .validators import ValidationError, Validator, LengthValidator, ComparisonValidator, \
     BoolValidator
 
@@ -248,6 +248,17 @@ class FieldTest(TestCase):
         self.assertEqual(bool_field.deserialize({'bool': 0}), False)
         self.assertEqual(bool_field.deserialize({'bool': 1}), True)
         self.assertEqual(bool_field.deserialize({'bool': []}), False)
+
+    def test_list_field(self):
+        list_field = ListField(name='list_', key='list', item_field=FloatField())
+
+        # serialize
+        test_data = TestData()
+        test_data.list_ = [1, 2, 3]
+        self.assertListEqual(list_field.serialize(test_data), [1.0, 2.0, 3.0])
+
+        # deserialize
+        self.assertListEqual(list_field.deserialize({'list': [1, 2, 3]}), [1.0, 2.0, 3.0])
 
 
 class ValidationTest(TestCase):
