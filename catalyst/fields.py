@@ -215,3 +215,38 @@ class ListField(Field):
             value = self.item_field.after_validate(value)
             list_[i] = value
         return list_
+
+
+class CallableFormatter:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, func):
+        return func(*self.args, **self.kwargs)
+
+
+def call_func(func):
+    return func()
+
+
+class CallableField(Field):
+    def __init__(self, name=None, key=None, source=None, formatter=None,
+                 validator=None, before_validate=None, after_validate=None,
+                 required=False, allow_none=True, error_messages=None,
+                 func_args: list=None, func_kwargs: dict=None):
+
+        if not func_args:
+            func_args = []
+
+        if not func_kwargs:
+            func_kwargs={}
+
+        if not formatter:
+            formatter = CallableFormatter(*func_args, **func_kwargs)
+
+        super().__init__(
+            name=name, key=key, source=source, formatter=formatter,
+            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            required=required, allow_none=allow_none, error_messages=error_messages
+            )

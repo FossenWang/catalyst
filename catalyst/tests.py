@@ -6,7 +6,8 @@ from marshmallow import Schema, fields
 # from django.forms import fields
 
 from . import Catalyst
-from .fields import Field, StringField, IntegerField, FloatField, BoolField, ListField
+from .fields import Field, StringField, IntegerField, FloatField, BoolField, ListField, \
+    CallableField
 from .validators import ValidationError, Validator, LengthValidator, ComparisonValidator, \
     BoolValidator
 
@@ -20,6 +21,9 @@ class TestData:
         self.integer = integer
         self.float_ = float_
         self.bool_ = bool_
+
+    def callable(self, a, b, c=1):
+        return a + b + c
 
 
 class TestDataCatalyst(Catalyst):
@@ -225,11 +229,6 @@ class FieldTest(TestCase):
         self.assertRaises(ValidationError, float_field.deserialize, {'float': 111.11})
         self.assertRaises(TypeError, float_field.deserialize, {'float': []})
 
-        # class TestSchema(Schema):
-        #     string = fields.String(allow_none=True, required=True)
-        # ts = TestSchema()
-        # pprint(ts.load({'string': None}))
-
     def test_bool_field(self):
         bool_field = BoolField(name='bool_', key='bool')
 
@@ -265,6 +264,13 @@ class FieldTest(TestCase):
         self.assertListEqual(list_field.deserialize({'list': [1, 2, 3]}), [1.0, 2.0, 3.0])
         self.assertListEqual(list_field.deserialize({'list': []}), [])
         self.assertEqual(list_field.deserialize({'list':None}), None)
+
+    def test_callable_field(self):
+        callable_field = CallableField(name='callable', func_args=[1, 2], func_kwargs={'c': 3})
+        # serialize
+        test_data = TestData()
+        self.assertEqual(callable_field.serialize(test_data), 6)
+
 
 
 class ValidationTest(TestCase):
