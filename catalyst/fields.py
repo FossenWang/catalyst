@@ -3,7 +3,7 @@
 from collections import Iterable
 
 from .validators import ValidationError, LengthValidator, ComparisonValidator, \
-    BoolValidator, ListValidator
+    BoolValidator
 
 
 from_attribute = getattr
@@ -166,6 +166,7 @@ class BoolField(Field):
             required=required, allow_none=allow_none, error_messages=error_messages
             )
 
+
 class ListFormatter:
     def __init__(self, item_field):
         self.item_field = item_field
@@ -188,9 +189,6 @@ class ListField(Field):
 
         if not formatter:
             formatter = ListFormatter(item_field)
-
-        # if not validator:
-        #     validator = ListValidator(item_field)
 
         self.default_error_messages['iterable'] = 'The field value is not Iterable.',
 

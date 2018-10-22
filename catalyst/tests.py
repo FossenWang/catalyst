@@ -256,9 +256,15 @@ class FieldTest(TestCase):
         test_data = TestData()
         test_data.list_ = [1, 2, 3]
         self.assertListEqual(list_field.serialize(test_data), [1.0, 2.0, 3.0])
+        test_data.list_ = []
+        self.assertListEqual(list_field.serialize(test_data), [])
+        test_data.list_ = None
+        self.assertEqual(list_field.serialize(test_data), None)
 
         # deserialize
         self.assertListEqual(list_field.deserialize({'list': [1, 2, 3]}), [1.0, 2.0, 3.0])
+        self.assertListEqual(list_field.deserialize({'list': []}), [])
+        self.assertEqual(list_field.deserialize({'list':None}), None)
 
 
 class ValidationTest(TestCase):

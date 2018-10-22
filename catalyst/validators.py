@@ -101,20 +101,3 @@ class BoolValidator(Validator):
     def __call__(self, value):
         if not isinstance(value, bool):
             raise ValidationError(self.error_messages['type_error'])
-
-
-class ListValidator(Validator):
-    """list validator"""
-    default_error_messages = {
-        'type_error': 'Ensure value is Iterable',
-    }
-
-    def __init__(self, item_field, error_messages=None):
-        self.item_field = item_field
-        super().__init__(error_messages=error_messages)
-
-    def __call__(self, list_):
-        if not isinstance(list_, Iterable):
-            raise ValidationError(self.error_messages.get('type_error'))
-        for i in list_:
-            self.item_field.validate(i)
