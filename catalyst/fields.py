@@ -1,5 +1,6 @@
 "Fields"
 
+from typing import Callable, Dict
 from collections import Iterable
 
 from .validators import ValidationError, LengthValidator, ComparisonValidator, \
@@ -17,9 +18,9 @@ class Field:
         'allow_none': 'Field may not be None.'
     }
 
-    def __init__(self, name=None, key=None, source=None, formatter=None,
-                 validator=None, before_validate=None, after_validate=None,
-                 required=False, allow_none=True, error_messages=None):
+    def __init__(self, name: str=None, key: str=None, source: Callable=None, formatter: Callable=None,
+                 validator: Callable=None, before_validate: Callable=None, after_validate: Callable=None,
+                 required=False, allow_none=True, error_messages: Dict[str]=None):
         self.name = name
         self.key = key
         self.required = required
@@ -61,13 +62,21 @@ class Field:
         self.after_validate = after_validate
         return after_validate
 
+    def set_serialize(self, serialize):
+        self.serialize = serialize
+        return serialize
+
+    def set_deserialize(self, deserialize):
+        self.deserialize = deserialize
+        return deserialize
+
     def serialize(self, obj):
         value = self.source(obj, self.name)
         if self.formatter and value is not None:
             value = self.formatter(value)
         return value
 
-    def get_deserializing_value(self, data):
+    def get_deserializing_value(self, data: dict):
         if self.key in data.keys():
             value = data[self.key]
             return value

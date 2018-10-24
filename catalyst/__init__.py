@@ -1,4 +1,4 @@
-from pprint import pprint
+from typing import Dict
 
 from .fields import *
 from .validators import *
@@ -7,7 +7,7 @@ from .validators import *
 class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
         # collect fields
-        fields = {}
+        fields = {}  # type: Dict[Field]
         for key, value in attrs.items():
             if isinstance(value, Field):
                 if value.name is None:
@@ -21,18 +21,18 @@ class CatalystMeta(type):
 
 
 class Catalyst(metaclass=CatalystMeta):
-    _fields = None
+    _fields = None  # type: Dict[Field]
 
     def __init__(self, raise_error=False):
         self.raise_error = raise_error
 
-    def serialize(self, obj):
+    def serialize(self, obj) -> dict:
         obj_dict = {}
         for field in self._fields.values():
             obj_dict[field.key] = field.serialize(obj)
         return obj_dict
 
-    def deserialize(self, data):
+    def deserialize(self, data: dict) -> dict:
         invalid_data = {}
         valid_data = {}
         errors = {}
