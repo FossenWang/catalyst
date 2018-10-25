@@ -1,6 +1,6 @@
 "Fields"
 
-from typing import Callable, Dict
+from typing import Callable, Dict, Any, NoReturn
 from collections import Iterable
 
 from .validators import ValidationError, LengthValidator, ComparisonValidator, \
@@ -11,6 +11,9 @@ from_attribute = getattr
 
 no_processing = lambda value: value
 
+Name = str
+Value = Any
+
 
 class Field:
     default_error_messages = {
@@ -18,9 +21,9 @@ class Field:
         'allow_none': 'Field may not be None.'
     }
 
-    def __init__(self, name: str=None, key: str=None, source: Callable=None, formatter: Callable=None,
-                 validator: Callable=None, before_validate: Callable=None, after_validate: Callable=None,
-                 required=False, allow_none=True, error_messages: Dict[str]=None):
+    def __init__(self, name: str=None, key: str=None, source: Callable[[object, Name], Value]=None, formatter: Callable[[Value], Value]=None,
+                 validator: Callable[[Value], NoReturn]=None, before_validate: Callable[[Value], Value]=None, after_validate: Callable[[Value], Value]=None,
+                 required: bool=False, allow_none: bool=True, error_messages: Dict[str, str]=None):
         self.name = name
         self.key = key
         self.required = required

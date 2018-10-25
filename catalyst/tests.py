@@ -46,6 +46,18 @@ class CatalystTest(TestCase):
             'bool': True,
             })
 
+        catalyst = TestDataCatalyst(fields=[])
+        self.assertDictEqual(catalyst._serializing_fields, test_data_catalyst._serializing_fields)
+
+        catalyst = TestDataCatalyst(fields=['string'])
+        self.assertDictEqual(catalyst.serialize(test_data), {'string': 'xxx'})
+
+        catalyst = TestDataCatalyst(fields=['string'], serializing_fields=['bool_field'])
+        self.assertDictEqual(catalyst.serialize(test_data), {'bool': True})
+
+        self.assertRaises(KeyError, TestDataCatalyst, fields=['wrong_name'])
+        self.assertRaises(KeyError, TestDataCatalyst, serializing_fields=['wrong_name'])
+
     def test_deserialize(self):
         # test valid_data
         valid_data = {'string': 'xxx', 'integer': 1, 'float': 1.1, 'bool': True}
@@ -88,6 +100,16 @@ class CatalystTest(TestCase):
         self.assertRaises(ValidationError, raise_err_catalyst.deserialize, invalid_data)
         result = raise_err_catalyst.deserialize(valid_data)
         self.assertTrue(result.is_valid)
+
+        catalyst = TestDataCatalyst(fields=[])
+        self.assertDictEqual(catalyst._deserializing_fields, test_data_catalyst._deserializing_fields)
+        catalyst = TestDataCatalyst(fields=['string'])
+        self.assertDictEqual(catalyst.deserialize(valid_data).valid_data, {'string': 'xxx'})
+
+        catalyst = TestDataCatalyst(fields=['string'], deserializing_fields=['bool_field'])
+        self.assertDictEqual(catalyst.deserialize(valid_data).valid_data, {'bool': True})
+
+        self.assertRaises(KeyError, TestDataCatalyst, deserializing_fields=['wrong_name'])
 
 
 class FieldTest(TestCase):

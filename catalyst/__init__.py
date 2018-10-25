@@ -1,7 +1,14 @@
-from typing import Dict
+from typing import Dict, Iterable
 
 from .fields import *
 from .validators import *
+
+
+def copy_dict(dict_: dict, keys: Iterable) -> dict:
+    new_dict = {}
+    for key in keys:
+        new_dict[key] = dict_[key]
+    return new_dict
 
 
 class CatalystMeta(type):
@@ -23,12 +30,28 @@ class CatalystMeta(type):
 class Catalyst(metaclass=CatalystMeta):
     _fields = None  # type: Dict[Field]
 
-    def __init__(self, raise_error=False):
+    def __init__(self, fields: Iterable=None, serializing_fields: Iterable=None, deserializing_fields: Iterable=None, raise_error: bool=False):
+        if fields:
+            if not serializing_fields:
+                serializing_fields = fields
+            if not deserializing_fields:
+                deserializing_fields = fields
+
+        if serializing_fields:
+            self._serializing_fields = copy_dict(self._fields, serializing_fields)
+        else:
+            self._serializing_fields = self._fields
+
+        if deserializing_fields:
+            self._deserializing_fields = copy_dict(self._fields, deserializing_fields)
+        else:
+            self._deserializing_fields = self._fields
+
         self.raise_error = raise_error
 
     def serialize(self, obj) -> dict:
         obj_dict = {}
-        for field in self._fields.values():
+        for field in self._serializing_fields.values():
             obj_dict[field.key] = field.serialize(obj)
         return obj_dict
 
@@ -36,7 +59,7 @@ class Catalyst(metaclass=CatalystMeta):
         invalid_data = {}
         valid_data = {}
         errors = {}
-        for field in self._fields.values():
+        for field in self._deserializing_fields.values():
             try:
                 value = field.deserialize(data)
             except Exception as e:
