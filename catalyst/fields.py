@@ -21,13 +21,26 @@ class Field:
         'allow_none': 'Field may not be None.'
     }
 
-    def __init__(self, name: str=None, key: str=None, source: Callable[[object, Name], Value]=None, formatter: Callable[[Value], Value]=None,
-                 validator: Callable[[Value], NoReturn]=None, before_validate: Callable[[Value], Value]=None, after_validate: Callable[[Value], Value]=None,
-                 required: bool=False, allow_none: bool=True, error_messages: Dict[str, str]=None):
+    def __init__(self,
+                 name: str=None,
+                 key: str=None,
+                 source: Callable[[object, Name], Value]=None,
+                 formatter: Callable[[Value], Value]=None,
+                 validator: Callable[[Value], NoReturn]=None,
+                 before_validate: Callable[[Value], Value]=None,
+                 after_validate: Callable[[Value], Value]=None,
+                 required: bool=False,
+                 allow_none: bool=True,
+                 error_messages: Dict[str, str]=None,
+                 no_serialize: bool=False,
+                 no_deserialize: bool=False,
+                 ):
         self.name = name
         self.key = key
         self.required = required
         self.allow_none = allow_none
+        self.no_serialize = no_serialize
+        self.no_deserialize = no_deserialize
 
         self.source = source if source else from_attribute
 
@@ -246,6 +259,7 @@ class CallableField(Field):
     def __init__(self, name=None, key=None, source=None, formatter=None,
                  validator=None, before_validate=None, after_validate=None,
                  required=False, allow_none=True, error_messages=None,
+                 no_serialize=False, no_deserialize=True,
                  func_args: list=None, func_kwargs: dict=None):
 
         if not func_args:
@@ -260,5 +274,6 @@ class CallableField(Field):
         super().__init__(
             name=name, key=key, source=source, formatter=formatter,
             before_validate=before_validate, validator=validator, after_validate=after_validate,
-            required=required, allow_none=allow_none, error_messages=error_messages
+            required=required, allow_none=allow_none, error_messages=error_messages,
+            no_serialize=no_serialize, no_deserialize=no_deserialize
             )

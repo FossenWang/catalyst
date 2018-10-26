@@ -22,7 +22,7 @@ class TestData:
         self.float_ = float_
         self.bool_ = bool_
 
-    def callable(self, a, b, c=1):
+    def func(self, a, b, c=1):
         return a + b + c
 
 
@@ -31,6 +31,7 @@ class TestDataCatalyst(Catalyst):
     integer = IntegerField(min_value=0, max_value=12, required=True)
     float_field = FloatField(name='float_', key='float', min_value=-1.1, max_value=1.1)
     bool_field = BoolField(name='bool_', key='bool')
+    func = CallableField(name='func', key='func', func_args=(1, 2, 3))
 
 
 test_data_catalyst = TestDataCatalyst()
@@ -43,7 +44,7 @@ class CatalystTest(TestCase):
         test_data_dict = test_data_catalyst.serialize(test_data)
         self.assertDictEqual(test_data_dict, {
             'float': 1.1, 'integer': 1, 'string': 'xxx',
-            'bool': True,
+            'bool': True, 'func': 6,
             })
 
         catalyst = TestDataCatalyst(fields=[])
@@ -101,14 +102,14 @@ class CatalystTest(TestCase):
         result = raise_err_catalyst.deserialize(valid_data)
         self.assertTrue(result.is_valid)
 
+        # test no deserializing
         catalyst = TestDataCatalyst(fields=[])
         self.assertDictEqual(catalyst._deserializing_fields, test_data_catalyst._deserializing_fields)
+        self.assertNotIn('func', catalyst._deserializing_fields.keys())
         catalyst = TestDataCatalyst(fields=['string'])
         self.assertDictEqual(catalyst.deserialize(valid_data).valid_data, {'string': 'xxx'})
-
         catalyst = TestDataCatalyst(fields=['string'], deserializing_fields=['bool_field'])
         self.assertDictEqual(catalyst.deserialize(valid_data).valid_data, {'bool': True})
-
         self.assertRaises(KeyError, TestDataCatalyst, deserializing_fields=['wrong_name'])
 
 
@@ -288,7 +289,7 @@ class FieldTest(TestCase):
         self.assertEqual(list_field.deserialize({'list':None}), None)
 
     def test_callable_field(self):
-        callable_field = CallableField(name='callable', func_args=[1, 2], func_kwargs={'c': 3})
+        callable_field = CallableField(name='func', func_args=[1, 2], func_kwargs={'c': 3})
         # serialize
         test_data = TestData()
         self.assertEqual(callable_field.serialize(test_data), 6)

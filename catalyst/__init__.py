@@ -1,7 +1,10 @@
-from typing import Dict, Iterable
+from typing import Dict, Iterable, TypeVar, Generic
 
 from .fields import *
 from .validators import *
+
+
+FieldDict = Dict[str, Field]
 
 
 def copy_dict(dict_: dict, keys: Iterable) -> dict:
@@ -14,7 +17,7 @@ def copy_dict(dict_: dict, keys: Iterable) -> dict:
 class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
         # collect fields
-        fields = {}  # type: Dict[Field]
+        fields = {}  # type: FieldDict
         for key, value in attrs.items():
             if isinstance(value, Field):
                 if value.name is None:
@@ -28,26 +31,36 @@ class CatalystMeta(type):
 
 
 class Catalyst(metaclass=CatalystMeta):
-    _fields = None  # type: Dict[Field]
+    _fields = None  # type: FieldDict
 
     def __init__(self, fields: Iterable=None, serializing_fields: Iterable=None, deserializing_fields: Iterable=None, raise_error: bool=False):
-        if fields:
-            if not serializing_fields:
-                serializing_fields = fields
-            if not deserializing_fields:
-                deserializing_fields = fields
+        if not fields:
+            fields = self._fields.keys()
+        if not serializing_fields:
+            serializing_fields = fields
+        if not deserializing_fields:
+            deserializing_fields = fields
 
-        if serializing_fields:
-            self._serializing_fields = copy_dict(self._fields, serializing_fields)
-        else:
-            self._serializing_fields = self._fields
-
-        if deserializing_fields:
-            self._deserializing_fields = copy_dict(self._fields, deserializing_fields)
-        else:
-            self._deserializing_fields = self._fields
+        self._serializing_fields = self._copy_fields(
+            self._fields, serializing_fields,
+            lambda k: not self._fields[k].no_serialize)
+        
+        self._deserializing_fields = self._copy_fields(
+            self._fields, deserializing_fields,
+            lambda k: not self._fields[k].no_deserialize)
 
         self.raise_error = raise_error
+
+    def _copy_fields(self,
+                     fields: FieldDict,
+                     keys: Iterable,
+                     is_copying: Callable[[str], bool]
+                     )-> FieldDict:
+        new_fields = {}  # type: FieldDict
+        for key in keys:
+            if is_copying(key):
+                new_fields[key] = fields[key]
+        return new_fields
 
     def serialize(self, obj) -> dict:
         obj_dict = {}
