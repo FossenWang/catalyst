@@ -26,7 +26,7 @@ class Field:
                  key: str=None,
                  source: Callable[[object, Name], Value]=None,
                  formatter: Callable[[Value], Value]=None,
-                 validator: Callable[[Value], NoReturn]=None,
+                 validator: Callable[[Value], None]=None,
                  before_validate: Callable[[Value], Value]=None,
                  after_validate: Callable[[Value], Value]=None,
                  required: bool=False,
@@ -58,31 +58,31 @@ class Field:
 
         # 待定参数: default
 
-    def set_source(self, source):
+    def set_source(self, source: Callable[[object, Name], Value]):
         self.source = source
         return source
 
-    def set_formatter(self, formatter):
+    def set_formatter(self, formatter: Callable[[Value], Value]):
         self.formatter = formatter
         return formatter
 
-    def set_before_validate(self, before_validate):
+    def set_before_validate(self, before_validate: Callable[[Value], Value]):
         self.before_validate = before_validate
         return before_validate
 
-    def set_validator(self, validator):
+    def set_validator(self, validator: Callable[[Value], None]):
         self.validator = validator
         return validator
 
-    def set_after_validate(self, after_validate):
+    def set_after_validate(self, after_validate: Callable[[Value], Value]):
         self.after_validate = after_validate
         return after_validate
 
-    def set_serialize(self, serialize):
+    def set_serialize(self, serialize: Callable[[object, Name], Value]):
         self.serialize = serialize
         return serialize
 
-    def set_deserialize(self, deserialize):
+    def set_deserialize(self, deserialize: Callable[[dict, Name], Value]):
         self.deserialize = deserialize
         return deserialize
 
@@ -127,6 +127,7 @@ class StringField(Field):
     def __init__(self, name=None, key=None, source=None, formatter=str,
                  before_validate=str, validator=None, after_validate=None,
                  required=False, allow_none=True, error_messages=None,
+                 no_serialize=False, no_deserialize=False,
                  min_length=None, max_length=None):
         self.min_length = min_length
         self.max_length = max_length
@@ -137,7 +138,8 @@ class StringField(Field):
         super().__init__(
             name=name, key=key, source=source, formatter=formatter,
             before_validate=before_validate, validator=validator, after_validate=after_validate,
-            required=required, allow_none=allow_none, error_messages=error_messages
+            required=required, allow_none=allow_none, error_messages=error_messages,
+            no_serialize=no_serialize, no_deserialize=no_deserialize
             )
 
 
@@ -147,6 +149,7 @@ class NumberField(Field):
     def __init__(self, name=None, key=None, source=None, formatter=None,
                  before_validate=None, validator=None, after_validate=None,
                  required=False, allow_none=True, error_messages=None,
+                 no_serialize=False, no_deserialize=False,
                  min_value=None, max_value=None):
         self.max_value = self.type_(max_value) if max_value is not None else max_value
         self.min_value = self.type_(min_value) if min_value is not None else min_value
@@ -164,7 +167,8 @@ class NumberField(Field):
         super().__init__(
             name=name, key=key, source=source, formatter=formatter,
             before_validate=before_validate, validator=validator, after_validate=after_validate,
-            required=required, allow_none=allow_none, error_messages=error_messages
+            required=required, allow_none=allow_none, error_messages=error_messages,
+            no_serialize=no_serialize, no_deserialize=no_deserialize
             )
 
 
@@ -180,7 +184,8 @@ class BoolField(Field):
 
     def __init__(self, name=None, key=None, source=None, formatter=bool,
                  before_validate=bool, validator=None, after_validate=None,
-                 required=False, allow_none=True, error_messages=None):
+                 required=False, allow_none=True, error_messages=None,
+                 no_serialize=False, no_deserialize=False):
 
         if not validator:
             validator = BoolValidator(error_messages)
@@ -188,7 +193,8 @@ class BoolField(Field):
         super().__init__(
             name=name, key=key, source=source, formatter=formatter,
             before_validate=before_validate, validator=validator, after_validate=after_validate,
-            required=required, allow_none=allow_none, error_messages=error_messages
+            required=required, allow_none=allow_none, error_messages=error_messages,
+            no_serialize=no_serialize, no_deserialize=no_deserialize
             )
 
 
@@ -207,7 +213,8 @@ class ListField(Field):
 
     def __init__(self, name=None, key=None, source=None, formatter=None,
                  validator=None, before_validate=None, after_validate=None,
-                 required=False, allow_none=True, error_messages=None, item_field=None):
+                 required=False, allow_none=True, error_messages=None,
+                 no_serialize=False, no_deserialize=False, item_field=None):
 
         if item_field:
             self.item_field = item_field
@@ -220,7 +227,8 @@ class ListField(Field):
         super().__init__(
             name=name, key=key, source=source, formatter=formatter,
             before_validate=before_validate, validator=validator, after_validate=after_validate,
-            required=required, allow_none=allow_none, error_messages=error_messages
+            required=required, allow_none=allow_none, error_messages=error_messages,
+            no_serialize=no_serialize, no_deserialize=no_deserialize
             )
 
     def deserialize(self, data):
@@ -249,10 +257,6 @@ class CallableFormatter:
 
     def __call__(self, func):
         return func(*self.args, **self.kwargs)
-
-
-def call_func(func):
-    return func()
 
 
 class CallableField(Field):

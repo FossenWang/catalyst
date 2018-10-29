@@ -33,7 +33,8 @@ class CatalystMeta(type):
 class Catalyst(metaclass=CatalystMeta):
     _fields = None  # type: FieldDict
 
-    def __init__(self, fields: Iterable=None, serializing_fields: Iterable=None, deserializing_fields: Iterable=None, raise_error: bool=False):
+    def __init__(self, fields: Iterable=None, serializing_fields: Iterable=None,
+                 deserializing_fields: Iterable=None, raise_error: bool=False):
         if not fields:
             fields = self._fields.keys()
         if not serializing_fields:
@@ -44,7 +45,7 @@ class Catalyst(metaclass=CatalystMeta):
         self._serializing_fields = self._copy_fields(
             self._fields, serializing_fields,
             lambda k: not self._fields[k].no_serialize)
-        
+
         self._deserializing_fields = self._copy_fields(
             self._fields, deserializing_fields,
             lambda k: not self._fields[k].no_deserialize)

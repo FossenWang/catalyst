@@ -2,7 +2,7 @@
 
 from unittest import TestCase
 
-from marshmallow import Schema, fields
+# from marshmallow import Schema, fields
 # from django.forms import fields
 
 from . import Catalyst
