@@ -1,72 +1,76 @@
-import enum
+from unittest import TestCase
 
-from sqlalchemy.sql.sqltypes import Enum
-
-from flask_fossen.testcases import FlaskTestCase
-from flask_fossen.validators import generate_validators_from_mapper, \
-    MaxLengthValidator, IntegerValidator, EnumValidator, \
-    PasswordValidator, EmailValidator, BooleanValidator
-
-from .test_app.app.database import User
+from catalyst.validators import (
+    ValidationError, Validator, LengthValidator,
+    ComparisonValidator, BoolValidator
+)
 
 
-class ValidatorsTest(FlaskTestCase):
-    def test_BooleanValidator(self):
-        validator = BooleanValidator()
-        self.assertEqual(validator(None), None)
-        self.assertEqual(validator(True), True)
-        self.assertEqual(validator(False), False)
-        self.assertRaises(AssertionError, validator, 'asdzxc')
+class ValidationTest(TestCase):
 
-    def test_MaxLengthValidator(self):
-        maxLength_validator = MaxLengthValidator(3)
-        self.assertEqual(maxLength_validator('asd'), 'asd')
-        self.assertRaises(AssertionError, maxLength_validator, 'asdzxc')
+    def test_base_validator(self):
+        class NewValidator(Validator):
+            default_error_messages = {'msg': 'default'}
+            def __call__(self, value):
+                raise ValidationError(self.error_messages['msg'])
 
-    def test_IntegerValidator(self):
-        integer_validator = IntegerValidator()
-        self.assertEqual(integer_validator(0), 0)
-        self.assertEqual(integer_validator(1), 1)
-        self.assertEqual(integer_validator('200'), 200)
-        self.assertRaises(ValueError, integer_validator, 'any')
-        self.assertRaises(TypeError, integer_validator, [])
-        self.assertRaises(TypeError, integer_validator, None)
+        # test alterable error messages
+        default_validator = NewValidator()
+        custom_msg_validator = NewValidator(error_messages={'msg': 'custom'})
+        try:
+            default_validator(0)
+        except ValidationError as e:
+            self.assertEqual(str(e), 'default')
+        try:
+            custom_msg_validator(0)
+        except ValidationError as e:
+            self.assertEqual(str(e), 'custom')
+        self.assertDictEqual(NewValidator.default_error_messages, {'msg': 'default'})
 
-    def test_EnumValidator(self):
-        class TestEnum(enum.Enum):
-            qqq = 1
-            www = 2
-            eee = 3
-        enum_type = Enum(TestEnum)
-        enum_validator = EnumValidator(enum_type._valid_lookup)
-        self.assertEqual(enum_validator('qqq'), 'qqq')
-        self.assertEqual(enum_validator(TestEnum(2)), 'www')
-        self.assertRaises(LookupError, enum_validator, 3)
+    def test_comparison_validator(self):
+        compare_integer = ComparisonValidator(0, 100)
+        compare_integer(1)
+        compare_integer(0)
+        compare_integer(100)
+        self.assertRaises(ValidationError, compare_integer, -1)
+        self.assertRaises(ValidationError, compare_integer, 101)
+        self.assertRaises(TypeError, compare_integer, '1')
+        self.assertRaises(TypeError, compare_integer, [1])
 
-    def test_EmailValidator(self):
-        email_validator = EmailValidator()
-        self.assertEqual(email_validator('asd@123.com'), 'asd@123.com')
-        self.assertEqual(email_validator('asd@123.com.cn'), 'asd@123.com.cn')
-        self.assertRaises(AssertionError, email_validator, '@123.com')
-        self.assertRaises(AssertionError, email_validator, 'asd@')
-        self.assertRaises(AssertionError, email_validator, '123.com')
-        self.assertRaises(AssertionError, email_validator, 'asd@com')
-        self.assertRaises(AssertionError, email_validator, 'asd@.com')
-        self.assertRaises(TypeError, email_validator, [])
+        compare_integer_float = ComparisonValidator(-1.1, 1.1)
 
-    def test_PasswordValidator(self):
-        password_validator = PasswordValidator(6, 20, '_,./')
-        self.assertEqual(password_validator('asd123'), 'asd123')
-        self.assertEqual(password_validator('asd_,./123'), 'asd_,./123')
-        self.assertRaises(AssertionError, password_validator, 'asd45')
-        self.assertRaises(AssertionError, password_validator, 'asd456@')
-        self.assertRaises(AssertionError, password_validator, '12345678')
-        self.assertRaises(AssertionError, password_validator, 'qweasdzxc')
+        compare_integer_float(1)
+        compare_integer_float(0)
+        compare_integer_float(0.1)
+        compare_integer_float(1.1)
+        compare_integer_float(-1.1)
+        self.assertRaises(ValidationError, compare_integer_float, -2)
+        self.assertRaises(ValidationError, compare_integer_float, 2)
+        self.assertRaises(TypeError, compare_integer_float, '1.1')
+        self.assertRaises(TypeError, compare_integer_float, [1.1])
 
-    def test_ValidatorMapper(self):
-        validators, required = generate_validators_from_mapper(User.__mapper__)
-        self.assertEqual(required, ['username', 'email'])
-        self.assertIsInstance(validators['id'][0], IntegerValidator)
-        self.assertIsInstance(validators['username'][0], MaxLengthValidator)
-        self.assertIsInstance(validators['email'][1], EmailValidator)
-        self.assertIsInstance(validators['password'][0], PasswordValidator)
+    def test_length_validator(self):
+        validator = LengthValidator(2, 10)
+
+        validator('x' * 2)
+        validator('x' * 5)
+        validator('x' * 10)
+        validator(['xzc', 1])
+        self.assertRaises(ValidationError, validator, 'x')
+        self.assertRaises(ValidationError, validator, 'x' * 11)
+        self.assertRaises(ValidationError, validator, '')
+        self.assertRaises(TypeError, validator, None)
+
+        validator = LengthValidator(0, 1)
+        validator('')
+        validator([])
+
+    def test_bool_validator(self):
+        validator = BoolValidator()
+
+        validator(True)
+        validator(False)
+        self.assertRaises(ValidationError, validator, '')
+        self.assertRaises(ValidationError, validator, 1)
+        self.assertRaises(ValidationError, validator, None)
+        self.assertRaises(ValidationError, validator, [])
