@@ -2,7 +2,7 @@
 
 from unittest import TestCase
 
-# from marshmallow import Schema, fields
+from marshmallow import Schema, fields
 # from django.forms import fields
 
 from . import Catalyst
@@ -39,30 +39,30 @@ test_data_catalyst = TestDataCatalyst()
 
 class CatalystTest(TestCase):
 
-    def test_serialize(self):
+    def test_dump(self):
         test_data = TestData(string='xxx', integer=1, float_=1.1, bool_=True)
-        test_data_dict = test_data_catalyst.serialize(test_data)
+        test_data_dict = test_data_catalyst.dump(test_data)
         self.assertDictEqual(test_data_dict, {
             'float': 1.1, 'integer': 1, 'string': 'xxx',
             'bool': True, 'func': 6,
             })
 
         catalyst = TestDataCatalyst(fields=[])
-        self.assertDictEqual(catalyst._serializing_fields, test_data_catalyst._serializing_fields)
+        self.assertDictEqual(catalyst._dump_fields, test_data_catalyst._dump_fields)
 
         catalyst = TestDataCatalyst(fields=['string'])
-        self.assertDictEqual(catalyst.serialize(test_data), {'string': 'xxx'})
+        self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
 
-        catalyst = TestDataCatalyst(fields=['string'], serializing_fields=['bool_field'])
-        self.assertDictEqual(catalyst.serialize(test_data), {'bool': True})
+        catalyst = TestDataCatalyst(fields=['string'], dump_fields=['bool_field'])
+        self.assertDictEqual(catalyst.dump(test_data), {'bool': True})
 
         self.assertRaises(KeyError, TestDataCatalyst, fields=['wrong_name'])
-        self.assertRaises(KeyError, TestDataCatalyst, serializing_fields=['wrong_name'])
+        self.assertRaises(KeyError, TestDataCatalyst, dump_fields=['wrong_name'])
 
-    def test_deserialize(self):
+    def test_load(self):
         # test valid_data
         valid_data = {'string': 'xxx', 'integer': 1, 'float': 1.1, 'bool': True}
-        result = test_data_catalyst.deserialize(valid_data)
+        result = test_data_catalyst.load(valid_data)
         self.assertTrue(result.is_valid)
         self.assertDictEqual(result.invalid_data, {})
         self.assertDictEqual(result.errors, {})
@@ -70,7 +70,7 @@ class CatalystTest(TestCase):
 
         # test invalid_data: validate errors
         invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
-        result = test_data_catalyst.deserialize(invalid_data)
+        result = test_data_catalyst.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
@@ -78,7 +78,7 @@ class CatalystTest(TestCase):
 
         # test invalid_data: parse errors
         invalid_data = {'string': 'x', 'integer': 'str', 'float': []}
-        result = test_data_catalyst.deserialize(invalid_data)
+        result = test_data_catalyst.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
@@ -90,7 +90,7 @@ class CatalystTest(TestCase):
         # ignore other fields
         invalid_data = valid_data.copy()
         invalid_data.pop('integer')
-        result = test_data_catalyst.deserialize(invalid_data)
+        result = test_data_catalyst.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, {})
         self.assertEqual(set(result.errors), {'integer'})
@@ -98,19 +98,19 @@ class CatalystTest(TestCase):
 
         # test raise error while validating
         raise_err_catalyst = TestDataCatalyst(raise_error=True)
-        self.assertRaises(ValidationError, raise_err_catalyst.deserialize, invalid_data)
-        result = raise_err_catalyst.deserialize(valid_data)
+        self.assertRaises(ValidationError, raise_err_catalyst.load, invalid_data)
+        result = raise_err_catalyst.load(valid_data)
         self.assertTrue(result.is_valid)
 
-        # test no deserializing
+        # test no load
         catalyst = TestDataCatalyst(fields=[])
-        self.assertDictEqual(catalyst._deserializing_fields, test_data_catalyst._deserializing_fields)
-        self.assertNotIn('func', catalyst._deserializing_fields.keys())
+        self.assertDictEqual(catalyst._load_fields, test_data_catalyst._load_fields)
+        self.assertNotIn('func', catalyst._load_fields.keys())
         catalyst = TestDataCatalyst(fields=['string'])
-        self.assertDictEqual(catalyst.deserialize(valid_data).valid_data, {'string': 'xxx'})
-        catalyst = TestDataCatalyst(fields=['string'], deserializing_fields=['bool_field'])
-        self.assertDictEqual(catalyst.deserialize(valid_data).valid_data, {'bool': True})
-        self.assertRaises(KeyError, TestDataCatalyst, deserializing_fields=['wrong_name'])
+        self.assertDictEqual(catalyst.load(valid_data).valid_data, {'string': 'xxx'})
+        catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])
+        self.assertDictEqual(catalyst.load(valid_data).valid_data, {'bool': True})
+        self.assertRaises(KeyError, TestDataCatalyst, load_fields=['wrong_name'])
 
 
 class FieldTest(TestCase):
@@ -121,8 +121,8 @@ class FieldTest(TestCase):
             key_2 = Field()
 
             @staticmethod
-            @key_1.set_source
-            @key_2.set_source
+            @key_1.set_dump_from
+            @key_2.set_dump_from
             def from_dict_key(obj, name):
                 return obj[name]
 
@@ -131,8 +131,8 @@ class FieldTest(TestCase):
             def fixed_value_formatter(value):
                 return 1
 
-            @fixed_value.set_before_validate
-            def before_validate_fixed_value(value):
+            @fixed_value.set_parse
+            def parse_fixed_value(value):
                 return value + 1
 
             @fixed_value.set_validator
@@ -149,150 +149,150 @@ class FieldTest(TestCase):
         a = A()
         test_data = TestData()
         test_data.fixed_value = 'asd'
-        self.assertEqual(a.fixed_value.serialize(test_data), 1)
+        self.assertEqual(a.fixed_value.dump(test_data), 1)
         test_data.fixed_value = 1000
-        self.assertEqual(a.fixed_value.serialize(test_data), 1)
+        self.assertEqual(a.fixed_value.dump(test_data), 1)
         test_data.fixed_value = [100]
-        self.assertEqual(a.fixed_value.serialize(test_data), 1)
+        self.assertEqual(a.fixed_value.dump(test_data), 1)
 
-        # test source
-        field_2 = Field(source=A.from_dict_key)
-        self.assertEqual(field_2.source, A.from_dict_key)
-        self.assertEqual(a.key_1.serialize({'key_1': 1,}), 1)
-        self.assertEqual(a.key_2.serialize({'key_2': 2,}), 2)
+        # test dump_from
+        field_2 = Field(dump_from=A.from_dict_key)
+        self.assertEqual(field_2.dump_from, A.from_dict_key)
+        self.assertEqual(a.key_1.dump({'key_1': 1,}), 1)
+        self.assertEqual(a.key_2.dump({'key_2': 2,}), 2)
         test_data.key = 1
-        self.assertRaises(TypeError, a.key_1.serialize, test_data)
+        self.assertRaises(TypeError, a.key_1.dump, test_data)
 
         # test after validate
-        self.assertEqual(a.fixed_value.deserialize({'fixed_value': 0}), 2)
-        self.assertRaises(TypeError, a.fixed_value.deserialize, {'fixed_value': '0'})
+        self.assertEqual(a.fixed_value.load({'fixed_value': 0}), 2)
+        self.assertRaises(TypeError, a.fixed_value.load, {'fixed_value': '0'})
 
         # test error msg
         field_3 = Field(key='a', allow_none=False, error_messages={'allow_none': '666'})
         try:
-            field_3.deserialize({'a': None})
+            field_3.load({'a': None})
         except ValidationError as e:
             self.assertEqual(e.args[0], '666')
 
     def test_string_field(self):
         string_field = StringField(name='string', key='string', min_length=2, max_length=12)
 
-        # serialize
+        # dump
         test_data = TestData(string='xxx')
-        self.assertEqual(string_field.serialize(test_data), 'xxx')
+        self.assertEqual(string_field.dump(test_data), 'xxx')
         test_data.string = 1
-        self.assertEqual(string_field.serialize(test_data), '1')
+        self.assertEqual(string_field.dump(test_data), '1')
         test_data.string = []
-        self.assertEqual(string_field.serialize(test_data), '[]')
+        self.assertEqual(string_field.dump(test_data), '[]')
         test_data.string = None
-        self.assertEqual(string_field.serialize(test_data), None)
+        self.assertEqual(string_field.dump(test_data), None)
 
-        # deserialize
-        self.assertEqual(string_field.deserialize({'string': 'xxx'}), 'xxx')
-        self.assertEqual(string_field.deserialize({'string': 123}), '123')
-        self.assertEqual(string_field.deserialize({'string': [1]}), '[1]')
-        self.assertEqual(string_field.deserialize({'string': None}), None)
-        self.assertEqual(string_field.deserialize({}), None)
-        self.assertRaises(ValidationError, string_field.deserialize, {'string': ''})
+        # load
+        self.assertEqual(string_field.load({'string': 'xxx'}), 'xxx')
+        self.assertEqual(string_field.load({'string': 123}), '123')
+        self.assertEqual(string_field.load({'string': [1]}), '[1]')
+        self.assertEqual(string_field.load({'string': None}), None)
+        self.assertEqual(string_field.load({}), None)
+        self.assertRaises(ValidationError, string_field.load, {'string': ''})
 
         string_field.allow_none = False
-        self.assertRaises(ValidationError, string_field.deserialize, {'string': None})
+        self.assertRaises(ValidationError, string_field.load, {'string': None})
 
         string_field.required = True
-        self.assertRaises(ValidationError, string_field.deserialize, {})
+        self.assertRaises(ValidationError, string_field.load, {})
 
     def test_int_field(self):
         int_field = IntegerField(name='integer', key='integer', min_value=-10, max_value=100)
 
-        # serialize
+        # dump
         test_data = TestData(integer=1)
-        self.assertEqual(int_field.serialize(test_data), 1)
+        self.assertEqual(int_field.dump(test_data), 1)
         test_data.integer = 1.6
-        self.assertEqual(int_field.serialize(test_data), 1)
+        self.assertEqual(int_field.dump(test_data), 1)
         test_data.integer = '10'
-        self.assertEqual(int_field.serialize(test_data), 10)
+        self.assertEqual(int_field.dump(test_data), 10)
 
-        # deserialize
-        self.assertEqual(int_field.deserialize({'integer': 0}), 0)
-        self.assertEqual(int_field.deserialize({'integer': 1}), 1)
-        self.assertEqual(int_field.deserialize({'integer': '1'}), 1)
-        self.assertEqual(int_field.deserialize({'integer': None}), None)
-        self.assertEqual(int_field.deserialize({}), None)
+        # load
+        self.assertEqual(int_field.load({'integer': 0}), 0)
+        self.assertEqual(int_field.load({'integer': 1}), 1)
+        self.assertEqual(int_field.load({'integer': '1'}), 1)
+        self.assertEqual(int_field.load({'integer': None}), None)
+        self.assertEqual(int_field.load({}), None)
 
-        self.assertRaises(ValueError, int_field.deserialize, {'integer': ''})
-        self.assertRaises(ValidationError, int_field.deserialize, {'integer': 111})
-        self.assertRaises(ValueError, int_field.deserialize, {'integer': 'asd'})
-        self.assertRaises(TypeError, int_field.deserialize, {'integer': []})
+        self.assertRaises(ValueError, int_field.load, {'integer': ''})
+        self.assertRaises(ValidationError, int_field.load, {'integer': 111})
+        self.assertRaises(ValueError, int_field.load, {'integer': 'asd'})
+        self.assertRaises(TypeError, int_field.load, {'integer': []})
 
     def test_float_field(self):
         float_field = FloatField(name='float_', key='float', min_value=-11.1, max_value=111.1)
 
-        # serialize
+        # dump
         test_data = TestData(float_=1)
-        self.assertEqual(float_field.serialize(test_data), 1.0)
+        self.assertEqual(float_field.dump(test_data), 1.0)
         test_data.float_ = 0
-        self.assertEqual(float_field.serialize(test_data), 0.0)
+        self.assertEqual(float_field.dump(test_data), 0.0)
         test_data.float_ = 5.5
-        self.assertEqual(float_field.serialize(test_data), 5.5)
+        self.assertEqual(float_field.dump(test_data), 5.5)
         test_data.float_ = '10'
-        self.assertEqual(float_field.serialize(test_data), 10.0)
+        self.assertEqual(float_field.dump(test_data), 10.0)
         test_data.float_ = None
-        self.assertEqual(float_field.serialize(test_data), None)
+        self.assertEqual(float_field.dump(test_data), None)
 
-        # deserialize
-        self.assertEqual(float_field.deserialize({'float': 0}), 0.0)
-        self.assertEqual(float_field.deserialize({'float': '1.1'}), 1.1)
-        self.assertEqual(float_field.deserialize({'float': -11.1}), -11.1)
-        self.assertEqual(float_field.deserialize({'float': 111.1}), 111.1)
-        self.assertEqual(float_field.deserialize({'float': 11}), 11)
-        self.assertEqual(float_field.deserialize({'float': None}), None)
-        self.assertEqual(float_field.deserialize({}), None)
+        # load
+        self.assertEqual(float_field.load({'float': 0}), 0.0)
+        self.assertEqual(float_field.load({'float': '1.1'}), 1.1)
+        self.assertEqual(float_field.load({'float': -11.1}), -11.1)
+        self.assertEqual(float_field.load({'float': 111.1}), 111.1)
+        self.assertEqual(float_field.load({'float': 11}), 11)
+        self.assertEqual(float_field.load({'float': None}), None)
+        self.assertEqual(float_field.load({}), None)
 
-        self.assertRaises(ValueError, float_field.deserialize, {'float': ''})
-        self.assertRaises(ValidationError, float_field.deserialize, {'float': 111.11})
-        self.assertRaises(TypeError, float_field.deserialize, {'float': []})
+        self.assertRaises(ValueError, float_field.load, {'float': ''})
+        self.assertRaises(ValidationError, float_field.load, {'float': 111.11})
+        self.assertRaises(TypeError, float_field.load, {'float': []})
 
     def test_bool_field(self):
         bool_field = BoolField(name='bool_', key='bool')
 
-        # serialize
+        # dump
         test_data = TestData(bool_=True)
-        self.assertEqual(bool_field.serialize(test_data), True)
+        self.assertEqual(bool_field.dump(test_data), True)
         test_data.bool_ = False
-        self.assertEqual(bool_field.serialize(test_data), False)
+        self.assertEqual(bool_field.dump(test_data), False)
         test_data.bool_ = None
-        self.assertEqual(bool_field.serialize(test_data), None)
+        self.assertEqual(bool_field.dump(test_data), None)
 
-        # deserialize
-        self.assertEqual(bool_field.deserialize({'bool': True}), True)
-        self.assertEqual(bool_field.deserialize({'bool': False}), False)
-        self.assertEqual(bool_field.deserialize({'bool': 'False'}), True)
-        self.assertEqual(bool_field.deserialize({'bool': 0}), False)
-        self.assertEqual(bool_field.deserialize({'bool': 1}), True)
-        self.assertEqual(bool_field.deserialize({'bool': []}), False)
+        # load
+        self.assertEqual(bool_field.load({'bool': True}), True)
+        self.assertEqual(bool_field.load({'bool': False}), False)
+        self.assertEqual(bool_field.load({'bool': 'False'}), True)
+        self.assertEqual(bool_field.load({'bool': 0}), False)
+        self.assertEqual(bool_field.load({'bool': 1}), True)
+        self.assertEqual(bool_field.load({'bool': []}), False)
 
     def test_list_field(self):
         list_field = ListField(name='list_', key='list', item_field=FloatField())
 
-        # serialize
+        # dump
         test_data = TestData()
         test_data.list_ = [1, 2, 3]
-        self.assertListEqual(list_field.serialize(test_data), [1.0, 2.0, 3.0])
+        self.assertListEqual(list_field.dump(test_data), [1.0, 2.0, 3.0])
         test_data.list_ = []
-        self.assertListEqual(list_field.serialize(test_data), [])
+        self.assertListEqual(list_field.dump(test_data), [])
         test_data.list_ = None
-        self.assertEqual(list_field.serialize(test_data), None)
+        self.assertEqual(list_field.dump(test_data), None)
 
-        # deserialize
-        self.assertListEqual(list_field.deserialize({'list': [1, 2, 3]}), [1.0, 2.0, 3.0])
-        self.assertListEqual(list_field.deserialize({'list': []}), [])
-        self.assertEqual(list_field.deserialize({'list':None}), None)
+        # load
+        self.assertListEqual(list_field.load({'list': [1, 2, 3]}), [1.0, 2.0, 3.0])
+        self.assertListEqual(list_field.load({'list': []}), [])
+        self.assertEqual(list_field.load({'list':None}), None)
 
     def test_callable_field(self):
         callable_field = CallableField(name='func', func_args=[1, 2], func_kwargs={'c': 3})
-        # serialize
+        # dump
         test_data = TestData()
-        self.assertEqual(callable_field.serialize(test_data), 6)
+        self.assertEqual(callable_field.dump(test_data), 6)
 
 
 

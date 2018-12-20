@@ -24,29 +24,29 @@ class Field:
     def __init__(self,
                  name: str=None,
                  key: str=None,
-                 source: Callable[[object, Name], Value]=None,
+                 dump_from: Callable[[object, Name], Value]=None,
                  formatter: Callable[[Value], Value]=None,
                  validator: Callable[[Value], None]=None,
-                 before_validate: Callable[[Value], Value]=None,
+                 parse: Callable[[Value], Value]=None,
                  after_validate: Callable[[Value], Value]=None,
                  required: bool=False,
                  allow_none: bool=True,
                  error_messages: Dict[str, str]=None,
-                 no_serialize: bool=False,
-                 no_deserialize: bool=False,
+                 no_dump: bool=False,
+                 no_load: bool=False,
                  ):
         self.name = name
         self.key = key
         self.required = required
         self.allow_none = allow_none
-        self.no_serialize = no_serialize
-        self.no_deserialize = no_deserialize
+        self.no_dump = no_dump
+        self.no_load = no_load
 
-        self.source = source if source else from_attribute
+        self.dump_from = dump_from if dump_from else from_attribute
 
         self.formatter = formatter if formatter else no_processing
 
-        self.before_validate = before_validate if before_validate else no_processing
+        self.parse = parse if parse else no_processing
 
         self.validator = validator if validator else no_processing
 
@@ -58,17 +58,17 @@ class Field:
 
         # 待定参数: default
 
-    def set_source(self, source: Callable[[object, Name], Value]):
-        self.source = source
-        return source
+    def set_dump_from(self, dump_from: Callable[[object, Name], Value]):
+        self.dump_from = dump_from
+        return dump_from
 
     def set_formatter(self, formatter: Callable[[Value], Value]):
         self.formatter = formatter
         return formatter
 
-    def set_before_validate(self, before_validate: Callable[[Value], Value]):
-        self.before_validate = before_validate
-        return before_validate
+    def set_parse(self, parse: Callable[[Value], Value]):
+        self.parse = parse
+        return parse
 
     def set_validator(self, validator: Callable[[Value], None]):
         self.validator = validator
@@ -78,21 +78,21 @@ class Field:
         self.after_validate = after_validate
         return after_validate
 
-    def set_serialize(self, serialize: Callable[[object, Name], Value]):
-        self.serialize = serialize
-        return serialize
+    def set_dump(self, dump: Callable[[object, Name], Value]):
+        self.dump = dump
+        return dump
 
-    def set_deserialize(self, deserialize: Callable[[dict, Name], Value]):
-        self.deserialize = deserialize
-        return deserialize
+    def set_load(self, load: Callable[[dict, Name], Value]):
+        self.load = load
+        return load
 
-    def serialize(self, obj):
-        value = self.source(obj, self.name)
+    def dump(self, obj):
+        value = self.dump_from(obj, self.name)
         if self.formatter and value is not None:
             value = self.formatter(value)
         return value
 
-    def get_deserializing_value(self, data: dict):
+    def get_load_value(self, data: dict):
         if self.key in data.keys():
             value = data[self.key]
             return value
@@ -101,15 +101,15 @@ class Field:
         else:
             return None
 
-    def deserialize(self, data):
-        value = self.get_deserializing_value(data)
+    def load(self, data):
+        value = self.get_load_value(data)
         if value is None:
             if self.allow_none:
                 return None
             else:
                 raise ValidationError(self.error_messages.get('allow_none'))
 
-        value = self.before_validate(value)
+        value = self.parse(value)
         self.validate(value)
         value = self.after_validate(value)
         return value
@@ -124,10 +124,10 @@ class Field:
 
 class StringField(Field):
 
-    def __init__(self, name=None, key=None, source=None, formatter=str,
-                 before_validate=str, validator=None, after_validate=None,
+    def __init__(self, name=None, key=None, dump_from=None, formatter=str,
+                 parse=str, validator=None, after_validate=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_serialize=False, no_deserialize=False,
+                 no_dump=False, no_load=False,
                  min_length=None, max_length=None):
         self.min_length = min_length
         self.max_length = max_length
@@ -136,20 +136,20 @@ class StringField(Field):
             validator = LengthValidator(min_length, max_length)
 
         super().__init__(
-            name=name, key=key, source=source, formatter=formatter,
-            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            name=name, key=key, dump_from=dump_from, formatter=formatter,
+            parse=parse, validator=validator, after_validate=after_validate,
             required=required, allow_none=allow_none, error_messages=error_messages,
-            no_serialize=no_serialize, no_deserialize=no_deserialize
+            no_dump=no_dump, no_load=no_load
             )
 
 
 class NumberField(Field):
     type_ = float
 
-    def __init__(self, name=None, key=None, source=None, formatter=None,
-                 before_validate=None, validator=None, after_validate=None,
+    def __init__(self, name=None, key=None, dump_from=None, formatter=None,
+                 parse=None, validator=None, after_validate=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_serialize=False, no_deserialize=False,
+                 no_dump=False, no_load=False,
                  min_value=None, max_value=None):
         self.max_value = self.type_(max_value) if max_value is not None else max_value
         self.min_value = self.type_(min_value) if min_value is not None else min_value
@@ -157,18 +157,18 @@ class NumberField(Field):
         if not formatter:
             formatter = self.type_
 
-        if not before_validate:
-            before_validate = self.type_
+        if not parse:
+            parse = self.type_
 
         if validator is None and \
             (min_value is not None or max_value is not None):
             validator = ComparisonValidator(min_value, max_value)
 
         super().__init__(
-            name=name, key=key, source=source, formatter=formatter,
-            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            name=name, key=key, dump_from=dump_from, formatter=formatter,
+            parse=parse, validator=validator, after_validate=after_validate,
             required=required, allow_none=allow_none, error_messages=error_messages,
-            no_serialize=no_serialize, no_deserialize=no_deserialize
+            no_dump=no_dump, no_load=no_load
             )
 
 
@@ -182,19 +182,19 @@ class FloatField(NumberField):
 
 class BoolField(Field):
 
-    def __init__(self, name=None, key=None, source=None, formatter=bool,
-                 before_validate=bool, validator=None, after_validate=None,
+    def __init__(self, name=None, key=None, dump_from=None, formatter=bool,
+                 parse=bool, validator=None, after_validate=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_serialize=False, no_deserialize=False):
+                 no_dump=False, no_load=False):
 
         if not validator:
             validator = BoolValidator(error_messages)
 
         super().__init__(
-            name=name, key=key, source=source, formatter=formatter,
-            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            name=name, key=key, dump_from=dump_from, formatter=formatter,
+            parse=parse, validator=validator, after_validate=after_validate,
             required=required, allow_none=allow_none, error_messages=error_messages,
-            no_serialize=no_serialize, no_deserialize=no_deserialize
+            no_dump=no_dump, no_load=no_load
             )
 
 
@@ -211,10 +211,10 @@ class ListFormatter:
 class ListField(Field):
     item_field = Field()
 
-    def __init__(self, name=None, key=None, source=None, formatter=None,
-                 validator=None, before_validate=None, after_validate=None,
+    def __init__(self, name=None, key=None, dump_from=None, formatter=None,
+                 validator=None, parse=None, after_validate=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_serialize=False, no_deserialize=False, item_field=None):
+                 no_dump=False, no_load=False, item_field=None):
 
         if item_field:
             self.item_field = item_field
@@ -225,14 +225,14 @@ class ListField(Field):
         self.default_error_messages['iterable'] = 'The field value is not Iterable.',
 
         super().__init__(
-            name=name, key=key, source=source, formatter=formatter,
-            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            name=name, key=key, dump_from=dump_from, formatter=formatter,
+            parse=parse, validator=validator, after_validate=after_validate,
             required=required, allow_none=allow_none, error_messages=error_messages,
-            no_serialize=no_serialize, no_deserialize=no_deserialize
+            no_dump=no_dump, no_load=no_load
             )
 
-    def deserialize(self, data):
-        list_ = self.get_deserializing_value(data)
+    def load(self, data):
+        list_ = self.get_load_value(data)
         if list_ is None:
             if self.allow_none:
                 return None
@@ -243,7 +243,7 @@ class ListField(Field):
             raise ValidationError(self.error_messages.get('iterable'))
 
         for i, value in enumerate(list_):
-            value = self.item_field.before_validate(value)
+            value = self.item_field.parse(value)
             self.item_field.validate(value)
             value = self.item_field.after_validate(value)
             list_[i] = value
@@ -260,10 +260,10 @@ class CallableFormatter:
 
 
 class CallableField(Field):
-    def __init__(self, name=None, key=None, source=None, formatter=None,
-                 validator=None, before_validate=None, after_validate=None,
+    def __init__(self, name=None, key=None, dump_from=None, formatter=None,
+                 validator=None, parse=None, after_validate=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_serialize=False, no_deserialize=True,
+                 no_dump=False, no_load=True,
                  func_args: list=None, func_kwargs: dict=None):
 
         if not func_args:
@@ -276,8 +276,8 @@ class CallableField(Field):
             formatter = CallableFormatter(*func_args, **func_kwargs)
 
         super().__init__(
-            name=name, key=key, source=source, formatter=formatter,
-            before_validate=before_validate, validator=validator, after_validate=after_validate,
+            name=name, key=key, dump_from=dump_from, formatter=formatter,
+            parse=parse, validator=validator, after_validate=after_validate,
             required=required, allow_none=allow_none, error_messages=error_messages,
-            no_serialize=no_serialize, no_deserialize=no_deserialize
+            no_dump=no_dump, no_load=no_load
             )

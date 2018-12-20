@@ -33,22 +33,22 @@ class CatalystMeta(type):
 class Catalyst(metaclass=CatalystMeta):
     _fields = None  # type: FieldDict
 
-    def __init__(self, fields: Iterable=None, serializing_fields: Iterable=None,
-                 deserializing_fields: Iterable=None, raise_error: bool=False):
+    def __init__(self, fields: Iterable=None, dump_fields: Iterable=None,
+                 load_fields: Iterable=None, raise_error: bool=False):
         if not fields:
             fields = self._fields.keys()
-        if not serializing_fields:
-            serializing_fields = fields
-        if not deserializing_fields:
-            deserializing_fields = fields
+        if not dump_fields:
+            dump_fields = fields
+        if not load_fields:
+            load_fields = fields
 
-        self._serializing_fields = self._copy_fields(
-            self._fields, serializing_fields,
-            lambda k: not self._fields[k].no_serialize)
+        self._dump_fields = self._copy_fields(
+            self._fields, dump_fields,
+            lambda k: not self._fields[k].no_dump)
 
-        self._deserializing_fields = self._copy_fields(
-            self._fields, deserializing_fields,
-            lambda k: not self._fields[k].no_deserialize)
+        self._load_fields = self._copy_fields(
+            self._fields, load_fields,
+            lambda k: not self._fields[k].no_load)
 
         self.raise_error = raise_error
 
@@ -63,19 +63,19 @@ class Catalyst(metaclass=CatalystMeta):
                 new_fields[key] = fields[key]
         return new_fields
 
-    def serialize(self, obj) -> dict:
+    def dump(self, obj) -> dict:
         obj_dict = {}
-        for field in self._serializing_fields.values():
-            obj_dict[field.key] = field.serialize(obj)
+        for field in self._dump_fields.values():
+            obj_dict[field.key] = field.dump(obj)
         return obj_dict
 
-    def deserialize(self, data: dict) -> dict:
+    def load(self, data: dict) -> ValidationResult:
         invalid_data = {}
         valid_data = {}
         errors = {}
-        for field in self._deserializing_fields.values():
+        for field in self._load_fields.values():
             try:
-                value = field.deserialize(data)
+                value = field.load(data)
             except Exception as e:
                 errors[field.key] = e
                 if field.key in data:
