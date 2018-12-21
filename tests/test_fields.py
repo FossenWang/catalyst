@@ -1,19 +1,23 @@
 from unittest import TestCase
+from datetime import datetime, time, date
 
 from catalyst import Catalyst
 from catalyst.fields import (
     Field, StringField, IntegerField, FloatField,
-    BoolField, ListField, CallableField
+    BoolField, ListField, CallableField,
+    DatetimeField, TimeField, DateField,
 )
 from catalyst.validators import ValidationError
 
 
 class TestData:
-    def __init__(self, string=None, integer=None, float_=None, bool_=None):
+    def __init__(self, string=None, integer=None, float_=None, bool_=None,
+                 time=None):
         self.string = string
         self.integer = integer
         self.float_ = float_
         self.bool_ = bool_
+        self.time = time
 
     def func(self, a, b, c=1):
         return a + b + c
@@ -195,3 +199,30 @@ class FieldTest(TestCase):
         # dump
         test_data = TestData()
         self.assertEqual(callable_field.dump(test_data), 6)
+
+    def test_datetime_field(self):
+        def base_test(now, type_, FieldClass, fmt):
+            test_data = TestData(time=now)
+
+            field = FieldClass(name='time', key='time')
+            dt_str = field.dump(test_data)
+            self.assertEqual(dt_str, now.isoformat())
+            self.assertEqual(field.load({'time': dt_str}), type_.fromisoformat(dt_str))
+            self.assertRaises(ValueError, field.load, {'time': '2018'})
+
+            field = FieldClass(name='time', key='time', fmt=fmt)
+            dt_str = field.dump(test_data)
+            self.assertEqual(dt_str, now.strftime(fmt))
+            if type_ is datetime:
+                dt = datetime.strptime(dt_str, fmt)
+            elif type_ is time:
+                dt = datetime.strptime(dt_str, fmt).time()
+            elif type_ is date:
+                dt = datetime.strptime(dt_str, fmt).date()
+            self.assertEqual(field.load({'time': dt_str}), dt)
+            self.assertRaises(ValueError, field.load, {'time': '2018Y'})
+
+        now = datetime.now()
+        base_test(now, datetime, DatetimeField, '%Y%m%d%H%M%S')
+        base_test(now.time(), time, TimeField, '%H%M%S')
+        base_test(now.date(), date, DateField, '%Y%m%d')
