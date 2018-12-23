@@ -6,6 +6,7 @@ from catalyst.fields import (
     Field, StringField, IntegerField, FloatField,
     BoolField, ListField, CallableField,
     DatetimeField, TimeField, DateField,
+    NestField,
 )
 from catalyst.validators import ValidationError
 
@@ -226,3 +227,23 @@ class FieldTest(TestCase):
         base_test(now, datetime, DatetimeField, '%Y%m%d%H%M%S')
         base_test(now.time(), time, TimeField, '%H%M%S')
         base_test(now.date(), date, DateField, '%Y%m%d')
+
+    def test_nest_field(self):
+        class A:
+            def __init__(self, name):
+                self.name = name
+
+        class B:
+            def __init__(self, a):
+                self.a = a
+
+        class ACatalyst(Catalyst):
+            name = StringField(max_length=3, required=True)
+        a_cata = ACatalyst()
+        field = NestField(a_cata, name='a', key='a')
+
+        b = B(A('1'))
+        self.assertEqual(field.dump(b), {'name': '1'})
+        self.assertEqual(field.load({'a': {'name': '1'}}), {'name': '1'})
+        self.assertRaises(ValidationError, field.load, {'a': {'n': 'm'}})
+        self.assertRaises(ValidationError, field.load, {'a': {'name': '1234'}})

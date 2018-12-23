@@ -7,13 +7,6 @@ from .validators import ValidationResult, ValidationError
 FieldDict = Dict[str, Field]
 
 
-def copy_dict(dict_: dict, keys: Iterable) -> dict:
-    new_dict = {}
-    for key in keys:
-        new_dict[key] = dict_[key]
-    return new_dict
-
-
 class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
         # collect fields
@@ -33,8 +26,8 @@ class CatalystMeta(type):
 class Catalyst(metaclass=CatalystMeta):
     _fields = None  # type: FieldDict
 
-    def __init__(self, fields: Iterable=None, dump_fields: Iterable=None,
-                 load_fields: Iterable=None, raise_error: bool=False):
+    def __init__(self, fields: Iterable[str] = None, dump_fields: Iterable[str] = None,
+                 load_fields: Iterable[str] = None, raise_error: bool = False):
         if not fields:
             fields = self._fields.keys()
         if not dump_fields:
@@ -52,11 +45,8 @@ class Catalyst(metaclass=CatalystMeta):
 
         self.raise_error = raise_error
 
-    def _copy_fields(self,
-                     fields: FieldDict,
-                     keys: Iterable,
-                     is_copying: Callable[[str], bool]
-                     )-> FieldDict:
+    def _copy_fields(self, fields: FieldDict, keys: Iterable[str],
+                     is_copying: Callable[[str], bool])-> FieldDict:
         new_fields = {}  # type: FieldDict
         for key in keys:
             if is_copying(key):

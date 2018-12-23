@@ -48,10 +48,11 @@ class LengthValidator(Validator):
         self.max_length = max_length
 
         if self.default_error_messages is None:
-            self.default_error_messages = {
-                'too_small': "Ensure string length >= %d" % self.min_length,
-                'too_large': "Ensure string length <= %d" % self.max_length,
-            }
+            self.default_error_messages = {}
+            if self.min_length is not None:
+                self.default_error_messages['too_small'] = "Ensure string length >= %d" % self.min_length
+            if self.max_length is not None:
+                self.default_error_messages['too_large'] = "Ensure string length <= %d" % self.max_length
         super().__init__(error_messages=error_messages)
 
     def __call__(self, value):

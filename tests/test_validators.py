@@ -65,6 +65,14 @@ class ValidationTest(TestCase):
         validator('')
         validator([])
 
+        validator = LengthValidator(min_length=1)
+        self.assertRaises(ValidationError, validator, '')
+        validator('1')
+
+        validator = LengthValidator(max_length=2)
+        self.assertRaises(ValidationError, validator, '123')
+        validator('1')
+
     def test_bool_validator(self):
         validator = BoolValidator()
 

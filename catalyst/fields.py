@@ -4,11 +4,10 @@ from typing import Callable, Dict, Any, NoReturn
 from collections import Iterable
 from datetime import datetime, time, date
 
-from .validators import ValidationError, LengthValidator, ComparisonValidator, \
+from .validators import (
+    ValidationError, LengthValidator, ComparisonValidator,
     BoolValidator
-
-
-from_attribute = getattr
+)
 
 
 def no_processing(value): return value
@@ -45,7 +44,7 @@ class Field:
         self.no_dump = no_dump
         self.no_load = no_load
 
-        self.dump_from = dump_from if dump_from else from_attribute
+        self.dump_from = dump_from if dump_from else getattr
 
         self.formatter = formatter if formatter else no_processing
 
@@ -119,11 +118,11 @@ class Field:
 
 
 class StringField(Field):
-    def __init__(self, name=None, key=None, dump_from=None, formatter=str,
+    def __init__(self, min_length=None, max_length=None,
+                 name=None, key=None, dump_from=None, formatter=str,
                  parse=str, validator=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False,
-                 min_length=None, max_length=None):
+                 no_dump=False, no_load=False):
         self.min_length = min_length
         self.max_length = max_length
         if validator is None and \
@@ -141,11 +140,11 @@ class StringField(Field):
 class NumberField(Field):
     type_ = float
 
-    def __init__(self, name=None, key=None, dump_from=None, formatter=None,
+    def __init__(self, min_value=None, max_value=None,
+                 name=None, key=None, dump_from=None, formatter=None,
                  parse=None, validator=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False,
-                 min_value=None, max_value=None):
+                 no_dump=False, no_load=False):
         self.max_value = self.type_(
             max_value) if max_value is not None else max_value
         self.min_value = self.type_(
@@ -194,23 +193,14 @@ class BoolField(Field):
         )
 
 
-class ListFormatter:
-    def __init__(self, item_field):
-        self.item_field = item_field
-
-    def __call__(self, list_):
-        for i, val in enumerate(list_):
-            list_[i] = self.item_field.formatter(val)
-        return list_
-
-
 class ListField(Field):
-    def __init__(self, name=None, key=None, dump_from=None, formatter=None,
+    def __init__(self, item_field=Field(),
+                 name=None, key=None, dump_from=None, formatter=None,
                  validator=None, parse=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False, item_field=Field()):
+                 no_dump=False, no_load=False):
         if not formatter:
-            formatter = ListFormatter(item_field)
+            formatter = lambda list_: [item_field.formatter(item) for item in list_]
 
         self.item_field = item_field
         self.default_error_messages['iterable'] = 'The field value is not Iterable.',
@@ -240,21 +230,12 @@ class ListField(Field):
         return list_
 
 
-class CallableFormatter:
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-
-    def __call__(self, func):
-        return func(*self.args, **self.kwargs)
-
-
 class CallableField(Field):
-    def __init__(self, name=None, key=None, dump_from=None, formatter=None,
+    def __init__(self, func_args: list = None, func_kwargs: dict = None,
+                 name=None, key=None, dump_from=None, formatter=None,
                  parse=None, validator=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=True,
-                 func_args: list = None, func_kwargs: dict = None):
+                 no_dump=False, no_load=True):
 
         if not func_args:
             func_args = []
@@ -263,7 +244,7 @@ class CallableField(Field):
             func_kwargs = {}
 
         if not formatter:
-            formatter = CallableFormatter(*func_args, **func_kwargs)
+            formatter = lambda func: func(*func_args, **func_kwargs)
 
         super().__init__(
             name=name, key=key, dump_from=dump_from, formatter=formatter,
@@ -276,11 +257,11 @@ class CallableField(Field):
 class DatetimeField(Field):
     type_ = datetime
 
-    def __init__(self, name=None, key=None, dump_from=None, formatter=None,
+    def __init__(self, fmt=None,
+                 name=None, key=None, dump_from=None, formatter=None,
                  parse=None, validator=None,
                  required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False,
-                 fmt=None):
+                 no_dump=False, no_load=False):
 
         self.fmt = fmt
 
@@ -320,3 +301,33 @@ class TimeField(DatetimeField):
 
 class DateField(DatetimeField):
     type_ = date
+
+
+class NestField(Field):
+    def __init__(self, catalyst,
+                 name=None, key=None, dump_from=None, formatter=None,
+                 parse=None, validator=None,
+                 required=False, allow_none=True, error_messages=None,
+                 no_dump=False, no_load=False):
+        self.catalyst = catalyst
+
+        if not formatter:
+            formatter = lambda obj: catalyst.dump(obj)
+
+        if not parse:
+            parse = self._get_parse(catalyst)
+
+        super().__init__(
+            name=name, key=key, dump_from=dump_from, formatter=formatter,
+            parse=parse, validator=validator,
+            required=required, allow_none=allow_none, error_messages=error_messages,
+            no_dump=no_dump, no_load=no_load
+        )
+
+    def _get_parse(self, catalyst):
+        def parse(obj):
+            r = catalyst.load(obj)
+            if not r.is_valid:
+                raise ValidationError(r)
+            return r.valid_data
+        return parse
