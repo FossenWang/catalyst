@@ -11,11 +11,22 @@ class ValidationResult:
         self.invalid_data = invalid_data
 
     def __repr__(self):
-        return 'ValidationResult(is_valid=%s, errors=%s)' % (self.is_valid, str(self.errors))
+        return 'ValidationResult(is_valid=%s)' % self.is_valid
+
+    def strferrors(self):
+        return { k: str(self.errors[k]) for k in self.errors }
 
 
 class ValidationError(Exception):
-    pass
+    def __init__(self, msg, *args):
+        self.msg = msg
+        super().__init__(*args)
+
+    def __repr__(self):
+        return 'ValidationResult(%s)' % self.msg
+
+    def __str__(self):
+        return str(self.msg)
 
 
 class Validator:

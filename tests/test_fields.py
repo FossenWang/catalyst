@@ -79,7 +79,7 @@ class FieldTest(TestCase):
         try:
             field_3.load({'a': None})
         except ValidationError as e:
-            self.assertEqual(e.args[0], '666')
+            self.assertEqual(e.msg, '666')
 
     def test_string_field(self):
         string_field = StringField(name='string', key='string', min_length=2, max_length=12)
