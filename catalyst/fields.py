@@ -74,6 +74,12 @@ class Field:
         self.validator = validator
         return validator
 
+    def add_validator(self, validator: Callable[[Value], None]):
+        if not isinstance(self.validator, Iterable):
+            self.validator = [self.validator]
+        self.validator.append(validator)
+        return validator
+
     def set_dump(self, dump: Callable[[object, Name], Value]):
         self.dump = dump
         return dump
@@ -119,32 +125,21 @@ class Field:
 
 class StringField(Field):
     def __init__(self, min_length=None, max_length=None,
-                 name=None, key=None, dump_from=None, formatter=str,
-                 parse=str, validator=None,
-                 required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False):
+                 formatter=str, parse=str, validator=None, **kwargs):
         self.min_length = min_length
         self.max_length = max_length
         if validator is None and \
                 (min_length is not None or max_length is not None):
             validator = LengthValidator(min_length, max_length)
-
         super().__init__(
-            name=name, key=key, dump_from=dump_from, formatter=formatter,
-            parse=parse, validator=validator,
-            required=required, allow_none=allow_none, error_messages=error_messages,
-            no_dump=no_dump, no_load=no_load
-        )
+            formatter=formatter, parse=parse, validator=validator, **kwargs)
 
 
 class NumberField(Field):
     type_ = float
 
     def __init__(self, min_value=None, max_value=None,
-                 name=None, key=None, dump_from=None, formatter=None,
-                 parse=None, validator=None,
-                 required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False):
+                 formatter=None, parse=None, validator=None, **kwargs):
         self.max_value = self.type_(
             max_value) if max_value is not None else max_value
         self.min_value = self.type_(
@@ -161,11 +156,7 @@ class NumberField(Field):
             validator = ComparisonValidator(min_value, max_value)
 
         super().__init__(
-            name=name, key=key, dump_from=dump_from, formatter=formatter,
-            parse=parse, validator=validator,
-            required=required, allow_none=allow_none, error_messages=error_messages,
-            no_dump=no_dump, no_load=no_load
-        )
+            formatter=formatter, parse=parse, validator=validator, **kwargs)
 
 
 class IntegerField(NumberField):
@@ -177,28 +168,20 @@ class FloatField(NumberField):
 
 
 class BoolField(Field):
-    def __init__(self, name=None, key=None, dump_from=None, formatter=bool,
-                 parse=bool, validator=None,
-                 required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False):
+    def __init__(self, formatter=bool, parse=bool, validator=None,
+                 error_messages=None, **kwargs):
 
         if not validator:
             validator = BoolValidator(error_messages)
 
         super().__init__(
-            name=name, key=key, dump_from=dump_from, formatter=formatter,
-            parse=parse, validator=validator,
-            required=required, allow_none=allow_none, error_messages=error_messages,
-            no_dump=no_dump, no_load=no_load
-        )
+            formatter=formatter, parse=parse, validator=validator,
+            error_messages=error_messages, **kwargs)
 
 
 class ListField(Field):
     def __init__(self, item_field=Field(),
-                 name=None, key=None, dump_from=None, formatter=None,
-                 validator=None, parse=None,
-                 required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False):
+                 formatter=None, parse=None, validator=None, **kwargs):
         if not formatter:
             formatter = lambda list_: [item_field.formatter(item) for item in list_]
 
@@ -206,11 +189,7 @@ class ListField(Field):
         self.default_error_messages['iterable'] = 'The field value is not Iterable.',
 
         super().__init__(
-            name=name, key=key, dump_from=dump_from, formatter=formatter,
-            parse=parse, validator=validator,
-            required=required, allow_none=allow_none, error_messages=error_messages,
-            no_dump=no_dump, no_load=no_load
-        )
+            formatter=formatter, parse=parse, validator=validator, **kwargs)
 
     def load(self, data):
         list_ = self.load_from(data)
@@ -232,10 +211,7 @@ class ListField(Field):
 
 class CallableField(Field):
     def __init__(self, func_args: list = None, func_kwargs: dict = None,
-                 name=None, key=None, dump_from=None, formatter=None,
-                 parse=None, validator=None,
-                 required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=True):
+                 formatter=None, no_load=True, **kwargs):
 
         if not func_args:
             func_args = []
@@ -246,22 +222,14 @@ class CallableField(Field):
         if not formatter:
             formatter = lambda func: func(*func_args, **func_kwargs)
 
-        super().__init__(
-            name=name, key=key, dump_from=dump_from, formatter=formatter,
-            parse=parse, validator=validator,
-            required=required, allow_none=allow_none, error_messages=error_messages,
-            no_dump=no_dump, no_load=no_load
-        )
+        super().__init__(formatter=formatter, no_load=no_load, **kwargs)
 
 
 class DatetimeField(Field):
     type_ = datetime
 
-    def __init__(self, fmt=None,
-                 name=None, key=None, dump_from=None, formatter=None,
-                 parse=None, validator=None,
-                 required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False):
+    def __init__(self, fmt=None, formatter=None,
+                 parse=None, validator=None, **kwargs):
 
         self.fmt = fmt
 
@@ -278,11 +246,7 @@ class DatetimeField(Field):
                 parse = lambda dt_str: self.type_.fromisoformat(dt_str)
 
         super().__init__(
-            name=name, key=key, dump_from=dump_from, formatter=formatter,
-            parse=parse, validator=validator,
-            required=required, allow_none=allow_none, error_messages=error_messages,
-            no_dump=no_dump, no_load=no_load
-        )
+            formatter=formatter, parse=parse, validator=validator, **kwargs)
 
     def _get_parse(self, fmt):
         parse = no_processing
@@ -304,11 +268,8 @@ class DateField(DatetimeField):
 
 
 class NestField(Field):
-    def __init__(self, catalyst,
-                 name=None, key=None, dump_from=None, formatter=None,
-                 parse=None, validator=None,
-                 required=False, allow_none=True, error_messages=None,
-                 no_dump=False, no_load=False):
+    def __init__(self, catalyst, formatter=None,
+                 parse=None, validator=None, **kwargs):
         self.catalyst = catalyst
 
         if not formatter:
@@ -318,11 +279,7 @@ class NestField(Field):
             parse = self._get_parse(catalyst)
 
         super().__init__(
-            name=name, key=key, dump_from=dump_from, formatter=formatter,
-            parse=parse, validator=validator,
-            required=required, allow_none=allow_none, error_messages=error_messages,
-            no_dump=no_dump, no_load=no_load
-        )
+            formatter=formatter, parse=parse, validator=validator, **kwargs)
 
     def _get_parse(self, catalyst):
         def parse(obj):

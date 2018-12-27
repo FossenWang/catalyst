@@ -47,8 +47,13 @@ class FieldTest(TestCase):
                 return value + 1
 
             @fixed_value.set_validator
-            def validate_fixed_value(value):
+            def large_than(value):
+                assert value > 0
                 return value + 1  # 返回值无用
+
+            @fixed_value.add_validator
+            def less_than(value):
+                assert value < 100
 
         # test formatter
         field_1 = Field(formatter=A.fixed_value_formatter)
@@ -70,9 +75,12 @@ class FieldTest(TestCase):
         test_data.key = 1
         self.assertRaises(TypeError, a.key_1.dump, test_data)
 
-        # test after validate
+        # test load
         self.assertEqual(a.fixed_value.load({'fixed_value': 0}), 1)
         self.assertRaises(TypeError, a.fixed_value.load, {'fixed_value': '0'})
+        self.assertRaises(AssertionError, a.fixed_value.load, {'fixed_value': -1})
+        self.assertRaises(AssertionError, a.fixed_value.load, {'fixed_value': 100})
+        self.assertEqual(len(a.fixed_value.validator), 2)
 
         # test error msg
         field_3 = Field(key='a', allow_none=False, error_messages={'allow_none': '666'})
