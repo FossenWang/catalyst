@@ -46,7 +46,7 @@ class FieldTest(TestCase):
             def parse_fixed_value(value):
                 return value + 1
 
-            @fixed_value.set_validator
+            @fixed_value.set_validators
             def large_than(value):
                 assert value > 0
                 return value + 1  # 返回值无用
@@ -80,7 +80,7 @@ class FieldTest(TestCase):
         self.assertRaises(TypeError, a.fixed_value.load, {'fixed_value': '0'})
         self.assertRaises(AssertionError, a.fixed_value.load, {'fixed_value': -1})
         self.assertRaises(AssertionError, a.fixed_value.load, {'fixed_value': 100})
-        self.assertEqual(len(a.fixed_value.validator), 2)
+        self.assertEqual(len(a.fixed_value.validators), 2)
 
         # test error msg
         field_3 = Field(key='a', allow_none=False, error_messages={'allow_none': '666'})
@@ -187,7 +187,7 @@ class FieldTest(TestCase):
         self.assertEqual(bool_field.load({'bool': []}), False)
 
     def test_list_field(self):
-        list_field = ListField(name='list_', key='list', item_field=FloatField())
+        list_field = ListField(name='list_', key='list', item_field=FloatField(), required=True)
 
         # dump
         test_data = TestData()
@@ -201,7 +201,15 @@ class FieldTest(TestCase):
         # load
         self.assertListEqual(list_field.load({'list': [1, 2, 3]}), [1.0, 2.0, 3.0])
         self.assertListEqual(list_field.load({'list': []}), [])
-        self.assertEqual(list_field.load({'list':None}), None)
+        self.assertEqual(list_field.load({'list': None}), None)
+        try:
+            list_field.load({'any': 1})
+        except ValidationError as e:
+            self.assertEqual(e.msg, Field.default_error_messages['required'])
+        try:
+            list_field.load({'list': 1})
+        except ValidationError as e:
+            self.assertEqual(e.msg, ListField.default_error_messages['iterable'])
 
     def test_callable_field(self):
         callable_field = CallableField(name='func', func_args=[1, 2], func_kwargs={'c': 3})
