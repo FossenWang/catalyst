@@ -1,7 +1,7 @@
 "Fields"
 
 from typing import Callable, Dict, Any, NoReturn, List
-from collections import Iterable
+from collections.abc import Iterable
 from datetime import datetime, time, date
 
 from .validators import (

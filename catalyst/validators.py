@@ -1,20 +1,6 @@
 "Validators"
 
-from collections import Iterable
-
-
-class ValidationResult:
-    def __init__(self, valid_data, errors, invalid_data):
-        self.valid_data = valid_data
-        self.is_valid = not errors
-        self.errors = errors
-        self.invalid_data = invalid_data
-
-    def __repr__(self):
-        return 'ValidationResult(is_valid=%s)' % self.is_valid
-
-    def strferrors(self):
-        return { k: str(self.errors[k]) for k in self.errors }
+from collections.abc import Iterable
 
 
 class ValidationError(Exception):
@@ -23,7 +9,7 @@ class ValidationError(Exception):
         super().__init__(*args)
 
     def __repr__(self):
-        return 'ValidationResult(%s)' % self.msg
+        return 'ValidationError(%s)' % repr(self.msg)
 
     def __str__(self):
         return str(self.msg)

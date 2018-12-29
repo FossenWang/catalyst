@@ -63,6 +63,10 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.invalid_data, {})
         self.assertDictEqual(result.errors, {})
         self.assertDictEqual(result.valid_data, valid_data)
+        self.assertDictEqual(result, valid_data)
+
+        # test invalid_data
+        self.assertRaises(TypeError, test_data_catalyst.load, 1)
 
         # test invalid_data: validate errors
         invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}

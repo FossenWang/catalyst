@@ -1,10 +1,33 @@
 from typing import Dict, Iterable, TypeVar, Generic, Callable
+from collections.abc import Mapping
 
 from .fields import Field
-from .validators import ValidationResult, ValidationError
+from .validators import ValidationError
 
 
 FieldDict = Dict[str, Field]
+
+
+class LoadResult(dict):
+    def __init__(self, valid_data: dict=None, errors: dict=None, invalid_data: dict=None):
+        self.valid_data = valid_data if valid_data else {}
+        self.update(self.valid_data)
+        self.is_valid = not errors
+        self.errors = errors if errors else {}
+        self.invalid_data = invalid_data if invalid_data else {}
+
+    def __repr__(self):
+        if not self.is_valid:
+            return 'LoadResult(is_valid=%s, errors=%s)' % (self.is_valid, self.strferrors())
+        return 'LoadResult(is_valid=%s, valid_data=%s)' % (self.is_valid, super().__repr__())
+
+    def __str__(self):
+        if not self.is_valid:
+            return str(self.strferrors())
+        return super().__repr__()
+
+    def strferrors(self):
+        return { k: str(self.errors[k]) for k in self.errors }
 
 
 class CatalystMeta(type):
@@ -59,7 +82,10 @@ class Catalyst(metaclass=CatalystMeta):
             obj_dict[field.key] = field.dump(obj)
         return obj_dict
 
-    def load(self, data: dict) -> ValidationResult:
+    def load(self, data: dict) -> LoadResult:
+        if not isinstance(data, Mapping):
+            raise TypeError('Argment data must be a mapping object.')
+
         invalid_data = {}
         valid_data = {}
         errors = {}
@@ -76,7 +102,7 @@ class Catalyst(metaclass=CatalystMeta):
                     # 有效数据返回处理后的数据，忽略原始数据中没有的字段
                     valid_data[field.key] = value
 
-        validation_result = ValidationResult(valid_data, errors, invalid_data)
-        if not validation_result.is_valid and self.raise_error:
-            raise ValidationError(validation_result)
-        return validation_result
+        load_result = LoadResult(valid_data, errors, invalid_data)
+        if not load_result.is_valid and self.raise_error:
+            raise ValidationError(load_result)
+        return load_result

@@ -263,3 +263,4 @@ class FieldTest(TestCase):
         self.assertEqual(field.load({'a': {'name': '1'}}), {'name': '1'})
         self.assertRaises(ValidationError, field.load, {'a': {'n': 'm'}})
         self.assertRaises(ValidationError, field.load, {'a': {'name': '1234'}})
+        self.assertRaises(TypeError, field.load, {'a': 1})
