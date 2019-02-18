@@ -13,12 +13,12 @@ from catalyst.validators import ValidationError
 
 class TestData:
     def __init__(self, string=None, integer=None, float_=None, bool_=None,
-                 time=None):
+                 time_=None):
         self.string = string
         self.integer = integer
         self.float_ = float_
         self.bool_ = bool_
-        self.time = time
+        self.time = time_
 
     def func(self, a, b, c=1):
         return a + b + c
@@ -106,12 +106,12 @@ class FieldTest(TestCase):
         self.assertEqual(string_field.load({'string': 'xxx'}), 'xxx')
         self.assertEqual(string_field.load({'string': 123}), '123')
         self.assertEqual(string_field.load({'string': [1]}), '[1]')
-        self.assertEqual(string_field.load({'string': None}), None)
-        self.assertEqual(string_field.load({}), None)
         self.assertRaises(ValidationError, string_field.load, {'string': ''})
-
-        string_field.allow_none = False
         self.assertRaises(ValidationError, string_field.load, {'string': None})
+        self.assertRaises(ValidationError, string_field.load, {})
+
+        string_field.allow_none = True
+        self.assertEqual(string_field.load({'string': None}), None)
 
         string_field.required = True
         self.assertRaises(ValidationError, string_field.load, {})
@@ -131,11 +131,10 @@ class FieldTest(TestCase):
         self.assertEqual(int_field.load({'integer': 0}), 0)
         self.assertEqual(int_field.load({'integer': 1}), 1)
         self.assertEqual(int_field.load({'integer': '1'}), 1)
-        self.assertEqual(int_field.load({'integer': None}), None)
-        self.assertEqual(int_field.load({}), None)
 
         self.assertRaises(ValueError, int_field.load, {'integer': ''})
         self.assertRaises(ValidationError, int_field.load, {'integer': 111})
+        self.assertRaises(ValidationError, int_field.load, {'integer': None})
         self.assertRaises(ValueError, int_field.load, {'integer': 'asd'})
         self.assertRaises(TypeError, int_field.load, {'integer': []})
 
@@ -160,11 +159,10 @@ class FieldTest(TestCase):
         self.assertEqual(float_field.load({'float': -11.1}), -11.1)
         self.assertEqual(float_field.load({'float': 111.1}), 111.1)
         self.assertEqual(float_field.load({'float': 11}), 11)
-        self.assertEqual(float_field.load({'float': None}), None)
-        self.assertEqual(float_field.load({}), None)
 
         self.assertRaises(ValueError, float_field.load, {'float': ''})
         self.assertRaises(ValidationError, float_field.load, {'float': 111.11})
+        self.assertRaises(ValidationError, float_field.load, {'float': None})
         self.assertRaises(TypeError, float_field.load, {'float': []})
 
     def test_bool_field(self):
@@ -201,7 +199,6 @@ class FieldTest(TestCase):
         # load
         self.assertListEqual(list_field.load({'list': [1, 2, 3]}), [1.0, 2.0, 3.0])
         self.assertListEqual(list_field.load({'list': []}), [])
-        self.assertEqual(list_field.load({'list': None}), None)
         try:
             list_field.load({'any': 1})
         except ValidationError as e:
@@ -219,7 +216,7 @@ class FieldTest(TestCase):
 
     def test_datetime_field(self):
         def base_test(now, type_, FieldClass, fmt):
-            test_data = TestData(time=now)
+            test_data = TestData(time_=now)
 
             field = FieldClass(name='time', key='time')
             dt_str = field.dump(test_data)

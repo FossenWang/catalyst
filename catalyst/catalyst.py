@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, TypeVar, Generic, Callable
+from typing import Dict, Iterable, Callable
 from collections.abc import Mapping
 
 from .fields import Field
@@ -9,9 +9,9 @@ FieldDict = Dict[str, Field]
 
 
 class LoadResult(dict):
-    def __init__(self, valid_data: dict=None, errors: dict=None, invalid_data: dict=None):
+    def __init__(self, valid_data: dict = None, errors: dict = None, invalid_data: dict = None):
         self.valid_data = valid_data if valid_data else {}
-        self.update(self.valid_data)
+        super().__init__(valid_data)
         self.is_valid = not errors
         self.errors = errors if errors else {}
         self.invalid_data = invalid_data if invalid_data else {}
@@ -27,7 +27,7 @@ class LoadResult(dict):
         return super().__repr__()
 
     def strferrors(self):
-        return { k: str(self.errors[k]) for k in self.errors }
+        return {k: str(self.errors[k]) for k in self.errors}
 
 
 class CatalystMeta(type):
@@ -47,7 +47,7 @@ class CatalystMeta(type):
 
 
 class Catalyst(metaclass=CatalystMeta):
-    _fields = None  # type: FieldDict
+    _fields = {}  # type: FieldDict
 
     def __init__(self, fields: Iterable[str] = None, dump_fields: Iterable[str] = None,
                  load_fields: Iterable[str] = None, raise_error: bool = False):

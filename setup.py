@@ -1,19 +1,14 @@
 from setuptools import setup
 
 setup(
-    name='Flask_Fossen',
+    name='catalyst',
     version='0.1',
-    description="Fossen's restful flask extension",
+    description="Library for converting objects to and from native Python datatypes.",
     long_description=__doc__,
     author="Fosssen",
     author_email="fossen@fossen.cn",
-    packages=['flask_fossen'],
+    packages=['catalyst'],
     include_package_data=False,
     zip_safe=False,
-    install_requires=[
-        'Flask>=1.0',
-        'Flask-SQLAlchemy>=2.3.2',
-        'Flask-JWT-Extended>=3.9.1',
-        'Flask-Migrate>=2.1.1',
-    ]
+    install_requires=[]
 )

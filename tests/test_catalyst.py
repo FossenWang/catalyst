@@ -1,10 +1,9 @@
 from unittest import TestCase
 
 from catalyst import Catalyst
-from catalyst.fields import Field, StringField, IntegerField, FloatField, BoolField, ListField, \
+from catalyst.fields import StringField, IntegerField, FloatField, BoolField, \
     CallableField
-from catalyst.validators import ValidationError, Validator, LengthValidator, ComparisonValidator, \
-    BoolValidator
+from catalyst.validators import ValidationError
 
 # from marshmallow import Schema, fields
 # from django.forms import fields
@@ -73,7 +72,7 @@ class CatalystTest(TestCase):
         result = test_data_catalyst.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
-        self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
+        self.assertEqual(set(result.errors), {'string', 'integer', 'float', 'bool'})
         self.assertDictEqual(result.valid_data, {})
 
         # test invalid_data: parse errors
@@ -81,7 +80,7 @@ class CatalystTest(TestCase):
         result = test_data_catalyst.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
-        self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
+        self.assertEqual(set(result.errors), {'string', 'integer', 'float', 'bool'})
         self.assertIsInstance(result.errors['string'], ValidationError)
         self.assertIsInstance(result.errors['integer'], ValueError)
         self.assertIsInstance(result.errors['float'], TypeError)

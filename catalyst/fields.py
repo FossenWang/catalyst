@@ -1,6 +1,6 @@
 "Fields"
 
-from typing import Callable, Dict, Any, NoReturn, List
+from typing import Callable, Dict, Any, List
 from collections.abc import Iterable
 from datetime import datetime, time, date
 
@@ -10,11 +10,12 @@ from .validators import (
 )
 
 
-def no_processing(value): return value
-
-
 Name = str
 Value = Any
+
+
+def no_processing(value):
+    return value
 
 
 class Field:
@@ -23,20 +24,19 @@ class Field:
         'allow_none': 'Field may not be None.'
     }
 
-    def __init__(
-        self,
-        name: str = None,
-        key: str = None,
-        dump_from: Callable[[object, Name], Value] = None,
-        formatter: Callable[[Value], Value] = None,
-        parse: Callable[[Value], Value] = None,
-        validators: Callable[[Value], None] = None,
-        required: bool = False,
-        allow_none: bool = True,
-        error_messages: Dict[str, str] = None,
-        no_dump: bool = False,
-        no_load: bool = False,
-    ):
+    def __init__(self,
+                 name: str = None,
+                 key: str = None,
+                 dump_from: Callable[[object, Name], Value] = None,
+                 formatter: Callable[[Value], Value] = None,
+                 parse: Callable[[Value], Value] = None,
+                 validators: Callable[[Value], None] = None,
+                 required: bool = False,
+                 allow_none: bool = False,
+                 error_messages: Dict[str, str] = None,
+                 no_dump: bool = False,
+                 no_load: bool = False,
+                 ):
         self.name = name
         self.key = key
         self.required = required
@@ -239,13 +239,13 @@ class DatetimeField(Field):
             if fmt:
                 formatter = lambda dt: self.type_.strftime(dt, fmt)
             else:
-                formatter = lambda dt: self.type_.isoformat(dt)
+                formatter = self.type_.isoformat
 
         if not parse:
             if fmt:
                 parse = self._get_parse(fmt)
             else:
-                parse = lambda dt_str: self.type_.fromisoformat(dt_str)
+                parse = self.type_.fromisoformat
 
         super().__init__(
             formatter=formatter, parse=parse, validators=validators, **kwargs)
@@ -288,5 +288,5 @@ class NestField(Field):
             r = catalyst.load(obj)
             if not r.is_valid:
                 raise ValidationError(r)
-            return r.valid_data
+            return r
         return parse

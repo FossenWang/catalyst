@@ -1,7 +1,5 @@
 "Validators"
 
-from collections.abc import Iterable
-
 
 class ValidationError(Exception):
     def __init__(self, msg, *args):
