@@ -229,44 +229,43 @@ class CallableField(Field):
 
 class DatetimeField(Field):
     type_ = datetime
+    default_fmt = r'%Y-%m-%d %H:%M:%S.%f'
 
     def __init__(self, fmt=None, formatter=None,
                  parse=None, validators=None, **kwargs):
 
-        self.fmt = fmt
+        self.fmt = fmt if fmt else self.default_fmt
 
         if not formatter:
-            if fmt:
-                formatter = lambda dt: self.type_.strftime(dt, fmt)
-            else:
-                formatter = self.type_.isoformat
+            formatter = self._format
 
         if not parse:
-            if fmt:
-                parse = self._get_parse(fmt)
-            else:
-                parse = self.type_.fromisoformat
+            parse = self._parse
 
         super().__init__(
             formatter=formatter, parse=parse, validators=validators, **kwargs)
 
-    def _get_parse(self, fmt):
-        parse = no_processing
-        if self.type_ is datetime:
-            parse = lambda dt_str: datetime.strptime(dt_str, fmt)
-        elif self.type_ is date:
-            parse = lambda dt_str: datetime.strptime(dt_str, fmt).date()
-        elif self.type_ is time:
-            parse = lambda dt_str: datetime.strptime(dt_str, fmt).time()
-        return parse
+    def _format(self, dt):
+        return self.type_.strftime(dt, self.fmt)
+
+    def _parse(self, date_string):
+        return datetime.strptime(date_string, self.fmt)
 
 
 class TimeField(DatetimeField):
     type_ = time
+    default_fmt = r'%H:%M:%S.%f'
+
+    def _parse(self, date_string):
+        return datetime.strptime(date_string, self.fmt).time()
 
 
 class DateField(DatetimeField):
     type_ = date
+    default_fmt = r'%Y-%m-%d'
+
+    def _parse(self, date_string):
+        return datetime.strptime(date_string, self.fmt).date()
 
 
 class NestField(Field):

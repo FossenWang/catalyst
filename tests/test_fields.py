@@ -42,15 +42,18 @@ class FieldTest(TestCase):
             def fixed_value_formatter(value):
                 return 1
 
+            @staticmethod
             @fixed_value.set_parse
             def parse_fixed_value(value):
                 return value + 1
 
+            @staticmethod
             @fixed_value.set_validators
             def large_than(value):
                 assert value > 0
                 return value + 1  # 返回值无用
 
+            @staticmethod
             @fixed_value.add_validator
             def less_than(value):
                 assert value < 100
@@ -220,8 +223,7 @@ class FieldTest(TestCase):
 
             field = FieldClass(name='time', key='time')
             dt_str = field.dump(test_data)
-            self.assertEqual(dt_str, now.isoformat())
-            self.assertEqual(field.load({'time': dt_str}), type_.fromisoformat(dt_str))
+            self.assertEqual(dt_str, now.strftime(field.default_fmt))
             self.assertRaises(ValueError, field.load, {'time': '2018'})
 
             field = FieldClass(name='time', key='time', fmt=fmt)
