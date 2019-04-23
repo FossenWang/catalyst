@@ -1,5 +1,7 @@
 "Validators"
 
+from .utils import ErrorMessageMixin
+
 
 class ValidationError(Exception):
     def __init__(self, msg, *args):
@@ -13,26 +15,9 @@ class ValidationError(Exception):
         return str(self.msg)
 
 
-class Validator:
-    """
-    default_error_messages
-    """
-    default_error_messages = {}
-
-    def __init__(self, error_messages=None):
-        """
-        params:
-        error_messages  type: dict
-        stores msg of errors raised by validator
-        change the dict data to custom error msg
-        data will update a copy of default_error_messages
-        """
-        # Collect default error message from self and parent classes
-        messages = {}
-        for cls in reversed(self.__class__.__mro__):
-            messages.update(getattr(cls, 'default_error_messages', {}))
-        messages.update(error_messages or {})
-        self.error_messages = messages
+class Validator(ErrorMessageMixin):
+    def __init__(self, error_messages: dict = None):
+        self.collect_error_messages(error_messages)
 
     def __call__(self, value):
         raise NotImplementedError('Validate the given value and \
@@ -45,8 +30,7 @@ class LengthValidator(Validator):
         self.min_length = min_length
         self.max_length = max_length
 
-        if error_messages is None:
-            error_messages = {}
+        error_messages = error_messages or {}
         if min_length is not None:
             error_messages['too_small'] = "Ensure string length >= %d" % min_length
         if max_length is not None:
@@ -72,8 +56,7 @@ class ComparisonValidator(Validator):
         self.min_value = min_value
         self.max_value = max_value
 
-        if error_messages is None:
-            error_messages = {}
+        error_messages = error_messages or {}
         if min_value is not None:
             error_messages['too_small'] = "Ensure value >= %d" % min_value
         if max_value is not None:
@@ -93,9 +76,6 @@ class BoolValidator(Validator):
     default_error_messages = {
         'type_error': 'Ensure value is bool',
     }
-
-    def __init__(self, error_messages=None):
-        super().__init__(error_messages=error_messages)
 
     def __call__(self, value):
         if not isinstance(value, bool):

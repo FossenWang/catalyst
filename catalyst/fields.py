@@ -3,6 +3,7 @@
 from typing import Callable, Dict, Any, Iterable
 from datetime import datetime, time, date
 
+from .utils import ErrorMessageMixin
 from .validators import (
     ValidationError, LengthValidator, ComparisonValidator,
     BoolValidator
@@ -17,7 +18,7 @@ def no_processing(value):
     return value
 
 
-class Field:
+class Field(ErrorMessageMixin):
     default_error_messages = {
         'required': 'Missing data for required field.',
         'none': 'Field may not be None.'
@@ -31,7 +32,7 @@ class Field:
                  validators: Callable[[Value], None] = None,
                  required: bool = False,
                  allow_none: bool = False,
-                 error_messages: Dict[str, str] = None,
+                 error_messages: dict = None,
                  no_dump: bool = False,
                  no_load: bool = False,
                  ):
@@ -48,12 +49,7 @@ class Field:
 
         self.set_validators(validators)
 
-        # Collect default error message from self and parent classes
-        messages = {}
-        for cls in reversed(self.__class__.__mro__):
-            messages.update(getattr(cls, 'default_error_messages', {}))
-        messages.update(error_messages or {})
-        self.error_messages = messages
+        self.collect_error_messages(error_messages)
 
     def set_formatter(self, formatter: Callable[[Value], Value]):
         self.formatter = formatter
