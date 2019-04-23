@@ -17,7 +17,7 @@ class Validator:
     """
     default_error_messages
     """
-    default_error_messages = None
+    default_error_messages = {}
 
     def __init__(self, error_messages=None):
         """
@@ -27,9 +27,12 @@ class Validator:
         change the dict data to custom error msg
         data will update a copy of default_error_messages
         """
-        self.error_messages = self.default_error_messages.copy() \
-            if self.default_error_messages else {}
-        self.error_messages.update(error_messages if error_messages else {})
+        # Collect default error message from self and parent classes
+        messages = {}
+        for cls in reversed(self.__class__.__mro__):
+            messages.update(getattr(cls, 'default_error_messages', {}))
+        messages.update(error_messages or {})
+        self.error_messages = messages
 
     def __call__(self, value):
         raise NotImplementedError('Validate the given value and \
@@ -42,12 +45,12 @@ class LengthValidator(Validator):
         self.min_length = min_length
         self.max_length = max_length
 
-        if self.default_error_messages is None:
-            self.default_error_messages = {}
-            if self.min_length is not None:
-                self.default_error_messages['too_small'] = "Ensure string length >= %d" % self.min_length
-            if self.max_length is not None:
-                self.default_error_messages['too_large'] = "Ensure string length <= %d" % self.max_length
+        if error_messages is None:
+            error_messages = {}
+        if min_length is not None:
+            error_messages['too_small'] = "Ensure string length >= %d" % min_length
+        if max_length is not None:
+            error_messages['too_large'] = "Ensure string length <= %d" % max_length
         super().__init__(error_messages=error_messages)
 
     def __call__(self, value):
@@ -69,12 +72,12 @@ class ComparisonValidator(Validator):
         self.min_value = min_value
         self.max_value = max_value
 
-        if self.default_error_messages is None:
-            self.default_error_messages = {
-                'too_small': "Ensure value >= %d" % self.min_value,
-                'too_large': "Ensure value <= %d" % self.max_value,
-            }
-
+        if error_messages is None:
+            error_messages = {}
+        if min_value is not None:
+            error_messages['too_small'] = "Ensure value >= %d" % min_value
+        if max_value is not None:
+            error_messages['too_large'] = "Ensure value <= %d" % max_value
         super().__init__(error_messages=error_messages)
 
     def __call__(self, value):

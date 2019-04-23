@@ -6,36 +6,15 @@ from catalyst.fields import (
     Field, StringField, IntegerField, FloatField,
     BoolField, ListField, CallableField,
     DatetimeField, TimeField, DateField,
-    NestField,
+    NestedField,
 )
 from catalyst.validators import ValidationError
 
 
-class TestData:
-    def __init__(self, string=None, integer=None, float_=None, bool_=None,
-                 time_=None):
-        self.string = string
-        self.integer = integer
-        self.float_ = float_
-        self.bool_ = bool_
-        self.time = time_
-
-    def func(self, a, b, c=1):
-        return a + b + c
-
-
 class FieldTest(TestCase):
     def test_field(self):
-        class A(Catalyst):
-            fixed_value = Field()
-            key_1 = Field()
-            key_2 = Field()
-
-            @staticmethod
-            @key_1.set_dump_from
-            @key_2.set_dump_from
-            def from_dict_key(obj, name):
-                return obj[name]
+        class A:
+            fixed_value = Field(validators=[])
 
             @staticmethod
             @fixed_value.set_formatter
@@ -44,7 +23,7 @@ class FieldTest(TestCase):
 
             @staticmethod
             @fixed_value.set_parse
-            def parse_fixed_value(value):
+            def fixed_value_add_1(value):
                 return value + 1
 
             @staticmethod
@@ -58,176 +37,152 @@ class FieldTest(TestCase):
             def less_than(value):
                 assert value < 100
 
-        # test formatter
+        # test dump
         field_1 = Field(formatter=A.fixed_value_formatter)
         self.assertEqual(field_1.formatter, A.fixed_value_formatter)
         a = A()
-        test_data = TestData()
-        test_data.fixed_value = 'asd'
-        self.assertEqual(a.fixed_value.dump(test_data), 1)
-        test_data.fixed_value = 1000
-        self.assertEqual(a.fixed_value.dump(test_data), 1)
-        test_data.fixed_value = [100]
-        self.assertEqual(a.fixed_value.dump(test_data), 1)
-
-        # test dump_from
-        field_2 = Field(dump_from=A.from_dict_key)
-        self.assertEqual(field_2.dump_from, A.from_dict_key)
-        self.assertEqual(a.key_1.dump({'key_1': 1,}), 1)
-        self.assertEqual(a.key_2.dump({'key_2': 2,}), 2)
-        test_data.key = 1
-        self.assertRaises(TypeError, a.key_1.dump, test_data)
+        self.assertEqual(a.fixed_value.dump('asd'), 1)
+        self.assertEqual(a.fixed_value.dump(1000), 1)
+        self.assertEqual(a.fixed_value.dump([100]), 1)
 
         # test load
-        self.assertEqual(a.fixed_value.load({'fixed_value': 0}), 1)
-        self.assertRaises(TypeError, a.fixed_value.load, {'fixed_value': '0'})
-        self.assertRaises(AssertionError, a.fixed_value.load, {'fixed_value': -1})
-        self.assertRaises(AssertionError, a.fixed_value.load, {'fixed_value': 100})
+        self.assertEqual(a.fixed_value.load(0), 1)
+        self.assertRaises(TypeError, a.fixed_value.load, '0')
+        self.assertRaises(AssertionError, a.fixed_value.load, -1)
+        self.assertRaises(AssertionError, a.fixed_value.load, 100)
+
+        # test validators
         self.assertEqual(len(a.fixed_value.validators), 2)
+        self.assertRaises(TypeError, a.fixed_value.set_validators, 1)
+        self.assertRaises(TypeError, a.fixed_value.add_validator, 1)
 
         # test error msg
-        field_3 = Field(key='a', allow_none=False, error_messages={'allow_none': '666'})
-        try:
-            field_3.load({'a': None})
-        except ValidationError as e:
-            self.assertEqual(e.msg, '666')
+        field_3 = Field(key='a', allow_none=False, error_messages={'none': '666'})        
+        with self.assertRaises(ValidationError) as c:
+            field_3.load(None)
+        self.assertEqual(c.exception.msg, '666')
 
     def test_string_field(self):
         string_field = StringField(name='string', key='string', min_length=2, max_length=12)
 
         # dump
-        test_data = TestData(string='xxx')
-        self.assertEqual(string_field.dump(test_data), 'xxx')
-        test_data.string = 1
-        self.assertEqual(string_field.dump(test_data), '1')
-        test_data.string = []
-        self.assertEqual(string_field.dump(test_data), '[]')
-        test_data.string = None
-        self.assertEqual(string_field.dump(test_data), None)
+        self.assertEqual(string_field.dump('xxx'), 'xxx')
+        self.assertEqual(string_field.dump(1), '1')
+        self.assertEqual(string_field.dump([]), '[]')
+        self.assertEqual(string_field.dump(None), None)
 
         # load
-        self.assertEqual(string_field.load({'string': 'xxx'}), 'xxx')
-        self.assertEqual(string_field.load({'string': 123}), '123')
-        self.assertEqual(string_field.load({'string': [1]}), '[1]')
-        self.assertRaises(ValidationError, string_field.load, {'string': ''})
-        self.assertRaises(ValidationError, string_field.load, {'string': None})
-        self.assertRaises(ValidationError, string_field.load, {})
+        self.assertEqual(string_field.load('xxx'), 'xxx')
+        self.assertEqual(string_field.load(123), '123')
+        self.assertEqual(string_field.load([1]), '[1]')
+        self.assertRaises(ValidationError, string_field.load, '')
+        self.assertRaises(ValidationError, string_field.load, None)
 
         string_field.allow_none = True
-        self.assertEqual(string_field.load({'string': None}), None)
-
-        string_field.required = True
-        self.assertRaises(ValidationError, string_field.load, {})
+        self.assertEqual(string_field.load(None), None)
 
     def test_int_field(self):
         int_field = IntegerField(name='integer', key='integer', min_value=-10, max_value=100)
 
         # dump
-        test_data = TestData(integer=1)
-        self.assertEqual(int_field.dump(test_data), 1)
-        test_data.integer = 1.6
-        self.assertEqual(int_field.dump(test_data), 1)
-        test_data.integer = '10'
-        self.assertEqual(int_field.dump(test_data), 10)
+        self.assertEqual(int_field.dump(1), 1)
+        self.assertEqual(int_field.dump(1.6), 1)
+        self.assertEqual(int_field.dump('10'), 10)
 
         # load
-        self.assertEqual(int_field.load({'integer': 0}), 0)
-        self.assertEqual(int_field.load({'integer': 1}), 1)
-        self.assertEqual(int_field.load({'integer': '1'}), 1)
+        self.assertEqual(int_field.load(0), 0)
+        self.assertEqual(int_field.load(1), 1)
+        self.assertEqual(int_field.load('1'), 1)
 
-        self.assertRaises(ValueError, int_field.load, {'integer': ''})
-        self.assertRaises(ValidationError, int_field.load, {'integer': 111})
-        self.assertRaises(ValidationError, int_field.load, {'integer': None})
-        self.assertRaises(ValueError, int_field.load, {'integer': 'asd'})
-        self.assertRaises(TypeError, int_field.load, {'integer': []})
+        self.assertRaises(ValueError, int_field.load, '')
+        self.assertRaises(ValidationError, int_field.load, 111)
+        self.assertRaises(ValidationError, int_field.load, None)
+        self.assertRaises(ValueError, int_field.load, 'asd')
+        self.assertRaises(TypeError, int_field.load, [])
 
     def test_float_field(self):
         float_field = FloatField(name='float_', key='float', min_value=-11.1, max_value=111.1)
 
         # dump
-        test_data = TestData(float_=1)
-        self.assertEqual(float_field.dump(test_data), 1.0)
-        test_data.float_ = 0
-        self.assertEqual(float_field.dump(test_data), 0.0)
-        test_data.float_ = 5.5
-        self.assertEqual(float_field.dump(test_data), 5.5)
-        test_data.float_ = '10'
-        self.assertEqual(float_field.dump(test_data), 10.0)
-        test_data.float_ = None
-        self.assertEqual(float_field.dump(test_data), None)
+        self.assertEqual(float_field.dump(1), 1.0)
+        self.assertEqual(float_field.dump(0), 0.0)
+        self.assertEqual(float_field.dump(5.5), 5.5)
+        self.assertEqual(float_field.dump('10'), 10.0)
+        self.assertEqual(float_field.dump(None), None)
 
         # load
-        self.assertEqual(float_field.load({'float': 0}), 0.0)
-        self.assertEqual(float_field.load({'float': '1.1'}), 1.1)
-        self.assertEqual(float_field.load({'float': -11.1}), -11.1)
-        self.assertEqual(float_field.load({'float': 111.1}), 111.1)
-        self.assertEqual(float_field.load({'float': 11}), 11)
+        self.assertEqual(float_field.load(0), 0.0)
+        self.assertEqual(float_field.load('1.1'), 1.1)
+        self.assertEqual(float_field.load(-11.1), -11.1)
+        self.assertEqual(float_field.load(111.1), 111.1)
+        self.assertEqual(float_field.load(11), 11)
 
-        self.assertRaises(ValueError, float_field.load, {'float': ''})
-        self.assertRaises(ValidationError, float_field.load, {'float': 111.11})
-        self.assertRaises(ValidationError, float_field.load, {'float': None})
-        self.assertRaises(TypeError, float_field.load, {'float': []})
+        self.assertRaises(ValueError, float_field.load, '')
+        self.assertRaises(ValidationError, float_field.load, 111.11)
+        self.assertRaises(ValidationError, float_field.load, None)
+        self.assertRaises(TypeError, float_field.load, [])
 
     def test_bool_field(self):
         bool_field = BoolField(name='bool_', key='bool')
 
         # dump
-        test_data = TestData(bool_=True)
-        self.assertEqual(bool_field.dump(test_data), True)
-        test_data.bool_ = False
-        self.assertEqual(bool_field.dump(test_data), False)
-        test_data.bool_ = None
-        self.assertEqual(bool_field.dump(test_data), None)
+        self.assertEqual(bool_field.dump(True), True)
+        self.assertEqual(bool_field.dump(False), False)
+        self.assertEqual(bool_field.dump(None), None)
 
         # load
-        self.assertEqual(bool_field.load({'bool': True}), True)
-        self.assertEqual(bool_field.load({'bool': False}), False)
-        self.assertEqual(bool_field.load({'bool': 'False'}), True)
-        self.assertEqual(bool_field.load({'bool': 0}), False)
-        self.assertEqual(bool_field.load({'bool': 1}), True)
-        self.assertEqual(bool_field.load({'bool': []}), False)
+        self.assertEqual(bool_field.load(True), True)
+        self.assertEqual(bool_field.load(False), False)
+        self.assertEqual(bool_field.load('False'), True)
+        self.assertEqual(bool_field.load(0), False)
+        self.assertEqual(bool_field.load(1), True)
+        self.assertEqual(bool_field.load([]), False)
 
     def test_list_field(self):
         list_field = ListField(name='list_', key='list', item_field=FloatField(), required=True)
 
         # dump
-        test_data = TestData()
-        test_data.list_ = [1, 2, 3]
-        self.assertListEqual(list_field.dump(test_data), [1.0, 2.0, 3.0])
-        test_data.list_ = []
-        self.assertListEqual(list_field.dump(test_data), [])
-        test_data.list_ = None
-        self.assertEqual(list_field.dump(test_data), None)
+        self.assertListEqual(list_field.dump([1, 2, 3]), [1.0, 2.0, 3.0])
+        self.assertListEqual(list_field.dump([]), [])
+        self.assertEqual(list_field.dump(None), None)
+        with self.assertRaises(ValueError):
+            list_field.dump(1)
 
         # load
-        self.assertListEqual(list_field.load({'list': [1, 2, 3]}), [1.0, 2.0, 3.0])
-        self.assertListEqual(list_field.load({'list': []}), [])
-        try:
-            list_field.load({'any': 1})
-        except ValidationError as e:
-            self.assertEqual(e.msg, Field.default_error_messages['required'])
-        try:
-            list_field.load({'list': 1})
-        except ValidationError as e:
-            self.assertEqual(e.msg, ListField.default_error_messages['iterable'])
+        self.assertListEqual(list_field.load([1, 2, 3]), [1.0, 2.0, 3.0])
+        self.assertListEqual(list_field.load([]), [])
+
+        with self.assertRaises(ValidationError) as c:
+            list_field.load(1)
+        self.assertEqual(c.exception.msg, list_field.error_messages['iterable'])
+
+        with self.assertRaises(ValidationError) as c:
+            list_field.load(None)
+        self.assertEqual(c.exception.msg, list_field.error_messages['none'])
+        list_field.allow_none = True
+        self.assertIsNone(list_field.load(None))
 
     def test_callable_field(self):
-        callable_field = CallableField(name='func', func_args=[1, 2], func_kwargs={'c': 3})
+        callable_field = CallableField(
+            name='test_func', func_args=[1, 2], func_kwargs={'c': 3})
+
+        def test_func(a, b, c=1):
+            return a + b + c
+
         # dump
-        test_data = TestData()
-        self.assertEqual(callable_field.dump(test_data), 6)
+        self.assertEqual(callable_field.dump(test_func), 6)
+        callable_field.func_args = [4, 5]
+        self.assertEqual(callable_field.dump(test_func), 12)
 
     def test_datetime_field(self):
         def base_test(now, type_, FieldClass, fmt):
-            test_data = TestData(time_=now)
-
             field = FieldClass(name='time', key='time')
-            dt_str = field.dump(test_data)
+            dt_str = field.dump(now)
             self.assertEqual(dt_str, now.strftime(field.default_fmt))
-            self.assertRaises(ValueError, field.load, {'time': '2018'})
+            self.assertRaises(ValueError, field.load, '2018')
 
             field = FieldClass(name='time', key='time', fmt=fmt)
-            dt_str = field.dump(test_data)
+            dt_str = field.dump(now)
             self.assertEqual(dt_str, now.strftime(fmt))
             if type_ is datetime:
                 dt = datetime.strptime(dt_str, fmt)
@@ -235,8 +190,8 @@ class FieldTest(TestCase):
                 dt = datetime.strptime(dt_str, fmt).time()
             elif type_ is date:
                 dt = datetime.strptime(dt_str, fmt).date()
-            self.assertEqual(field.load({'time': dt_str}), dt)
-            self.assertRaises(ValueError, field.load, {'time': '2018Y'})
+            self.assertEqual(field.load(dt_str), dt)
+            self.assertRaises(ValueError, field.load, '2018Y')
 
         now = datetime.now()
         base_test(now, datetime, DatetimeField, '%Y%m%d%H%M%S')
@@ -248,18 +203,13 @@ class FieldTest(TestCase):
             def __init__(self, name):
                 self.name = name
 
-        class B:
-            def __init__(self, a):
-                self.a = a
-
         class ACatalyst(Catalyst):
             name = StringField(max_length=3, required=True)
         a_cata = ACatalyst()
-        field = NestField(a_cata, name='a', key='a')
+        field = NestedField(a_cata, name='a', key='a')
 
-        b = B(A('1'))
-        self.assertEqual(field.dump(b), {'name': '1'})
-        self.assertEqual(field.load({'a': {'name': '1'}}), {'name': '1'})
-        self.assertRaises(ValidationError, field.load, {'a': {'n': 'm'}})
-        self.assertRaises(ValidationError, field.load, {'a': {'name': '1234'}})
-        self.assertRaises(TypeError, field.load, {'a': 1})
+        self.assertEqual(field.dump(A('1')), {'name': '1'})
+        self.assertEqual(field.load({'name': '1'}), {'name': '1'})
+        self.assertRaises(ValidationError, field.load, {'n': 'm'})
+        self.assertRaises(ValidationError, field.load, {'name': '1234'})
+        self.assertRaises(TypeError, field.load, 1)

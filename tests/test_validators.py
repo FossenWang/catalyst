@@ -9,6 +9,9 @@ from catalyst.validators import (
 class ValidationTest(TestCase):
 
     def test_base_validator(self):
+        with self.assertRaises(NotImplementedError):
+            Validator()(None)
+
         class NewValidator(Validator):
             default_error_messages = {'msg': 'default'}
             def __call__(self, value):
@@ -17,14 +20,15 @@ class ValidationTest(TestCase):
         # test alterable error messages
         default_validator = NewValidator()
         custom_msg_validator = NewValidator(error_messages={'msg': 'custom'})
-        try:
+
+        with self.assertRaises(ValidationError) as c:
             default_validator(0)
-        except ValidationError as e:
-            self.assertEqual(str(e), 'default')
-        try:
+        self.assertEqual(str(c.exception), 'default')
+        with self.assertRaises(ValidationError) as c:
             custom_msg_validator(0)
-        except ValidationError as e:
-            self.assertEqual(str(e), 'custom')
+        self.assertEqual(str(c.exception), 'custom')
+        self.assertEqual(repr(c.exception), "ValidationError('custom')")
+
         self.assertDictEqual(NewValidator.default_error_messages, {'msg': 'default'})
 
     def test_comparison_validator(self):

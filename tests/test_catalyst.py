@@ -35,15 +35,16 @@ test_data_catalyst = TestDataCatalyst()
 class CatalystTest(TestCase):
 
     def test_dump(self):
+        # dump from object
         test_data = TestData(string='xxx', integer=1, float_=1.1, bool_=True)
         test_data_dict = test_data_catalyst.dump(test_data)
         self.assertDictEqual(test_data_dict, {
             'float': 1.1, 'integer': 1, 'string': 'xxx',
             'bool': True, 'func': 6,
-            })
+        })
 
         catalyst = TestDataCatalyst(fields=[])
-        self.assertDictEqual(catalyst._dump_fields, test_data_catalyst._dump_fields)
+        self.assertDictEqual(catalyst._dump_field_dict, test_data_catalyst._dump_field_dict)
 
         catalyst = TestDataCatalyst(fields=['string'])
         self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
@@ -54,6 +55,19 @@ class CatalystTest(TestCase):
         self.assertRaises(KeyError, TestDataCatalyst, fields=['wrong_name'])
         self.assertRaises(KeyError, TestDataCatalyst, dump_fields=['wrong_name'])
 
+        # dump from dict
+        self.assertEqual(
+            test_data_catalyst.dump({
+                'float_': 1.1, 'integer': 1, 'string': 'xxx',
+                'bool_': True, 'func': test_data.func,
+            }), {
+                'float': 1.1, 'integer': 1, 'string': 'xxx',
+                'bool': True, 'func': 6,
+            }
+        )
+        self.assertRaises(AttributeError, test_data_catalyst.dump, {'a'})
+
+
     def test_load(self):
         # test valid_data
         valid_data = {'string': 'xxx', 'integer': 1, 'float': 1.1, 'bool': True}
@@ -63,6 +77,9 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.errors, {})
         self.assertDictEqual(result.valid_data, valid_data)
         self.assertDictEqual(result, valid_data)
+        # test repr
+        self.assertTrue(str(result).startswith('{'))
+        self.assertTrue(repr(result).startswith('LoadResult(is_valid=True'))
 
         # test invalid_data
         self.assertRaises(TypeError, test_data_catalyst.load, 1)
@@ -74,6 +91,9 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {'string', 'integer', 'float', 'bool'})
         self.assertDictEqual(result.valid_data, {})
+        # test repr
+        self.assertTrue(str(result).startswith('{'))
+        self.assertTrue(repr(result).startswith('LoadResult(is_valid=False'))
 
         # test invalid_data: parse errors
         invalid_data = {'string': 'x', 'integer': 'str', 'float': []}
@@ -103,8 +123,8 @@ class CatalystTest(TestCase):
 
         # test no load
         catalyst = TestDataCatalyst(fields=[])
-        self.assertDictEqual(catalyst._load_fields, test_data_catalyst._load_fields)
-        self.assertNotIn('func', catalyst._load_fields.keys())
+        self.assertDictEqual(catalyst._load_field_dict, test_data_catalyst._load_field_dict)
+        self.assertNotIn('func', catalyst._load_field_dict.keys())
         catalyst = TestDataCatalyst(fields=['string'])
         self.assertDictEqual(catalyst.load(valid_data).valid_data, {'string': 'xxx'})
         catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])

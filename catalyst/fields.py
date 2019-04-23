@@ -1,7 +1,6 @@
 "Fields"
 
-from typing import Callable, Dict, Any, List
-from collections.abc import Iterable
+from typing import Callable, Dict, Any, Iterable
 from datetime import datetime, time, date
 
 from .validators import (
@@ -21,13 +20,12 @@ def no_processing(value):
 class Field:
     default_error_messages = {
         'required': 'Missing data for required field.',
-        'allow_none': 'Field may not be None.'
+        'none': 'Field may not be None.'
     }
 
     def __init__(self,
                  name: str = None,
                  key: str = None,
-                 dump_from: Callable[[object, Name], Value] = None,
                  formatter: Callable[[Value], Value] = None,
                  parse: Callable[[Value], Value] = None,
                  validators: Callable[[Value], None] = None,
@@ -44,8 +42,6 @@ class Field:
         self.no_dump = no_dump
         self.no_load = no_load
 
-        self.dump_from = dump_from if dump_from else getattr
-
         self.formatter = formatter if formatter else no_processing
 
         self.parse = parse if parse else no_processing
@@ -59,10 +55,6 @@ class Field:
         messages.update(error_messages or {})
         self.error_messages = messages
 
-    def set_dump_from(self, dump_from: Callable[[object, Name], Value]):
-        self.dump_from = dump_from
-        return dump_from
-
     def set_formatter(self, formatter: Callable[[Value], Value]):
         self.formatter = formatter
         return formatter
@@ -71,49 +63,43 @@ class Field:
         self.parse = parse
         return parse
 
-    def set_validators(self, validators: List[Callable[[Value], None]]):
+    def set_validators(self, validators: Iterable[Callable[[Value], None]]):
+        if validators is None:
+            self.validators = []
+            return validators
+
         if isinstance(validators, Iterable):
             self.validators = validators
-        elif validators:
-            self.validators = [validators]
         else:
-            self.validators = []
+            self.validators = [validators]
+
+        for v in self.validators:
+            if not isinstance(v, Callable):
+                raise TypeError('Param validators must be ether Callable or Iterable contained Callable.')
+
         return validators
 
     def add_validator(self, validator: Callable[[Value], None]):
+        if not isinstance(validator, Callable):
+            raise TypeError('Param validator must be Callable.')
+
         self.validators.append(validator)
         return validator
 
-    def dump(self, obj):
-        value = self.dump_from(obj, self.name)
-        value = self.format(value)
-        return value
-
-    def format(self, value):
+    def dump(self, value):
         if self.formatter and value is not None:
             value = self.formatter(value)
         return value
 
-    def load(self, data: dict):
-        value = self.load_from(data)
+    def load(self, value):
         if value is None:
             if self.allow_none:
                 return None
-            else:
-                raise ValidationError(self.error_messages.get('allow_none'))
+            raise ValidationError(self.error_messages.get('none'))
 
         value = self.parse(value)
         self.validate(value)
         return value
-
-    def load_from(self, data: dict):
-        if self.key in data.keys():
-            value = data[self.key]
-            return value
-        elif self.required:
-            raise ValidationError(self.error_messages.get('required'))
-        else:
-            return None
 
     def validate(self, value):
         for validator in self.validators:
@@ -185,18 +171,18 @@ class ListField(Field):
         self.item_field = item_field
         super().__init__(**kwargs)
 
-    def format(self, list_):
+    def dump(self, list_):
         if isinstance(list_, Iterable):
-            list_ = [self.item_field.format(item) for item in list_]
+            list_ = [self.item_field.dump(item) for item in list_]
+        elif list_ is not None:
+            raise ValueError(f'The value of "{self.name}" field is not Iterable.')
         return list_
 
-    def load(self, data):
-        list_ = self.load_from(data)
+    def load(self, list_):
         if list_ is None:
             if self.allow_none:
                 return None
-            else:
-                raise ValidationError(self.error_messages.get('allow_none'))
+            raise ValidationError(self.error_messages.get('none'))
 
         if not isinstance(list_, Iterable):
             raise ValidationError(self.error_messages.get('iterable'))
@@ -218,7 +204,7 @@ class CallableField(Field):
 
         super().__init__(formatter=formatter, no_load=no_load, **kwargs)
 
-    def format(self, func):
+    def dump(self, func):
         value = None
         if func is not None:
             value = func(*self.func_args, **self.func_kwargs)
@@ -268,7 +254,7 @@ class DateField(DatetimeField):
         return datetime.strptime(date_string, self.fmt).date()
 
 
-class NestField(Field):
+class NestedField(Field):
     def __init__(self, catalyst, parse=None, validators=None, **kwargs):
 
         self.catalyst = catalyst
@@ -278,8 +264,8 @@ class NestField(Field):
 
         super().__init__(parse=parse, validators=validators, **kwargs)
 
-    def format(self, obj):
-        value = self.catalyst.dump(obj)
+    def dump(self, value):
+        value = self.catalyst.dump(value)
         return value
 
     def _get_parse(self, catalyst):

@@ -1,5 +1,4 @@
-from typing import Dict, Iterable, Callable
-from collections.abc import Mapping
+from typing import Dict, Iterable, Callable, Mapping
 
 from .fields import Field
 from .validators import ValidationError
@@ -32,7 +31,7 @@ class LoadResult(dict):
 
 class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
-        # collect fields
+        # collect fields to cls._field_dict
         fields = {}  # type: FieldDict
         for key, value in attrs.items():
             if isinstance(value, Field):
@@ -41,30 +40,30 @@ class CatalystMeta(type):
                 if value.key is None:
                     value.key = key
                 fields[key] = value
-        attrs['_fields'] = fields
+        attrs['_field_dict'] = fields
         new_cls = type.__new__(cls, name, bases, attrs)
         return new_cls
 
 
 class Catalyst(metaclass=CatalystMeta):
-    _fields = {}  # type: FieldDict
+    _field_dict = {}  # type: FieldDict
 
     def __init__(self, fields: Iterable[str] = None, dump_fields: Iterable[str] = None,
                  load_fields: Iterable[str] = None, raise_error: bool = False):
         if not fields:
-            fields = self._fields.keys()
+            fields = set(self._field_dict.keys())
         if not dump_fields:
             dump_fields = fields
         if not load_fields:
             load_fields = fields
 
-        self._dump_fields = self._copy_fields(
-            self._fields, dump_fields,
-            lambda k: not self._fields[k].no_dump)
+        self._dump_field_dict = self._copy_fields(
+            self._field_dict, dump_fields,
+            lambda k: not self._field_dict[k].no_dump)
 
-        self._load_fields = self._copy_fields(
-            self._fields, load_fields,
-            lambda k: not self._fields[k].no_load)
+        self._load_field_dict = self._copy_fields(
+            self._field_dict, load_fields,
+            lambda k: not self._field_dict[k].no_load)
 
         self.raise_error = raise_error
 
@@ -78,9 +77,19 @@ class Catalyst(metaclass=CatalystMeta):
 
     def dump(self, obj) -> dict:
         obj_dict = {}
-        for field in self._dump_fields.values():
-            obj_dict[field.key] = field.dump(obj)
+        for field in self._dump_field_dict.values():
+            value = self.get_dump_value(obj, field.name)
+            obj_dict[field.key] = field.dump(value)
         return obj_dict
+
+    def get_dump_value(self, obj, name):
+        if hasattr(obj, name):
+            return getattr(obj, name)
+
+        if isinstance(obj, Mapping) and name in obj:
+            return obj.get(name)
+
+        raise AttributeError(f'{obj} has no attribute or key "{name}".')
 
     def load(self, data: dict) -> LoadResult:
         if not isinstance(data, Mapping):
@@ -89,14 +98,15 @@ class Catalyst(metaclass=CatalystMeta):
         invalid_data = {}
         valid_data = {}
         errors = {}
-        for field in self._load_fields.values():
+        for field in self._load_field_dict.values():
             try:
-                value = field.load(data)
+                row_value = self.get_load_value(data, field)
+                value = field.load(row_value)
             except Exception as e:
                 errors[field.key] = e
                 if field.key in data:
                     # 无效数据的应该返回原始数据，忽略原始数据中没有的字段
-                    invalid_data[field.key] = data[field.key]
+                    invalid_data[field.key] = row_value
             else:
                 if field.key in data:
                     # 有效数据返回处理后的数据，忽略原始数据中没有的字段
@@ -106,3 +116,11 @@ class Catalyst(metaclass=CatalystMeta):
         if not load_result.is_valid and self.raise_error:
             raise ValidationError(load_result)
         return load_result
+
+    def get_load_value(self, data: dict, field: Field):
+        if field.key in data.keys():
+            value = data[field.key]
+            return value
+        if field.required:
+            raise ValidationError(field.error_messages.get('required'))
+        return None
