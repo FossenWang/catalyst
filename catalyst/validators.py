@@ -1,5 +1,7 @@
 "Validators"
 
+from numbers import Number
+
 from .utils import ErrorMessageMixin
 
 
@@ -15,7 +17,10 @@ class Validator(ErrorMessageMixin):
 class LengthValidator(Validator):
     """length validator"""
 
-    def __init__(self, min_length=None, max_length=None, error_messages=None):
+    def __init__(self,
+                 min_length: int = None,
+                 max_length: int = None,
+                 error_messages: dict = None):
         self.min_length = min_length
         self.max_length = max_length
 
@@ -36,12 +41,15 @@ class LengthValidator(Validator):
 
 class ComparisonValidator(Validator):
     """
-    comparison validator
+    Compares between values.
     error_messages:
     includ keys ('too_small', 'too_large')
     """
 
-    def __init__(self, min_value=None, max_value=None, error_messages=None):
+    def __init__(self,
+                 min_value: Number = None,
+                 max_value: Number = None,
+                 error_messages: dict = None):
         self.min_value = min_value
         self.max_value = max_value
 

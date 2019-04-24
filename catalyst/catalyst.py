@@ -45,11 +45,31 @@ class CatalystMeta(type):
         return new_cls
 
 
+def get_attr_or_item(obj, name):
+    if hasattr(obj, name):
+        return getattr(obj, name)
+
+    if isinstance(obj, Mapping) and name in obj:
+        return obj.get(name)
+
+    raise AttributeError(f'{obj} has no attribute or key "{name}".')
+
+
 class Catalyst(metaclass=CatalystMeta):
     _field_dict = {}  # type: FieldDict
 
+    from_attribute = 0
+    from_dict_key = 1
+    from_attribute_or_key = 2
+    _getter_map = {
+        from_attribute: getattr,
+        from_dict_key: lambda d, key: d[key],
+        from_attribute_or_key: get_attr_or_item,
+    }
+
     def __init__(self, fields: Iterable[str] = None, dump_fields: Iterable[str] = None,
-                 load_fields: Iterable[str] = None, raise_error: bool = False):
+                 load_fields: Iterable[str] = None, raise_error: bool = False, 
+                 dump_from: int = from_attribute_or_key):
         if not fields:
             fields = set(self._field_dict.keys())
         if not dump_fields:
@@ -67,6 +87,8 @@ class Catalyst(metaclass=CatalystMeta):
 
         self.raise_error = raise_error
 
+        self.set_dump_getter(dump_from)
+
     def _copy_fields(self, fields: FieldDict, keys: Iterable[str],
                      is_copying: Callable[[str], bool]) -> FieldDict:
         new_fields = {}  # type: FieldDict
@@ -75,21 +97,20 @@ class Catalyst(metaclass=CatalystMeta):
                 new_fields[key] = fields[key]
         return new_fields
 
+    def set_dump_getter(self, dump_from: int):
+        'Set once when initialize.'
+        if dump_from not in self._getter_map:
+            raise ValueError((
+                'Invalid value for "dump_from" which should '
+                f'be one of {tuple(self._getter_map)}.'))
+        self.get_dump_value = self._getter_map.get(dump_from)
+
     def dump(self, obj) -> dict:
         obj_dict = {}
         for field in self._dump_field_dict.values():
             value = self.get_dump_value(obj, field.name)
             obj_dict[field.key] = field.dump(value)
         return obj_dict
-
-    def get_dump_value(self, obj, name):
-        if hasattr(obj, name):
-            return getattr(obj, name)
-
-        if isinstance(obj, Mapping) and name in obj:
-            return obj.get(name)
-
-        raise AttributeError(f'{obj} has no attribute or key "{name}".')
 
     def load(self, data: dict) -> LoadResult:
         if not isinstance(data, Mapping):

@@ -33,8 +33,8 @@ class CatalystTest(TestCase):
     def test_dump(self):
         # dump from object
         test_data = TestData(string='xxx', integer=1, float_=1.1, bool_=True)
-        test_data_dict = test_data_catalyst.dump(test_data)
-        self.assertDictEqual(test_data_dict, {
+        dump_result = test_data_catalyst.dump(test_data)
+        self.assertDictEqual(dump_result, {
             'float': 1.1, 'integer': 1, 'string': 'xxx',
             'bool': True, 'func': 6,
         })
@@ -52,16 +52,27 @@ class CatalystTest(TestCase):
         self.assertRaises(KeyError, TestDataCatalyst, dump_fields=['wrong_name'])
 
         # dump from dict
-        self.assertEqual(
-            test_data_catalyst.dump({
+        test_data_dict = {
                 'float_': 1.1, 'integer': 1, 'string': 'xxx',
                 'bool_': True, 'func': test_data.func,
-            }), {
-                'float': 1.1, 'integer': 1, 'string': 'xxx',
-                'bool': True, 'func': 6,
             }
-        )
+        self.assertEqual(test_data_catalyst.dump(test_data_dict), dump_result)
         self.assertRaises(AttributeError, test_data_catalyst.dump, {'a'})
+
+        # set dump_from
+        catalyst = TestDataCatalyst(dump_from=TestDataCatalyst.from_attribute)
+        catalyst.dump(test_data)
+        with self.assertRaises(AttributeError) as c:
+            catalyst.dump(test_data_dict)
+
+        catalyst = TestDataCatalyst(dump_from=TestDataCatalyst.from_dict_key)
+        catalyst.dump(test_data_dict)
+        with self.assertRaises(TypeError) as c:
+            catalyst.dump(test_data)
+
+        # wrong args
+        with self.assertRaises(ValueError):
+            catalyst = TestDataCatalyst(dump_from='wrong')
 
 
     def test_load(self):
