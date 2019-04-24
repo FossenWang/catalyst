@@ -8,7 +8,7 @@ from catalyst.fields import (
     DatetimeField, TimeField, DateField,
     NestedField,
 )
-from catalyst.validators import ValidationError
+from catalyst.exceptions import ValidationError
 
 
 class FieldTest(TestCase):
@@ -22,7 +22,7 @@ class FieldTest(TestCase):
                 return 1
 
             @staticmethod
-            @fixed_value.set_parse
+            @fixed_value.set_parser
             def fixed_value_add_1(value):
                 return value + 1
 
@@ -57,7 +57,7 @@ class FieldTest(TestCase):
         self.assertRaises(TypeError, a.fixed_value.add_validator, 1)
 
         # test error msg
-        field_3 = Field(key='a', allow_none=False, error_messages={'none': '666'})        
+        field_3 = Field(key='a', allow_none=False, error_messages={'none': '666'})
         with self.assertRaises(ValidationError) as c:
             field_3.load(None)
         self.assertEqual(c.exception.msg, '666')

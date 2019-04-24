@@ -1,7 +1,7 @@
 from typing import Dict, Iterable, Callable, Mapping
 
 from .fields import Field
-from .validators import ValidationError
+from .exceptions import ValidationError
 
 
 FieldDict = Dict[str, Field]
@@ -68,7 +68,7 @@ class Catalyst(metaclass=CatalystMeta):
         self.raise_error = raise_error
 
     def _copy_fields(self, fields: FieldDict, keys: Iterable[str],
-                     is_copying: Callable[[str], bool])-> FieldDict:
+                     is_copying: Callable[[str], bool]) -> FieldDict:
         new_fields = {}  # type: FieldDict
         for key in keys:
             if is_copying(key):
@@ -100,13 +100,13 @@ class Catalyst(metaclass=CatalystMeta):
         errors = {}
         for field in self._load_field_dict.values():
             try:
-                row_value = self.get_load_value(data, field)
-                value = field.load(row_value)
+                raw_value = self.get_load_value(data, field)
+                value = field.load(raw_value)
             except Exception as e:
                 errors[field.key] = e
                 if field.key in data:
                     # 无效数据的应该返回原始数据，忽略原始数据中没有的字段
-                    invalid_data[field.key] = row_value
+                    invalid_data[field.key] = raw_value
             else:
                 if field.key in data:
                     # 有效数据返回处理后的数据，忽略原始数据中没有的字段
@@ -118,7 +118,7 @@ class Catalyst(metaclass=CatalystMeta):
         return load_result
 
     def get_load_value(self, data: dict, field: Field):
-        if field.key in data.keys():
+        if field.key in data:
             value = data[field.key]
             return value
         if field.required:

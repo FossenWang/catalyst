@@ -1,17 +1,22 @@
 "Fields"
 
-from typing import Callable, Dict, Any, Iterable
+from typing import Callable, Any, Iterable, Union
 from datetime import datetime, time, date
 
 from .utils import ErrorMessageMixin
+from .exceptions import ValidationError
 from .validators import (
-    ValidationError, LengthValidator, ComparisonValidator,
+    LengthValidator,
+    ComparisonValidator,
     BoolValidator
 )
 
 
-Name = str
-Value = Any
+FormatterType = ParserType = Callable[[Any], Any]
+
+ValidatorType = Callable[[Any], None]
+
+MultiValidator = Union[ValidatorType, Iterable[ValidatorType]]
 
 
 def no_processing(value):
@@ -27,9 +32,9 @@ class Field(ErrorMessageMixin):
     def __init__(self,
                  name: str = None,
                  key: str = None,
-                 formatter: Callable[[Value], Value] = None,
-                 parse: Callable[[Value], Value] = None,
-                 validators: Callable[[Value], None] = None,
+                 formatter: FormatterType = None,
+                 parser: ParserType = None,
+                 validators: MultiValidator = None,
                  required: bool = False,
                  allow_none: bool = False,
                  error_messages: dict = None,
@@ -45,21 +50,21 @@ class Field(ErrorMessageMixin):
 
         self.formatter = formatter if formatter else no_processing
 
-        self.parse = parse if parse else no_processing
+        self.parser = parser if parser else no_processing
 
         self.set_validators(validators)
 
         self.collect_error_messages(error_messages)
 
-    def set_formatter(self, formatter: Callable[[Value], Value]):
+    def set_formatter(self, formatter: FormatterType):
         self.formatter = formatter
         return formatter
 
-    def set_parse(self, parse: Callable[[Value], Value]):
-        self.parse = parse
-        return parse
+    def set_parser(self, parser: ParserType):
+        self.parser = parser
+        return parser
 
-    def set_validators(self, validators: Iterable[Callable[[Value], None]]):
+    def set_validators(self, validators: MultiValidator):
         if validators is None:
             self.validators = []
             return validators
@@ -71,11 +76,12 @@ class Field(ErrorMessageMixin):
 
         for v in self.validators:
             if not isinstance(v, Callable):
-                raise TypeError('Param validators must be ether Callable or Iterable contained Callable.')
+                raise TypeError(
+                    'Param validators must be ether Callable or Iterable contained Callable.')
 
         return validators
 
-    def add_validator(self, validator: Callable[[Value], None]):
+    def add_validator(self, validator: ValidatorType):
         if not isinstance(validator, Callable):
             raise TypeError('Param validator must be Callable.')
 
@@ -91,9 +97,9 @@ class Field(ErrorMessageMixin):
         if value is None:
             if self.allow_none:
                 return None
-            raise ValidationError(self.error_messages.get('none'))
+            self.error('none')
 
-        value = self.parse(value)
+        value = self.parser(value)
         self.validate(value)
         return value
 
@@ -103,39 +109,49 @@ class Field(ErrorMessageMixin):
 
 
 class StringField(Field):
-    def __init__(self, min_length=None, max_length=None,
-                 formatter=str, parse=str, validators=None, **kwargs):
+    def __init__(self,
+                 min_length: int = None,
+                 max_length: int = None,
+                 formatter: FormatterType = str,
+                 parser: ParserType = str,
+                 validators: MultiValidator = None,
+                 **kwargs):
         self.min_length = min_length
         self.max_length = max_length
         if validators is None and \
                 (min_length is not None or max_length is not None):
             validators = LengthValidator(min_length, max_length)
         super().__init__(
-            formatter=formatter, parse=parse, validators=validators, **kwargs)
+            formatter=formatter, parser=parser, validators=validators, **kwargs)
 
 
 class NumberField(Field):
     type_ = float
 
-    def __init__(self, min_value=None, max_value=None,
-                 formatter=None, parse=None, validators=None, **kwargs):
-        self.max_value = self.type_(
-            max_value) if max_value is not None else max_value
-        self.min_value = self.type_(
-            min_value) if min_value is not None else min_value
+    def __init__(self,
+                 min_value: type_ = None,
+                 max_value: type_ = None,
+                 formatter: FormatterType = None,
+                 parser: ParserType = None,
+                 validators: MultiValidator = None,
+                 **kwargs):
+        self.max_value = self.type_(max_value) \
+            if max_value is not None else max_value
+        self.min_value = self.type_(min_value) \
+            if min_value is not None else min_value
 
         if not formatter:
             formatter = self.type_
 
-        if not parse:
-            parse = self.type_
+        if not parser:
+            parser = self.type_
 
         if validators is None and \
                 (min_value is not None or max_value is not None):
             validators = ComparisonValidator(min_value, max_value)
 
         super().__init__(
-            formatter=formatter, parse=parse, validators=validators, **kwargs)
+            formatter=formatter, parser=parser, validators=validators, **kwargs)
 
 
 class IntegerField(NumberField):
@@ -147,14 +163,18 @@ class FloatField(NumberField):
 
 
 class BoolField(Field):
-    def __init__(self, formatter=bool, parse=bool, validators=None,
-                 error_messages=None, **kwargs):
+    def __init__(self,
+                 formatter: FormatterType = bool,
+                 parser: ParserType = bool,
+                 validators: MultiValidator = None,
+                 error_messages: dict = None,
+                 **kwargs):
 
         if not validators:
             validators = BoolValidator(error_messages)
 
         super().__init__(
-            formatter=formatter, parse=parse, validators=validators,
+            formatter=formatter, parser=parser, validators=validators,
             error_messages=error_messages, **kwargs)
 
 
@@ -163,36 +183,41 @@ class ListField(Field):
         'iterable': 'The field value is not Iterable.',
     }
 
-    def __init__(self, item_field, **kwargs):
+    def __init__(self, item_field: Iterable[Field], **kwargs):
         self.item_field = item_field
         super().__init__(**kwargs)
 
-    def dump(self, list_):
+    def dump(self, list_: Iterable):
         if isinstance(list_, Iterable):
             list_ = [self.item_field.dump(item) for item in list_]
         elif list_ is not None:
-            raise ValueError(f'The value of "{self.name}" field is not Iterable.')
+            raise ValueError(
+                f'The value of "{self.name}" field is not Iterable.')
         return list_
 
-    def load(self, list_):
+    def load(self, list_: Iterable):
         if list_ is None:
             if self.allow_none:
                 return None
-            raise ValidationError(self.error_messages.get('none'))
+            self.error('none')
 
         if not isinstance(list_, Iterable):
-            raise ValidationError(self.error_messages.get('iterable'))
+            self.error('iterable')
 
         for i, value in enumerate(list_):
-            value = self.item_field.parse(value)
+            value = self.item_field.parser(value)
             self.item_field.validate(value)
             list_[i] = value
         return list_
 
 
 class CallableField(Field):
-    def __init__(self, func_args: list = None, func_kwargs: dict = None,
-                 formatter=None, no_load=True, **kwargs):
+    def __init__(self,
+                 func_args: list = None,
+                 func_kwargs: dict = None,
+                 formatter: FormatterType = None,
+                 no_load: bool = True,
+                 **kwargs):
 
         self.func_args = func_args if func_args else []
 
@@ -200,7 +225,7 @@ class CallableField(Field):
 
         super().__init__(formatter=formatter, no_load=no_load, **kwargs)
 
-    def dump(self, func):
+    def dump(self, func: Callable):
         value = None
         if func is not None:
             value = func(*self.func_args, **self.func_kwargs)
@@ -213,24 +238,28 @@ class DatetimeField(Field):
     type_ = datetime
     default_fmt = r'%Y-%m-%d %H:%M:%S.%f'
 
-    def __init__(self, fmt=None, formatter=None,
-                 parse=None, validators=None, **kwargs):
+    def __init__(self,
+                 fmt: str = None,
+                 formatter: FormatterType = None,
+                 parser: ParserType = None,
+                 validators: MultiValidator = None,
+                 **kwargs):
 
         self.fmt = fmt if fmt else self.default_fmt
 
         if not formatter:
             formatter = self._format
 
-        if not parse:
-            parse = self._parse
+        if not parser:
+            parser = self._parse
 
         super().__init__(
-            formatter=formatter, parse=parse, validators=validators, **kwargs)
+            formatter=formatter, parser=parser, validators=validators, **kwargs)
 
-    def _format(self, dt):
+    def _format(self, dt: type_):
         return self.type_.strftime(dt, self.fmt)
 
-    def _parse(self, date_string):
+    def _parse(self, date_string: str):
         return datetime.strptime(date_string, self.fmt)
 
 
@@ -238,7 +267,7 @@ class TimeField(DatetimeField):
     type_ = time
     default_fmt = r'%H:%M:%S.%f'
 
-    def _parse(self, date_string):
+    def _parse(self, date_string: str):
         return datetime.strptime(date_string, self.fmt).time()
 
 
@@ -246,28 +275,32 @@ class DateField(DatetimeField):
     type_ = date
     default_fmt = r'%Y-%m-%d'
 
-    def _parse(self, date_string):
+    def _parse(self, date_string: str):
         return datetime.strptime(date_string, self.fmt).date()
 
 
 class NestedField(Field):
-    def __init__(self, catalyst, parse=None, validators=None, **kwargs):
+    def __init__(self,
+                 catalyst,
+                 parser: ParserType = None,
+                 validators: MultiValidator = None,
+                 **kwargs):
 
         self.catalyst = catalyst
 
-        if not parse:
-            parse = self._get_parse(catalyst)
+        if not parser:
+            parser = self._get_parser(catalyst)
 
-        super().__init__(parse=parse, validators=validators, **kwargs)
+        super().__init__(parser=parser, validators=validators, **kwargs)
 
     def dump(self, value):
         value = self.catalyst.dump(value)
         return value
 
-    def _get_parse(self, catalyst):
-        def parse(obj):
+    def _get_parser(self, catalyst):
+        def parser(obj):
             r = catalyst.load(obj)
             if not r.is_valid:
                 raise ValidationError(r)
             return r
-        return parse
+        return parser

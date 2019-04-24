@@ -1,13 +1,9 @@
 from unittest import TestCase
 
 from catalyst import Catalyst
-from catalyst.fields import StringField, IntegerField, FloatField, BoolField, \
-    CallableField
-from catalyst.validators import ValidationError
-
-# from marshmallow import Schema, fields
-# from django.forms import fields
-# from pprint import pprint
+from catalyst.fields import StringField, IntegerField, \
+    FloatField, BoolField, CallableField
+from catalyst.exceptions import ValidationError
 
 
 class TestData:

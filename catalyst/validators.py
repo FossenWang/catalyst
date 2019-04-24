@@ -3,18 +3,6 @@
 from .utils import ErrorMessageMixin
 
 
-class ValidationError(Exception):
-    def __init__(self, msg, *args):
-        self.msg = msg
-        super().__init__(*args)
-
-    def __repr__(self):
-        return 'ValidationError(%s)' % repr(self.msg)
-
-    def __str__(self):
-        return str(self.msg)
-
-
 class Validator(ErrorMessageMixin):
     def __init__(self, error_messages: dict = None):
         self.collect_error_messages(error_messages)
@@ -26,6 +14,7 @@ class Validator(ErrorMessageMixin):
 
 class LengthValidator(Validator):
     """length validator"""
+
     def __init__(self, min_length=None, max_length=None, error_messages=None):
         self.min_length = min_length
         self.max_length = max_length
@@ -39,10 +28,10 @@ class LengthValidator(Validator):
 
     def __call__(self, value):
         if self.min_length is not None and len(value) < self.min_length:
-            raise ValidationError(self.error_messages['too_small'])
+            self.error('too_small')
 
         if self.max_length is not None and len(value) > self.max_length:
-            raise ValidationError(self.error_messages['too_large'])
+            self.error('too_large')
 
 
 class ComparisonValidator(Validator):
@@ -65,10 +54,10 @@ class ComparisonValidator(Validator):
 
     def __call__(self, value):
         if self.min_value is not None and value < self.min_value:
-            raise ValidationError(self.error_messages['too_small'])
+            self.error('too_small')
 
         if self.max_value is not None and value > self.max_value:
-            raise ValidationError(self.error_messages['too_large'])
+            self.error('too_large')
 
 
 class BoolValidator(Validator):
@@ -79,4 +68,4 @@ class BoolValidator(Validator):
 
     def __call__(self, value):
         if not isinstance(value, bool):
-            raise ValidationError(self.error_messages['type_error'])
+            self.error('type_error')

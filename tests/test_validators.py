@@ -1,7 +1,8 @@
 from unittest import TestCase
 
+from catalyst.exceptions import ValidationError
 from catalyst.validators import (
-    ValidationError, Validator, LengthValidator,
+    Validator, LengthValidator,
     ComparisonValidator, BoolValidator
 )
 
