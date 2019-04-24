@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, Callable, Mapping
+from typing import Dict, Iterable, Callable, Mapping, Any
 
 from .fields import Field
 from .exceptions import ValidationError
@@ -54,22 +54,19 @@ def get_attr_or_item(obj, name):
 
     raise AttributeError(f'{obj} has no attribute or key "{name}".')
 
+def get_item(mapping, key):
+    return mapping[key]
+
 
 class Catalyst(metaclass=CatalystMeta):
     _field_dict = {}  # type: FieldDict
-
-    from_attribute = 0
-    from_dict_key = 1
-    from_attribute_or_key = 2
-    _getter_map = {
-        from_attribute: getattr,
-        from_dict_key: lambda d, key: d[key],
-        from_attribute_or_key: get_attr_or_item,
-    }
+    dump_from_attribute_or_key = get_attr_or_item
+    dump_from_attribute = getattr
+    dump_from_key = get_item
 
     def __init__(self, fields: Iterable[str] = None, dump_fields: Iterable[str] = None,
-                 load_fields: Iterable[str] = None, raise_error: bool = False, 
-                 dump_from: int = from_attribute_or_key):
+                 load_fields: Iterable[str] = None, raise_error: bool = False,
+                 dump_from: Callable[[Any, str], Any] = dump_from_attribute_or_key):
         if not fields:
             fields = set(self._field_dict.keys())
         if not dump_fields:
@@ -87,7 +84,7 @@ class Catalyst(metaclass=CatalystMeta):
 
         self.raise_error = raise_error
 
-        self.set_dump_getter(dump_from)
+        self.set_dump_from(dump_from)
 
     def _copy_fields(self, fields: FieldDict, keys: Iterable[str],
                      is_copying: Callable[[str], bool]) -> FieldDict:
@@ -97,13 +94,10 @@ class Catalyst(metaclass=CatalystMeta):
                 new_fields[key] = fields[key]
         return new_fields
 
-    def set_dump_getter(self, dump_from: int):
-        'Set once when initialize.'
-        if dump_from not in self._getter_map:
-            raise ValueError((
-                'Invalid value for "dump_from" which should '
-                f'be one of {tuple(self._getter_map)}.'))
-        self.get_dump_value = self._getter_map.get(dump_from)
+    def set_dump_from(self, dump_from: Callable[[Any, str], Any]):
+        if not isinstance(dump_from, Callable):
+            raise TypeError('Param "dump_from" must be Callable.')
+        self.get_dump_value = dump_from
 
     def dump(self, obj) -> dict:
         obj_dict = {}
