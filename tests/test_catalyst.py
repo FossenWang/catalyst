@@ -4,6 +4,7 @@ from catalyst import Catalyst
 from catalyst.fields import StringField, IntegerField, \
     FloatField, BoolField, CallableField
 from catalyst.exceptions import ValidationError
+from catalyst.utils import dump_from_attribute, dump_from_key
 
 
 class TestData:
@@ -60,13 +61,13 @@ class CatalystTest(TestCase):
         self.assertRaises(AttributeError, test_data_catalyst.dump, {'a'})
 
         # only dump from attribute
-        catalyst = TestDataCatalyst(dump_from=TestDataCatalyst.dump_from_attribute)
+        catalyst = TestDataCatalyst(dump_from=dump_from_attribute)
         catalyst.dump(test_data)
         with self.assertRaises(AttributeError):
             catalyst.dump(test_data_dict)
 
         # only dump from key
-        catalyst = TestDataCatalyst(dump_from=TestDataCatalyst.dump_from_key)
+        catalyst = TestDataCatalyst(dump_from=dump_from_key)
         catalyst.dump(test_data_dict)
         with self.assertRaises(TypeError):
             catalyst.dump(test_data)

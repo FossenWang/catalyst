@@ -2,6 +2,7 @@ from typing import Dict, Iterable, Callable, Mapping, Any
 
 from .fields import Field
 from .exceptions import ValidationError
+from .utils import dump_from_attribute_or_key
 
 
 FieldDict = Dict[str, Field]
@@ -45,28 +46,12 @@ class CatalystMeta(type):
         return new_cls
 
 
-def get_attr_or_item(obj, name):
-    if hasattr(obj, name):
-        return getattr(obj, name)
-
-    if isinstance(obj, Mapping) and name in obj:
-        return obj.get(name)
-
-    raise AttributeError(f'{obj} has no attribute or key "{name}".')
-
-def get_item(mapping, key):
-    return mapping[key]
-
-
 class Catalyst(metaclass=CatalystMeta):
     _field_dict = {}  # type: FieldDict
-    dump_from_attribute_or_key = get_attr_or_item
-    dump_from_attribute = getattr
-    dump_from_key = get_item
 
     def __init__(self, fields: Iterable[str] = None, dump_fields: Iterable[str] = None,
                  load_fields: Iterable[str] = None, raise_error: bool = False,
-                 dump_from: Callable[[Any, str], Any] = dump_from_attribute_or_key):
+                 dump_from: Callable[[Any, str], Any] = None):
         if not fields:
             fields = set(self._field_dict.keys())
         if not dump_fields:
@@ -84,6 +69,8 @@ class Catalyst(metaclass=CatalystMeta):
 
         self.raise_error = raise_error
 
+        if not dump_from:
+            dump_from = dump_from_attribute_or_key
         self.set_dump_from(dump_from)
 
     def _copy_fields(self, fields: FieldDict, keys: Iterable[str],
