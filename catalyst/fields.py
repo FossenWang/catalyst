@@ -1,5 +1,7 @@
 "Fields"
 
+import json
+
 from typing import Callable, Any, Iterable, Union
 from datetime import datetime, time, date
 
@@ -93,6 +95,10 @@ class Field(ErrorMessageMixin):
             value = self.formatter(value)
         return value
 
+    def dump_to_json(self, value):
+        value = self.dump(value)
+        return json.dumps(value)
+
     def load(self, value):
         if value is None:
             if self.allow_none:
@@ -183,7 +189,7 @@ class ListField(Field):
         'iterable': 'The field value is not Iterable.',
     }
 
-    def __init__(self, item_field: Iterable[Field], **kwargs):
+    def __init__(self, item_field: Field, **kwargs):
         self.item_field = item_field
         super().__init__(**kwargs)
 
@@ -191,9 +197,23 @@ class ListField(Field):
         if isinstance(list_, Iterable):
             list_ = [self.item_field.dump(item) for item in list_]
         elif list_ is not None:
-            raise ValueError(
+            raise TypeError(
                 f'The value of "{self.name}" field is not Iterable.')
         return list_
+
+    def dump_to_json(self, list_: Iterable):
+        text = ''
+        if isinstance(list_, Iterable):
+            for item in list_:
+                value = self.item_field.dump_to_json(item)
+                text += f'{value}, '
+            text = '[' + text[:-2] + ']'
+        elif list_ is None:
+            text = 'null'
+        else:
+            raise TypeError(
+                f'The value of "{self.name}" field is not Iterable.')
+        return text
 
     def load(self, list_: Iterable):
         if list_ is None:
@@ -216,22 +236,30 @@ class CallableField(Field):
                  func_args: list = None,
                  func_kwargs: dict = None,
                  formatter: FormatterType = None,
-                 no_load: bool = True,
                  **kwargs):
 
         self.func_args = func_args if func_args else []
 
         self.func_kwargs = func_kwargs if func_kwargs else {}
 
-        super().__init__(formatter=formatter, no_load=no_load, **kwargs)
+        super().__init__(formatter=formatter, no_load=True, **kwargs)
 
     def dump(self, func: Callable):
         value = None
-        if func is not None:
+
+        if isinstance(func, Callable):
             value = func(*self.func_args, **self.func_kwargs)
+        elif func is not None:
+            raise TypeError(
+                f'The value of "{self.name}" field is not Callable.')
+
         if self.formatter and value is not None:
             value = self.formatter(value)
         return value
+
+    def set_args(self, *args, **kwargs):
+        self.func_args = args
+        self.func_kwargs = kwargs
 
 
 class DatetimeField(Field):
@@ -295,6 +323,10 @@ class NestedField(Field):
 
     def dump(self, value):
         value = self.catalyst.dump(value)
+        return value
+
+    def dump_to_json(self, value):
+        value = self.catalyst.dump_to_json(value)
         return value
 
     def _get_parser(self, catalyst):

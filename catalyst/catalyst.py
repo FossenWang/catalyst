@@ -18,15 +18,15 @@ class LoadResult(dict):
 
     def __repr__(self):
         if not self.is_valid:
-            return 'LoadResult(is_valid=%s, errors=%s)' % (self.is_valid, self.strferrors())
+            return 'LoadResult(is_valid=%s, errors=%s)' % (self.is_valid, self.format_errors())
         return 'LoadResult(is_valid=%s, valid_data=%s)' % (self.is_valid, super().__repr__())
 
     def __str__(self):
         if not self.is_valid:
-            return str(self.strferrors())
+            return str(self.format_errors())
         return super().__repr__()
 
-    def strferrors(self):
+    def format_errors(self):
         return {k: str(self.errors[k]) for k in self.errors}
 
 
@@ -92,6 +92,14 @@ class Catalyst(metaclass=CatalystMeta):
             value = self.get_dump_value(obj, field.name)
             obj_dict[field.key] = field.dump(value)
         return obj_dict
+
+    def dump_to_json(self, obj) -> str:
+        text = ''
+        for field in self._dump_field_dict.values():
+            value = self.get_dump_value(obj, field.name)
+            text += f'"{field.key}": {field.dump_to_json(value)}, '
+        text = '{' + text[:-2] + '}'
+        return text
 
     def load(self, data: dict) -> LoadResult:
         if not isinstance(data, Mapping):
