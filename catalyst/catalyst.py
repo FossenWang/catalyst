@@ -1,3 +1,5 @@
+import json
+
 from typing import Dict, Iterable, Callable, Mapping, Any
 
 from .fields import Field
@@ -94,14 +96,9 @@ class Catalyst(metaclass=CatalystMeta):
         return obj_dict
 
     def dump_to_json(self, obj) -> str:
-        text = ''
-        for field in self._dump_field_dict.values():
-            value = self.get_dump_value(obj, field.name)
-            text += f'"{field.key}": {field.dump_to_json(value)}, '
-        text = '{' + text[:-2] + '}'
-        return text
+        return json.dumps(self.dump(obj))
 
-    def load(self, data: dict) -> LoadResult:
+    def load(self, data: dict, raise_error: bool = None) -> LoadResult:
         if not isinstance(data, Mapping):
             raise TypeError('Argment data must be a mapping object.')
 
@@ -123,9 +120,14 @@ class Catalyst(metaclass=CatalystMeta):
                     valid_data[field.key] = value
 
         load_result = LoadResult(valid_data, errors, invalid_data)
-        if not load_result.is_valid and self.raise_error:
+        if raise_error is None:
+            raise_error = self.raise_error
+        if not load_result.is_valid and raise_error:
             raise ValidationError(load_result)
         return load_result
+
+    def load_from_json(self, s: str, raise_error: bool = None) -> LoadResult:
+        return self.load(json.loads(s), raise_error=raise_error)
 
     def get_load_value(self, data: dict, field: Field):
         if field.key in data:

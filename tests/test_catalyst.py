@@ -3,8 +3,7 @@ from unittest import TestCase
 
 from catalyst import Catalyst
 from catalyst.fields import StringField, IntegerField, \
-    FloatField, BoolField, CallableField, ListField, \
-    NestedField
+    FloatField, BoolField, CallableField, ListField
 from catalyst.exceptions import ValidationError
 from catalyst.utils import dump_from_attribute, dump_from_key
 
@@ -74,7 +73,8 @@ class CatalystTest(TestCase):
             'bool_': True, 'func': test_data.func, 'list_': ['a', 'b']
         }
         self.assertEqual(test_data_catalyst.dump(test_data_dict), dump_result)
-        self.assertRaises(AttributeError, test_data_catalyst.dump, {'a'})
+        with self.assertRaises(AttributeError):
+            test_data_catalyst.dump({'a'})
 
         # only dump from attribute
         catalyst = TestDataCatalyst(dump_from=dump_from_attribute)
@@ -103,12 +103,19 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.errors, {})
         self.assertDictEqual(result.valid_data, valid_data)
         self.assertDictEqual(result, valid_data)
+        # load from json
+        s = json.dumps(valid_data)
+        result = test_data_catalyst.load_from_json(s)
+        self.assertTrue(result.is_valid)
+        self.assertDictEqual(result.valid_data, valid_data)
+
         # test repr
         self.assertTrue(str(result).startswith('{'))
         self.assertTrue(repr(result).startswith('LoadResult(is_valid=True'))
 
         # test invalid_data
-        self.assertRaises(TypeError, test_data_catalyst.load, 1)
+        with self.assertRaises(TypeError):
+            test_data_catalyst.load(1)
 
         # test invalid_data: validate errors
         invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
@@ -118,6 +125,12 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {
             'string', 'integer', 'float', 'bool', 'list_'})
         self.assertDictEqual(result.valid_data, {})
+        # load from json
+        s = json.dumps(invalid_data)
+        result = test_data_catalyst.load_from_json(s)
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.invalid_data, invalid_data)
+
         # test repr
         self.assertTrue(str(result).startswith('{'))
         self.assertTrue(repr(result).startswith('LoadResult(is_valid=False'))
@@ -144,10 +157,18 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.valid_data, invalid_data)
 
         # test raise error while validating
+        with self.assertRaises(ValidationError):
+            test_data_catalyst.load(invalid_data, raise_error=True)
+
+        s = json.dumps(invalid_data)
+        with self.assertRaises(ValidationError):
+            result = test_data_catalyst.load_from_json(s, raise_error=True)
+
         raise_err_catalyst = TestDataCatalyst(raise_error=True)
-        self.assertRaises(ValidationError, raise_err_catalyst.load, invalid_data)
         result = raise_err_catalyst.load(valid_data)
         self.assertTrue(result.is_valid)
+        with self.assertRaises(ValidationError):
+            raise_err_catalyst.load(invalid_data)
 
         # test no load
         catalyst = TestDataCatalyst(fields=[])
@@ -157,4 +178,5 @@ class CatalystTest(TestCase):
         self.assertDictEqual(catalyst.load(valid_data).valid_data, {'string': 'xxx'})
         catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])
         self.assertDictEqual(catalyst.load(valid_data).valid_data, {'bool': True})
-        self.assertRaises(KeyError, TestDataCatalyst, load_fields=['wrong_name'])
+        with self.assertRaises(KeyError):
+            TestDataCatalyst(load_fields=['wrong_name'])

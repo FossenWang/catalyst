@@ -1,7 +1,5 @@
 "Fields"
 
-import json
-
 from typing import Callable, Any, Iterable, Union
 from datetime import datetime, time, date
 
@@ -94,10 +92,6 @@ class Field(ErrorMessageMixin):
         if self.formatter and value is not None:
             value = self.formatter(value)
         return value
-
-    def dump_to_json(self, value):
-        value = self.dump(value)
-        return json.dumps(value)
 
     def load(self, value):
         if value is None:
@@ -200,20 +194,6 @@ class ListField(Field):
             raise TypeError(
                 f'The value of "{self.name}" field is not Iterable.')
         return list_
-
-    def dump_to_json(self, list_: Iterable):
-        text = ''
-        if isinstance(list_, Iterable):
-            for item in list_:
-                value = self.item_field.dump_to_json(item)
-                text += f'{value}, '
-            text = '[' + text[:-2] + ']'
-        elif list_ is None:
-            text = 'null'
-        else:
-            raise TypeError(
-                f'The value of "{self.name}" field is not Iterable.')
-        return text
 
     def load(self, list_: Iterable):
         if list_ is None:
@@ -323,10 +303,6 @@ class NestedField(Field):
 
     def dump(self, value):
         value = self.catalyst.dump(value)
-        return value
-
-    def dump_to_json(self, value):
-        value = self.catalyst.dump_to_json(value)
         return value
 
     def _get_parser(self, catalyst):

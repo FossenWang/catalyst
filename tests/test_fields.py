@@ -44,8 +44,6 @@ class FieldTest(TestCase):
         self.assertEqual(a.fixed_value.dump('asd'), 1)
         self.assertEqual(a.fixed_value.dump(1000), 1)
         self.assertEqual(a.fixed_value.dump([100]), 1)
-        # dump to json
-        self.assertEqual(a.fixed_value.dump_to_json('asd'), '1')
 
         # test load
         self.assertEqual(a.fixed_value.load(0), 1)
@@ -72,10 +70,6 @@ class FieldTest(TestCase):
         self.assertEqual(string_field.dump(1), '1')
         self.assertEqual(string_field.dump([]), '[]')
         self.assertEqual(string_field.dump(None), None)
-        # dump to json
-        self.assertEqual(string_field.dump_to_json('xxx'), '"xxx"')
-        self.assertEqual(string_field.dump_to_json('1'), '"1"')
-        self.assertEqual(string_field.dump_to_json(None), 'null')
 
         # load
         self.assertEqual(string_field.load('xxx'), 'xxx')
@@ -94,10 +88,6 @@ class FieldTest(TestCase):
         self.assertEqual(int_field.dump(1), 1)
         self.assertEqual(int_field.dump(1.6), 1)
         self.assertEqual(int_field.dump('10'), 10)
-        # dump to json
-        self.assertEqual(int_field.dump_to_json(1), '1')
-        self.assertEqual(int_field.dump_to_json('1'), '1')
-        self.assertEqual(int_field.dump_to_json(None), 'null')
 
         # load
         self.assertEqual(int_field.load(0), 0)
@@ -119,10 +109,6 @@ class FieldTest(TestCase):
         self.assertEqual(float_field.dump(5.5), 5.5)
         self.assertEqual(float_field.dump('10'), 10.0)
         self.assertEqual(float_field.dump(None), None)
-        # dump to json
-        self.assertEqual(float_field.dump_to_json(1), '1.0')
-        self.assertEqual(float_field.dump_to_json('0'), '0.0')
-        self.assertEqual(float_field.dump_to_json(None), 'null')
 
         # load
         self.assertEqual(float_field.load(0), 0.0)
@@ -143,10 +129,6 @@ class FieldTest(TestCase):
         self.assertEqual(bool_field.dump(True), True)
         self.assertEqual(bool_field.dump(False), False)
         self.assertEqual(bool_field.dump(None), None)
-        # dump to json
-        self.assertEqual(bool_field.dump_to_json(True), 'true')
-        self.assertEqual(bool_field.dump_to_json(False), 'false')
-        self.assertEqual(bool_field.dump_to_json(None), 'null')
 
         # load
         self.assertEqual(bool_field.load(True), True)
@@ -165,12 +147,6 @@ class FieldTest(TestCase):
         self.assertEqual(list_field.dump(None), None)
         with self.assertRaises(TypeError):
             list_field.dump(1)
-        # dump to json
-        self.assertEqual(list_field.dump_to_json([1, 2, 3]), '[1.0, 2.0, 3.0]')
-        self.assertEqual(list_field.dump_to_json([]), '[]')
-        self.assertEqual(list_field.dump_to_json(None), 'null')
-        with self.assertRaises(TypeError):
-            list_field.dump_to_json(1)
 
         # load
         self.assertListEqual(list_field.load([1, 2, 3]), [1.0, 2.0, 3.0])
@@ -200,10 +176,6 @@ class FieldTest(TestCase):
         with self.assertRaises(TypeError):
             callable_field.dump(1)
 
-        # dump to json
-        self.assertEqual(callable_field.dump_to_json(test_func), '12')
-        self.assertEqual(callable_field.dump_to_json(None), 'null')
-
     def test_datetime_field(self):
         def base_test(now, type_, FieldClass, fmt):
             # dump
@@ -214,10 +186,6 @@ class FieldTest(TestCase):
             field = FieldClass(name='time', key='time', fmt=fmt)
             dt_str = field.dump(now)
             self.assertEqual(dt_str, now.strftime(fmt))
-
-            # dump to json
-            self.assertEqual(field.dump_to_json(now), f'"{dt_str}"')
-            self.assertEqual(field.dump_to_json(None), 'null')
 
             # load
             if type_ is datetime:
@@ -245,7 +213,6 @@ class FieldTest(TestCase):
         field = NestedField(a_cata, name='a', key='a')
 
         self.assertEqual(field.dump(A('1')), {'name': '1'})
-        self.assertEqual(field.dump_to_json(A('1')), '{"name": "1"}')
         self.assertEqual(field.load({'name': '1'}), {'name': '1'})
         self.assertRaises(ValidationError, field.load, {'n': 'm'})
         self.assertRaises(ValidationError, field.load, {'name': '1234'})
