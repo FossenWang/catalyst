@@ -4,7 +4,7 @@ from typing import Dict, Iterable, Callable, Mapping, Any
 
 from .fields import Field
 from .exceptions import ValidationError
-from .utils import dump_from_attribute_or_key
+from .utils import dump_from_attribute_or_key, no_default
 
 
 FieldDict = Dict[str, Field]
@@ -85,22 +85,31 @@ class Catalyst(metaclass=CatalystMeta):
 
     def set_dump_from(self, dump_from: Callable[[Any, str], Any]):
         if not isinstance(dump_from, Callable):
-            raise TypeError('Param "dump_from" must be Callable.')
-        self.get_dump_value = dump_from
+            raise TypeError('Param `dump_from` must be Callable.')
+        self.dump_from = dump_from
 
     def dump(self, obj) -> dict:
         obj_dict = {}
         for field in self._dump_field_dict.values():
-            value = self.get_dump_value(obj, field.name)
+            value = self.get_dump_value(obj, field)
             obj_dict[field.key] = field.dump(value)
         return obj_dict
+
+    def get_dump_value(self, obj, field: Field):
+        try:
+            value = self.dump_from(obj, field.name)
+        except (AttributeError, KeyError) as e:
+            if field.dump_default is no_default:
+                raise e
+            value = field.dump_default
+        return value
 
     def dump_to_json(self, obj) -> str:
         return json.dumps(self.dump(obj))
 
     def load(self, data: dict, raise_error: bool = None) -> LoadResult:
         if not isinstance(data, Mapping):
-            raise TypeError('Argment data must be a mapping object.')
+            raise TypeError('Param `data` must be a mapping object.')
 
         invalid_data = {}
         valid_data = {}
@@ -108,16 +117,17 @@ class Catalyst(metaclass=CatalystMeta):
         for field in self._load_field_dict.values():
             try:
                 raw_value = self.get_load_value(data, field)
+            except Exception as e:
+                errors[field.key] = e
+                continue
+
+            try:
                 value = field.load(raw_value)
             except Exception as e:
                 errors[field.key] = e
-                if field.key in data:
-                    # 无效数据的应该返回原始数据，忽略原始数据中没有的字段
-                    invalid_data[field.key] = raw_value
+                invalid_data[field.key] = raw_value
             else:
-                if field.key in data:
-                    # 有效数据返回处理后的数据，忽略原始数据中没有的字段
-                    valid_data[field.key] = value
+                valid_data[field.key] = value
 
         load_result = LoadResult(valid_data, errors, invalid_data)
         if raise_error is None:
@@ -130,9 +140,12 @@ class Catalyst(metaclass=CatalystMeta):
         return self.load(json.loads(s), raise_error=raise_error)
 
     def get_load_value(self, data: dict, field: Field):
-        if field.key in data:
+        try:
             value = data[field.key]
-            return value
-        if field.required:
-            raise ValidationError(field.error_messages.get('required'))
-        return None
+        except KeyError as e:
+            if field.required:
+                raise ValidationError(field.error_messages.get('required'))
+            if field.load_default is no_default:
+                raise e
+            value = field.load_default
+        return value

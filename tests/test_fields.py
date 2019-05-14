@@ -47,14 +47,19 @@ class FieldTest(TestCase):
 
         # test load
         self.assertEqual(a.fixed_value.load(0), 1)
-        self.assertRaises(TypeError, a.fixed_value.load, '0')
-        self.assertRaises(AssertionError, a.fixed_value.load, -1)
-        self.assertRaises(AssertionError, a.fixed_value.load, 100)
+        with self.assertRaises(TypeError):
+            a.fixed_value.load('0')
+        with self.assertRaises(AssertionError):
+            a.fixed_value.load(-1)
+        with self.assertRaises(AssertionError):
+            a.fixed_value.load(100)
 
         # test validators
         self.assertEqual(len(a.fixed_value.validators), 2)
-        self.assertRaises(TypeError, a.fixed_value.set_validators, 1)
-        self.assertRaises(TypeError, a.fixed_value.add_validator, 1)
+        with self.assertRaises(TypeError):
+            a.fixed_value.set_validators(1)
+        with self.assertRaises(TypeError):
+            a.fixed_value.add_validator(1)
 
         # test error msg
         field_3 = Field(key='a', allow_none=False, error_messages={'none': '666'})
@@ -75,8 +80,10 @@ class FieldTest(TestCase):
         self.assertEqual(string_field.load('xxx'), 'xxx')
         self.assertEqual(string_field.load(123), '123')
         self.assertEqual(string_field.load([1]), '[1]')
-        self.assertRaises(ValidationError, string_field.load, '')
-        self.assertRaises(ValidationError, string_field.load, None)
+        with self.assertRaises(ValidationError):
+            string_field.load('')
+        with self.assertRaises(ValidationError):
+            string_field.load(None)
 
         string_field.allow_none = True
         self.assertEqual(string_field.load(None), None)
@@ -94,11 +101,16 @@ class FieldTest(TestCase):
         self.assertEqual(int_field.load(1), 1)
         self.assertEqual(int_field.load('1'), 1)
 
-        self.assertRaises(ValueError, int_field.load, '')
-        self.assertRaises(ValidationError, int_field.load, 111)
-        self.assertRaises(ValidationError, int_field.load, None)
-        self.assertRaises(ValueError, int_field.load, 'asd')
-        self.assertRaises(TypeError, int_field.load, [])
+        with self.assertRaises(ValueError):
+            int_field.load('')
+        with self.assertRaises(ValidationError):
+            int_field.load(111)
+        with self.assertRaises(ValidationError):
+            int_field.load(None)
+        with self.assertRaises(ValueError):
+            int_field.load('asd')
+        with self.assertRaises(TypeError):
+            int_field.load([])
 
     def test_float_field(self):
         float_field = FloatField(name='float_', key='float', min_value=-11.1, max_value=111.1)
@@ -117,10 +129,14 @@ class FieldTest(TestCase):
         self.assertEqual(float_field.load(111.1), 111.1)
         self.assertEqual(float_field.load(11), 11)
 
-        self.assertRaises(ValueError, float_field.load, '')
-        self.assertRaises(ValidationError, float_field.load, 111.11)
-        self.assertRaises(ValidationError, float_field.load, None)
-        self.assertRaises(TypeError, float_field.load, [])
+        with self.assertRaises(ValueError):
+            float_field.load('')
+        with self.assertRaises(ValidationError):
+            float_field.load(111.11)
+        with self.assertRaises(ValidationError):
+            float_field.load(None)
+        with self.assertRaises(TypeError):
+            float_field.load([])
 
     def test_bool_field(self):
         bool_field = BoolField(name='bool_', key='bool')
@@ -195,7 +211,8 @@ class FieldTest(TestCase):
             elif type_ is date:
                 dt = datetime.strptime(dt_str, fmt).date()
             self.assertEqual(field.load(dt_str), dt)
-            self.assertRaises(ValueError, field.load, '2018Y')
+            with self.assertRaises(ValueError):
+                field.load('2018Y')
 
         now = datetime.now()
         base_test(now, datetime, DatetimeField, '%Y%m%d%H%M%S')
@@ -214,6 +231,9 @@ class FieldTest(TestCase):
 
         self.assertEqual(field.dump(A('1')), {'name': '1'})
         self.assertEqual(field.load({'name': '1'}), {'name': '1'})
-        self.assertRaises(ValidationError, field.load, {'n': 'm'})
-        self.assertRaises(ValidationError, field.load, {'name': '1234'})
-        self.assertRaises(TypeError, field.load, 1)
+        with self.assertRaises(ValidationError):
+            field.load({'n': 'm'})
+        with self.assertRaises(ValidationError):
+            field.load({'name': '1234'})
+        with self.assertRaises(TypeError):
+            field.load(1)

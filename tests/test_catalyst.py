@@ -24,7 +24,8 @@ class TestData:
 
 
 class TestDataCatalyst(Catalyst):
-    string = StringField(min_length=2, max_length=12)
+    string = StringField(min_length=2, max_length=12,
+                         dump_default='default', load_default='default')
     integer = IntegerField(min_value=0, max_value=12, required=True)
     float_field = FloatField(name='float_', key='float', min_value=-1.1, max_value=1.1)
     bool_field = BoolField(name='bool_', key='bool')
@@ -73,8 +74,16 @@ class CatalystTest(TestCase):
             'bool_': True, 'func': test_data.func, 'list_': ['a', 'b']
         }
         self.assertEqual(test_data_catalyst.dump(test_data_dict), dump_result)
+
+        # missing value
         with self.assertRaises(AttributeError):
             test_data_catalyst.dump({'a'})
+
+        # default value
+        test_data_dict_2 = test_data_dict.copy()
+        del test_data_dict_2['string']
+        dump_result = test_data_catalyst.dump(test_data_dict_2)
+        self.assertEqual(dump_result['string'], 'default')
 
         # only dump from attribute
         catalyst = TestDataCatalyst(dump_from=dump_from_attribute)
@@ -103,6 +112,7 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.errors, {})
         self.assertDictEqual(result.valid_data, valid_data)
         self.assertDictEqual(result, valid_data)
+
         # load from json
         s = json.dumps(valid_data)
         result = test_data_catalyst.load_from_json(s)
@@ -125,6 +135,7 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {
             'string', 'integer', 'float', 'bool', 'list_'})
         self.assertDictEqual(result.valid_data, {})
+
         # load from json
         s = json.dumps(invalid_data)
         result = test_data_catalyst.load_from_json(s)
@@ -146,8 +157,14 @@ class CatalystTest(TestCase):
         self.assertIsInstance(result.errors['integer'], ValueError)
         self.assertIsInstance(result.errors['float'], TypeError)
 
+        # test default value
+        invalid_data = valid_data.copy()
+        invalid_data.pop('string')
+        invalid_data.pop('float')
+        result = test_data_catalyst.load(invalid_data)
+        self.assertFalse(result.is_valid)
+
         # test required field
-        # ignore other fields
         invalid_data = valid_data.copy()
         invalid_data.pop('integer')
         result = test_data_catalyst.load(invalid_data)
@@ -160,6 +177,7 @@ class CatalystTest(TestCase):
         with self.assertRaises(ValidationError):
             test_data_catalyst.load(invalid_data, raise_error=True)
 
+        # load from json
         s = json.dumps(invalid_data)
         with self.assertRaises(ValidationError):
             result = test_data_catalyst.load_from_json(s, raise_error=True)
@@ -174,6 +192,8 @@ class CatalystTest(TestCase):
         catalyst = TestDataCatalyst(fields=[])
         self.assertDictEqual(catalyst._load_field_dict, test_data_catalyst._load_field_dict)
         self.assertNotIn('func', catalyst._load_field_dict.keys())
+
+        # test limit field
         catalyst = TestDataCatalyst(fields=['string'])
         self.assertDictEqual(catalyst.load(valid_data).valid_data, {'string': 'xxx'})
         catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])

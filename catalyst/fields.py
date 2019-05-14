@@ -3,7 +3,7 @@
 from typing import Callable, Any, Iterable, Union
 from datetime import datetime, time, date
 
-from .utils import ErrorMessageMixin
+from .utils import ErrorMessageMixin, no_default
 from .exceptions import ValidationError
 from .validators import (
     LengthValidator,
@@ -40,6 +40,8 @@ class Field(ErrorMessageMixin):
                  error_messages: dict = None,
                  no_dump: bool = False,
                  no_load: bool = False,
+                 dump_default: Any = no_default,
+                 load_default: Any = no_default,
                  ):
         self.name = name
         self.key = key
@@ -47,6 +49,9 @@ class Field(ErrorMessageMixin):
         self.allow_none = allow_none
         self.no_dump = no_dump
         self.no_load = no_load
+        # 待定: 字段缺失时有三种可能的处理：填充默认值；忽略；报错；
+        self.dump_default = dump_default
+        self.load_default = load_default
 
         self.formatter = formatter if formatter else no_processing
 
@@ -77,13 +82,13 @@ class Field(ErrorMessageMixin):
         for v in self.validators:
             if not isinstance(v, Callable):
                 raise TypeError(
-                    'Param validators must be ether Callable or Iterable contained Callable.')
+                    'Param `validators` must be ether Callable or Iterable contained Callable.')
 
         return validators
 
     def add_validator(self, validator: ValidatorType):
         if not isinstance(validator, Callable):
-            raise TypeError('Param validator must be Callable.')
+            raise TypeError('Param `validator` must be Callable.')
 
         self.validators.append(validator)
         return validator
