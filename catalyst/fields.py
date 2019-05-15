@@ -3,7 +3,7 @@
 from typing import Callable, Any, Iterable, Union
 from datetime import datetime, time, date
 
-from .utils import ErrorMessageMixin, no_default
+from .utils import ErrorMessageMixin, missing
 from .exceptions import ValidationError
 from .validators import (
     LengthValidator,
@@ -40,8 +40,8 @@ class Field(ErrorMessageMixin):
                  error_messages: dict = None,
                  no_dump: bool = False,
                  no_load: bool = False,
-                 dump_default: Any = no_default,
-                 load_default: Any = no_default,
+                 dump_default: Any = missing,
+                 load_default: Any = missing,
                  ):
         self.name = name
         self.key = key

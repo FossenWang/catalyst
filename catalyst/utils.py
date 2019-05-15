@@ -24,13 +24,9 @@ class ErrorMessageMixin:
 
 
 def get_attr_or_item(obj, name):
-    if hasattr(obj, name):
-        return getattr(obj, name)
-
-    if isinstance(obj, Mapping) and name in obj:
-        return obj.get(name)
-
-    raise AttributeError(f'{obj} has no attribute or key "{name}".')
+    if isinstance(obj, Mapping):
+        return obj[name]
+    return getattr(obj, name)
 
 
 def get_item(mapping, key):
@@ -42,21 +38,12 @@ dump_from_attribute = getattr
 dump_from_key = get_item
 
 
-class _NoDefault(object):
-
-    def __bool__(self):
-        return False
-
-    def __copy__(self):
-        return self
-
-    def __deepcopy__(self, _):
-        return self
-
+class _Missing:
     def __repr__(self):
-        return '<catalyst.no_default>'
+        return '<catalyst.missing>'
 
 # Default value for field args `dump_default` and `load_default`
-# which means that there's no default value for dumping or loading,
-# and a KeyError or AttributeError will be raised if field is missing.
-no_default = _NoDefault()
+# which means that the field does not exist in data.
+# KeyError or AttributeError will be raised if dumping field is missing.
+# Field will be excluded from load result if loading field is missing.
+missing = _Missing()

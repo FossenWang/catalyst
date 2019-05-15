@@ -4,7 +4,7 @@ from typing import Dict, Iterable, Callable, Mapping, Any
 
 from .fields import Field
 from .exceptions import ValidationError
-from .utils import dump_from_attribute_or_key, no_default
+from .utils import dump_from_attribute_or_key, missing
 
 
 FieldDict = Dict[str, Field]
@@ -99,7 +99,7 @@ class Catalyst(metaclass=CatalystMeta):
         try:
             value = self.dump_from(obj, field.name)
         except (AttributeError, KeyError) as e:
-            if field.dump_default is no_default:
+            if field.dump_default is missing:
                 raise e
             value = field.dump_default
         return value
@@ -114,18 +114,19 @@ class Catalyst(metaclass=CatalystMeta):
         invalid_data = {}
         valid_data = {}
         errors = {}
+
         for field in self._load_field_dict.values():
             try:
-                raw_value = self.get_load_value(data, field)
-            except Exception as e:
-                errors[field.key] = e
-                continue
-
-            try:
+                raw_value = data.get(field.key, field.load_default)
+                if raw_value is missing:
+                    if field.required:
+                        raise ValidationError(field.error_messages.get('required'))
+                    continue
                 value = field.load(raw_value)
             except Exception as e:
                 errors[field.key] = e
-                invalid_data[field.key] = raw_value
+                if raw_value is not missing:
+                    invalid_data[field.key] = raw_value
             else:
                 valid_data[field.key] = value
 
@@ -138,14 +139,3 @@ class Catalyst(metaclass=CatalystMeta):
 
     def load_from_json(self, s: str, raise_error: bool = None) -> LoadResult:
         return self.load(json.loads(s), raise_error=raise_error)
-
-    def get_load_value(self, data: dict, field: Field):
-        try:
-            value = data[field.key]
-        except KeyError as e:
-            if field.required:
-                raise ValidationError(field.error_messages.get('required'))
-            if field.load_default is no_default:
-                raise e
-            value = field.load_default
-        return value

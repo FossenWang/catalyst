@@ -75,9 +75,11 @@ class CatalystTest(TestCase):
         }
         self.assertEqual(test_data_catalyst.dump(test_data_dict), dump_result)
 
-        # missing value
+        # missing value will raise error
         with self.assertRaises(AttributeError):
-            test_data_catalyst.dump({'a'})
+            test_data_catalyst.dump(None)
+        with self.assertRaises(KeyError):
+            test_data_catalyst.dump({})
 
         # default value
         test_data_dict_2 = test_data_dict.copy()
@@ -133,7 +135,7 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {
-            'string', 'integer', 'float', 'bool', 'list_'})
+            'string', 'integer', 'float'})
         self.assertDictEqual(result.valid_data, {})
 
         # load from json
@@ -152,17 +154,24 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {
-            'string', 'integer', 'float', 'bool', 'list_'})
+            'string', 'integer', 'float'})
         self.assertIsInstance(result.errors['string'], ValidationError)
         self.assertIsInstance(result.errors['integer'], ValueError)
         self.assertIsInstance(result.errors['float'], TypeError)
 
+        # missing value will be excluded
+        valid_data_2 = valid_data.copy()
+        valid_data_2.pop('float')
+        result = test_data_catalyst.load(valid_data_2)
+        self.assertTrue(result.is_valid)
+        self.assertTrue('float' not in result)
+
         # test default value
-        invalid_data = valid_data.copy()
-        invalid_data.pop('string')
-        invalid_data.pop('float')
-        result = test_data_catalyst.load(invalid_data)
-        self.assertFalse(result.is_valid)
+        valid_data_2 = valid_data.copy()
+        valid_data_2.pop('string')
+        result = test_data_catalyst.load(valid_data_2)
+        self.assertTrue(result.is_valid)
+        self.assertEqual(result['string'], 'default')
 
         # test required field
         invalid_data = valid_data.copy()
