@@ -33,31 +33,35 @@ class Field(ErrorMessageMixin):
                  name: str = None,
                  key: str = None,
                  formatter: FormatterType = None,
-                 parser: ParserType = None,
-                 validators: MultiValidator = None,
-                 required: bool = False,
-                 allow_none: bool = False,
-                 error_messages: dict = None,
-                 no_dump: bool = False,
-                 no_load: bool = False,
+                 format_none: bool = False,
+                 dump_required: bool = True,
                  dump_default: Any = missing,
+                 no_dump: bool = False,
+                 parser: ParserType = None,
+                 parse_none: bool = False,
+                 allow_none: bool = True,
+                 validators: MultiValidator = None,
+                 load_required: bool = False,
                  load_default: Any = missing,
+                 no_load: bool = False,
+                 error_messages: dict = None,
                  ):
         self.name = name
         self.key = key
-        self.required = required
-        self.allow_none = allow_none
-        self.no_dump = no_dump
-        self.no_load = no_load
-        # 待定: 字段缺失时有三种可能的处理：填充默认值；忽略；报错；
-        self.dump_default = dump_default
-        self.load_default = load_default
 
         self.formatter = formatter if formatter else no_processing
+        self.format_none = format_none
+        self.dump_required = dump_required
+        self.dump_default = dump_default
+        self.no_dump = no_dump
 
         self.parser = parser if parser else no_processing
-
+        self.parse_none = parse_none
+        self.allow_none = allow_none
         self.set_validators(validators)
+        self.load_required = load_required
+        self.load_default = load_default
+        self.no_load = no_load
 
         self.collect_error_messages(error_messages)
 
@@ -82,13 +86,14 @@ class Field(ErrorMessageMixin):
         for v in self.validators:
             if not isinstance(v, Callable):
                 raise TypeError(
-                    'Param `validators` must be ether Callable or Iterable contained Callable.')
+                    'Argument "validators" must be ether Callable '
+                    'or Iterable which contained Callable.')
 
         return validators
 
     def add_validator(self, validator: ValidatorType):
         if not isinstance(validator, Callable):
-            raise TypeError('Param `validator` must be Callable.')
+            raise TypeError('Argument "validator" must be Callable.')
 
         self.validators.append(validator)
         return validator

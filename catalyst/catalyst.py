@@ -85,7 +85,7 @@ class Catalyst(metaclass=CatalystMeta):
 
     def set_dump_from(self, dump_from: Callable[[Any, str], Any]):
         if not isinstance(dump_from, Callable):
-            raise TypeError('Param `dump_from` must be Callable.')
+            raise TypeError('Argument "dump_from" must be Callable.')
         self.dump_from = dump_from
 
     def dump(self, obj) -> dict:
@@ -100,7 +100,8 @@ class Catalyst(metaclass=CatalystMeta):
             value = self.dump_from(obj, field.name)
         except (AttributeError, KeyError) as e:
             if field.dump_default is missing:
-                raise e
+                if field.dump_required:
+                    raise e
             value = field.dump_default
         return value
 
@@ -109,7 +110,7 @@ class Catalyst(metaclass=CatalystMeta):
 
     def load(self, data: dict, raise_error: bool = None) -> LoadResult:
         if not isinstance(data, Mapping):
-            raise TypeError('Param `data` must be a mapping object.')
+            raise TypeError('Argument "data" must be a mapping object.')
 
         invalid_data = {}
         valid_data = {}
@@ -119,8 +120,8 @@ class Catalyst(metaclass=CatalystMeta):
             try:
                 raw_value = data.get(field.key, field.load_default)
                 if raw_value is missing:
-                    if field.required:
-                        raise ValidationError(field.error_messages.get('required'))
+                    if field.load_required:
+                        field.error('required')
                     continue
                 value = field.load(raw_value)
             except Exception as e:

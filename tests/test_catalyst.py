@@ -26,7 +26,7 @@ class TestData:
 class TestDataCatalyst(Catalyst):
     string = StringField(min_length=2, max_length=12,
                          dump_default='default', load_default='default')
-    integer = IntegerField(min_value=0, max_value=12, required=True)
+    integer = IntegerField(min_value=0, max_value=12, load_required=True)
     float_field = FloatField(name='float_', key='float', min_value=-1.1, max_value=1.1)
     bool_field = BoolField(name='bool_', key='bool')
     func = CallableField(name='func', key='func', func_args=(1, 2, 3))
@@ -88,7 +88,6 @@ class CatalystTest(TestCase):
 
         with self.assertRaises(KeyError):
             TestDataCatalyst(load_fields=['wrong_name'])
-
 
     def test_dump(self):
         "Test dumping data."

@@ -47,6 +47,7 @@ class FieldTest(TestCase):
 
         # test load
         self.assertEqual(a.fixed_value.load(0), 1)
+        self.assertEqual(a.fixed_value.load(None), None)
         with self.assertRaises(TypeError):
             a.fixed_value.load('0')
         with self.assertRaises(AssertionError):
@@ -80,13 +81,13 @@ class FieldTest(TestCase):
         self.assertEqual(string_field.load('xxx'), 'xxx')
         self.assertEqual(string_field.load(123), '123')
         self.assertEqual(string_field.load([1]), '[1]')
+        self.assertEqual(string_field.load(None), None)
         with self.assertRaises(ValidationError):
             string_field.load('')
+
+        string_field.allow_none = False
         with self.assertRaises(ValidationError):
             string_field.load(None)
-
-        string_field.allow_none = True
-        self.assertEqual(string_field.load(None), None)
 
     def test_int_field(self):
         int_field = IntegerField(name='integer', key='integer', min_value=-10, max_value=100)
@@ -100,13 +101,12 @@ class FieldTest(TestCase):
         self.assertEqual(int_field.load(0), 0)
         self.assertEqual(int_field.load(1), 1)
         self.assertEqual(int_field.load('1'), 1)
+        self.assertEqual(int_field.load(None), None)
 
         with self.assertRaises(ValueError):
             int_field.load('')
         with self.assertRaises(ValidationError):
             int_field.load(111)
-        with self.assertRaises(ValidationError):
-            int_field.load(None)
         with self.assertRaises(ValueError):
             int_field.load('asd')
         with self.assertRaises(TypeError):
@@ -128,13 +128,12 @@ class FieldTest(TestCase):
         self.assertEqual(float_field.load(-11.1), -11.1)
         self.assertEqual(float_field.load(111.1), 111.1)
         self.assertEqual(float_field.load(11), 11)
+        self.assertEqual(float_field.load(None), None)
 
         with self.assertRaises(ValueError):
             float_field.load('')
         with self.assertRaises(ValidationError):
             float_field.load(111.11)
-        with self.assertRaises(ValidationError):
-            float_field.load(None)
         with self.assertRaises(TypeError):
             float_field.load([])
 
@@ -155,7 +154,8 @@ class FieldTest(TestCase):
         self.assertEqual(bool_field.load([]), False)
 
     def test_list_field(self):
-        list_field = ListField(name='list_', key='list', item_field=FloatField(), required=True)
+        list_field = ListField(
+            name='list_', key='list', item_field=FloatField(), load_required=True)
 
         # dump
         self.assertListEqual(list_field.dump([1, 2, 3]), [1.0, 2.0, 3.0])
@@ -172,11 +172,11 @@ class FieldTest(TestCase):
             list_field.load(1)
         self.assertEqual(c.exception.msg, list_field.error_messages['iterable'])
 
+        self.assertIsNone(list_field.load(None))
+        list_field.allow_none = False
         with self.assertRaises(ValidationError) as c:
             list_field.load(None)
         self.assertEqual(c.exception.msg, list_field.error_messages['none'])
-        list_field.allow_none = True
-        self.assertIsNone(list_field.load(None))
 
     def test_callable_field(self):
         callable_field = CallableField(
@@ -225,7 +225,7 @@ class FieldTest(TestCase):
                 self.name = name
 
         class ACatalyst(Catalyst):
-            name = StringField(max_length=3, required=True)
+            name = StringField(max_length=3, load_required=True)
         a_cata = ACatalyst()
         field = NestedField(a_cata, name='a', key='a')
 

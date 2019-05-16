@@ -5,6 +5,7 @@ from .exceptions import ValidationError
 
 class ErrorMessageMixin:
     default_error_messages = {}
+    unknown_error = "Unknown error."
 
     def collect_error_messages(self, error_messages: dict = None):
         """
@@ -20,7 +21,8 @@ class ErrorMessageMixin:
         self.error_messages = messages
 
     def error(self, error_key: str):
-        raise ValidationError(self.error_messages.get(error_key))
+        raise ValidationError(
+            self.error_messages.get(error_key, self.unknown_error))
 
 
 def get_attr_or_item(obj, name):
