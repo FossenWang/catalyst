@@ -37,26 +37,63 @@ test_data_catalyst = TestDataCatalyst()
 
 
 class CatalystTest(TestCase):
-
-    def test_dump(self):
-        test_data = TestData(
+    def setUp(self):
+        self.test_data = TestData(
             string='xxx', integer=1, float_=1.1,
             bool_=True, list_=['a', 'b'])
 
-        # initialize
+        self.valid_data = {
+            'string': 'xxx', 'integer': 1, 'float': 1.1,
+            'bool': True, 'list_': ['a', 'b']}
+
+    def test_init(self):
+        "Test initializing Catalyst."
+
+        test_data = self.test_data
+        valid_data = self.valid_data
+
+        # Empty "fields" has no effect
         catalyst = TestDataCatalyst(fields=[])
         self.assertDictEqual(catalyst._dump_field_dict, test_data_catalyst._dump_field_dict)
+        self.assertDictEqual(catalyst._load_field_dict, test_data_catalyst._load_field_dict)
+        # if field.no_load is True, this field will be excluded from loading
+        self.assertNotIn('func', catalyst._load_field_dict.keys())
 
+        # Specify "fields" for dumping and loading
         catalyst = TestDataCatalyst(fields=['string'])
         self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
+        self.assertDictEqual(catalyst.load(valid_data).valid_data, {'string': 'xxx'})
 
+        # "dump_fields" takes precedence over "fields"
         catalyst = TestDataCatalyst(fields=['string'], dump_fields=['bool_field'])
         self.assertDictEqual(catalyst.dump(test_data), {'bool': True})
+        self.assertDictEqual(catalyst.load(valid_data).valid_data, {'string': 'xxx'})
+
+        # "load_fields" takes precedence over "fields"
+        catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])
+        self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
+        self.assertDictEqual(catalyst.load(valid_data).valid_data, {'bool': True})
+
+        # When "dump_fields" and "load_fields" are given, fields is not used.
+        catalyst = TestDataCatalyst(
+            fields=['integer'], dump_fields=['string'], load_fields=['bool_field'])
+        self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
+        self.assertDictEqual(catalyst.load(valid_data).valid_data, {'bool': True})
 
         with self.assertRaises(KeyError):
             TestDataCatalyst(fields=['wrong_name'])
+
         with self.assertRaises(KeyError):
             TestDataCatalyst(dump_fields=['wrong_name'])
+
+        with self.assertRaises(KeyError):
+            TestDataCatalyst(load_fields=['wrong_name'])
+
+
+    def test_dump(self):
+        "Test dumping data."
+
+        test_data = self.test_data
 
         # dump from object
         dump_result = test_data_catalyst.dump(test_data)
@@ -75,25 +112,13 @@ class CatalystTest(TestCase):
         }
         self.assertEqual(test_data_catalyst.dump(test_data_dict), dump_result)
 
-        # missing value will raise error
-        with self.assertRaises(AttributeError):
-            test_data_catalyst.dump(None)
-        with self.assertRaises(KeyError):
-            test_data_catalyst.dump({})
-
-        # default value
-        test_data_dict_2 = test_data_dict.copy()
-        del test_data_dict_2['string']
-        dump_result = test_data_catalyst.dump(test_data_dict_2)
-        self.assertEqual(dump_result['string'], 'default')
-
-        # only dump from attribute
+        # only get dump value from attribute
         catalyst = TestDataCatalyst(dump_from=dump_from_attribute)
         catalyst.dump(test_data)
         with self.assertRaises(AttributeError):
             catalyst.dump(test_data_dict)
 
-        # only dump from key
+        # only get dump value from key
         catalyst = TestDataCatalyst(dump_from=dump_from_key)
         catalyst.dump(test_data_dict)
         with self.assertRaises(TypeError):
@@ -103,11 +128,24 @@ class CatalystTest(TestCase):
         with self.assertRaises(TypeError):
             catalyst = TestDataCatalyst(dump_from='wrong')
 
+        # missing field will raise error
+        with self.assertRaises(AttributeError):
+            test_data_catalyst.dump(None)
+        with self.assertRaises(KeyError):
+            test_data_catalyst.dump({})
+
+        # default value for missing field
+        test_data_dict_2 = test_data_dict.copy()
+        del test_data_dict_2['string']
+        dump_result = test_data_catalyst.dump(test_data_dict_2)
+        self.assertEqual(dump_result['string'], 'default')
+
     def test_load(self):
+        "Test loading data."
+
+        valid_data = self.valid_data
+
         # test valid_data
-        valid_data = {
-            'string': 'xxx', 'integer': 1, 'float': 1.1,
-            'bool': True, 'list_': ['a', 'b']}
         result = test_data_catalyst.load(valid_data)
         self.assertTrue(result.is_valid)
         self.assertDictEqual(result.invalid_data, {})
@@ -159,21 +197,38 @@ class CatalystTest(TestCase):
         self.assertIsInstance(result.errors['integer'], ValueError)
         self.assertIsInstance(result.errors['float'], TypeError)
 
-        # missing value will be excluded
+        # raise error while validating
+        # set "raise_error" when init
+        raise_err_catalyst = TestDataCatalyst(raise_error=True)
+        result = raise_err_catalyst.load(valid_data)
+        self.assertTrue(result.is_valid)
+        with self.assertRaises(ValidationError):
+            raise_err_catalyst.load(invalid_data)
+
+        # set "raise_error" when call load
+        with self.assertRaises(ValidationError):
+            test_data_catalyst.load(invalid_data, raise_error=True)
+
+        # set "raise_error" when call load_from_json
+        s = json.dumps(invalid_data)
+        with self.assertRaises(ValidationError):
+            result = test_data_catalyst.load_from_json(s, raise_error=True)
+
+        # missing field will be excluded
         valid_data_2 = valid_data.copy()
         valid_data_2.pop('float')
         result = test_data_catalyst.load(valid_data_2)
         self.assertTrue(result.is_valid)
         self.assertTrue('float' not in result)
 
-        # test default value
+        # default value for missing field
         valid_data_2 = valid_data.copy()
         valid_data_2.pop('string')
         result = test_data_catalyst.load(valid_data_2)
         self.assertTrue(result.is_valid)
         self.assertEqual(result['string'], 'default')
 
-        # test required field
+        # raise error when required field is missing
         invalid_data = valid_data.copy()
         invalid_data.pop('integer')
         result = test_data_catalyst.load(invalid_data)
@@ -181,31 +236,3 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.invalid_data, {})
         self.assertEqual(set(result.errors), {'integer'})
         self.assertDictEqual(result.valid_data, invalid_data)
-
-        # test raise error while validating
-        with self.assertRaises(ValidationError):
-            test_data_catalyst.load(invalid_data, raise_error=True)
-
-        # load from json
-        s = json.dumps(invalid_data)
-        with self.assertRaises(ValidationError):
-            result = test_data_catalyst.load_from_json(s, raise_error=True)
-
-        raise_err_catalyst = TestDataCatalyst(raise_error=True)
-        result = raise_err_catalyst.load(valid_data)
-        self.assertTrue(result.is_valid)
-        with self.assertRaises(ValidationError):
-            raise_err_catalyst.load(invalid_data)
-
-        # test no load
-        catalyst = TestDataCatalyst(fields=[])
-        self.assertDictEqual(catalyst._load_field_dict, test_data_catalyst._load_field_dict)
-        self.assertNotIn('func', catalyst._load_field_dict.keys())
-
-        # test limit field
-        catalyst = TestDataCatalyst(fields=['string'])
-        self.assertDictEqual(catalyst.load(valid_data).valid_data, {'string': 'xxx'})
-        catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])
-        self.assertDictEqual(catalyst.load(valid_data).valid_data, {'bool': True})
-        with self.assertRaises(KeyError):
-            TestDataCatalyst(load_fields=['wrong_name'])
