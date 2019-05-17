@@ -5,7 +5,7 @@ from catalyst import Catalyst
 from catalyst.fields import StringField, IntegerField, \
     FloatField, BoolField, CallableField, ListField
 from catalyst.exceptions import ValidationError
-from catalyst.utils import dump_from_attribute, dump_from_key
+from catalyst.utils import dump_from_attribute, dump_from_key, missing
 
 
 class TestData:
@@ -37,6 +37,7 @@ test_data_catalyst = TestDataCatalyst()
 
 
 class CatalystTest(TestCase):
+
     def setUp(self):
         self.test_data = TestData(
             string='xxx', integer=1, float_=1.1,
@@ -89,7 +90,7 @@ class CatalystTest(TestCase):
         with self.assertRaises(KeyError):
             TestDataCatalyst(load_fields=['wrong_name'])
 
-    def test_dump(self):
+    def test_base_dumping(self):
         "Test dumping data."
 
         test_data = self.test_data
@@ -127,17 +128,62 @@ class CatalystTest(TestCase):
         with self.assertRaises(TypeError):
             catalyst = TestDataCatalyst(dump_from='wrong')
 
+    def test_field_args_which_affect_dumping(self):
+        class C(Catalyst):
+            s = StringField()
+
+        catalyst = C()
+
+        # default behavior
         # missing field will raise error
         with self.assertRaises(AttributeError):
-            test_data_catalyst.dump(None)
+            catalyst.dump(None)
         with self.assertRaises(KeyError):
-            test_data_catalyst.dump({})
+            catalyst.dump({})
+
+        # change default field args
+        def change_args(
+                format_none=False,
+                dump_required=True,
+                dump_default=missing):
+            catalyst.s.format_none = format_none
+            catalyst.s.dump_default = dump_default
+            catalyst.s.dump_required = dump_required
+
+        # ignore missing field
+        change_args(dump_required=False)
+        dump_result = catalyst.dump({})
+        self.assertEqual(dump_result, {})
 
         # default value for missing field
-        test_data_dict_2 = test_data_dict.copy()
-        del test_data_dict_2['string']
-        dump_result = test_data_catalyst.dump(test_data_dict_2)
-        self.assertEqual(dump_result['string'], 'default')
+        change_args(dump_default='default')
+        dump_result = catalyst.dump({})
+        self.assertEqual(dump_result['s'], 'default')
+
+        dump_result = catalyst.dump({'s': 1})
+        self.assertEqual(dump_result['s'], '1')
+
+        change_args(dump_default=None)
+        dump_result = catalyst.dump({})
+        self.assertEqual(dump_result['s'], None)
+
+        # pass None to formatter
+        change_args(format_none=True)
+        dump_result = catalyst.dump({'s': None})
+        self.assertEqual(dump_result['s'], 'None')
+
+        change_args(format_none=True, dump_default=None)
+        dump_result = catalyst.dump({})
+        self.assertEqual(dump_result['s'], 'None')
+
+        # no_dump means ignore this field
+        class CC(Catalyst):
+            s = StringField(no_dump=True)
+
+        catalyst = CC()
+
+        dump_result = catalyst.dump({})
+        self.assertEqual(dump_result, {})
 
     def test_load(self):
         "Test loading data."

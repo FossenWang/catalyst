@@ -49,12 +49,14 @@ class Field(ErrorMessageMixin):
         self.name = name
         self.key = key
 
+        # Arguments used for dumping
         self.formatter = formatter if formatter else no_processing
         self.format_none = format_none
         self.dump_required = dump_required
         self.dump_default = dump_default
         self.no_dump = no_dump
 
+        # Arguments used for loading
         self.parser = parser if parser else no_processing
         self.parse_none = parse_none
         self.allow_none = allow_none
@@ -99,7 +101,11 @@ class Field(ErrorMessageMixin):
         return validator
 
     def dump(self, value):
-        if self.formatter and value is not None:
+        if value is None and not self.format_none:
+            # don't pass value to formatter
+            return value
+
+        if self.formatter:
             value = self.formatter(value)
         return value
 

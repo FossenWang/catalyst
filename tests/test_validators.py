@@ -37,10 +37,14 @@ class ValidationTest(TestCase):
         compare_integer(1)
         compare_integer(0)
         compare_integer(100)
-        self.assertRaises(ValidationError, compare_integer, -1)
-        self.assertRaises(ValidationError, compare_integer, 101)
-        self.assertRaises(TypeError, compare_integer, '1')
-        self.assertRaises(TypeError, compare_integer, [1])
+        with self.assertRaises(ValidationError):
+            compare_integer(-1)
+        with self.assertRaises(ValidationError):
+            compare_integer(101)
+        with self.assertRaises(TypeError):
+            compare_integer('1')
+        with self.assertRaises(TypeError):
+            compare_integer([1])
 
         compare_integer_float = ComparisonValidator(-1.1, 1.1)
 
@@ -49,10 +53,17 @@ class ValidationTest(TestCase):
         compare_integer_float(0.1)
         compare_integer_float(1.1)
         compare_integer_float(-1.1)
-        self.assertRaises(ValidationError, compare_integer_float, -2)
-        self.assertRaises(ValidationError, compare_integer_float, 2)
-        self.assertRaises(TypeError, compare_integer_float, '1.1')
-        self.assertRaises(TypeError, compare_integer_float, [1.1])
+        with self.assertRaises(ValidationError):
+            compare_integer_float(-2)
+        with self.assertRaises(ValidationError):
+            compare_integer_float(2)
+        with self.assertRaises(TypeError):
+            compare_integer_float('1.1')
+        with self.assertRaises(TypeError):
+            compare_integer_float([1.1])
+
+        with self.assertRaises(ValueError):
+            ComparisonValidator(1, 0)
 
     def test_length_validator(self):
         validator = LengthValidator(2, 10)
@@ -61,29 +72,42 @@ class ValidationTest(TestCase):
         validator('x' * 5)
         validator('x' * 10)
         validator(['xzc', 1])
-        self.assertRaises(ValidationError, validator, 'x')
-        self.assertRaises(ValidationError, validator, 'x' * 11)
-        self.assertRaises(ValidationError, validator, '')
-        self.assertRaises(TypeError, validator, None)
+        with self.assertRaises(ValidationError):
+            validator('x')
+        with self.assertRaises(ValidationError):
+            validator('x' * 11)
+        with self.assertRaises(ValidationError):
+            validator('')
+        with self.assertRaises(TypeError):
+            validator(None)
 
         validator = LengthValidator(0, 1)
         validator('')
         validator([])
 
         validator = LengthValidator(min_length=1)
-        self.assertRaises(ValidationError, validator, '')
+        with self.assertRaises(ValidationError):
+            validator('')
         validator('1')
 
         validator = LengthValidator(max_length=2)
-        self.assertRaises(ValidationError, validator, '123')
+        with self.assertRaises(ValidationError):
+            validator('123')
         validator('1')
+
+        with self.assertRaises(ValueError):
+            LengthValidator(1, 0)
 
     def test_bool_validator(self):
         validator = BoolValidator()
 
         validator(True)
         validator(False)
-        self.assertRaises(ValidationError, validator, '')
-        self.assertRaises(ValidationError, validator, 1)
-        self.assertRaises(ValidationError, validator, None)
-        self.assertRaises(ValidationError, validator, [])
+        with self.assertRaises(ValidationError):
+            validator('')
+        with self.assertRaises(ValidationError):
+            validator(1)
+        with self.assertRaises(ValidationError):
+            validator(None)
+        with self.assertRaises(ValidationError):
+            validator([])

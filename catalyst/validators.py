@@ -10,8 +10,9 @@ class Validator(ErrorMessageMixin):
         self.collect_error_messages(error_messages)
 
     def __call__(self, value):
-        raise NotImplementedError('Validate the given value and \
-            return the valid value or raise any exception if invalid')
+        raise NotImplementedError((
+            'Implement this method, return nothing if valid, '
+            'or raise any exception if invalid.'))
 
 
 class LengthValidator(Validator):
@@ -21,14 +22,18 @@ class LengthValidator(Validator):
                  min_length: int = None,
                  max_length: int = None,
                  error_messages: dict = None):
+        if min_length is not None and max_length is not None \
+            and min_length > max_length:
+            raise ValueError('"min_length" can\'t be greater than "max_length".')
+
         self.min_length = min_length
         self.max_length = max_length
 
         error_messages = error_messages or {}
         if min_length is not None:
-            error_messages['too_small'] = "Ensure string length >= %d" % min_length
+            error_messages.setdefault('too_small', f'Ensure string length >= {min_length}.')
         if max_length is not None:
-            error_messages['too_large'] = "Ensure string length <= %d" % max_length
+            error_messages.setdefault('too_large', f'Ensure string length <= {max_length}.')
         super().__init__(error_messages=error_messages)
 
     def __call__(self, value):
@@ -50,14 +55,18 @@ class ComparisonValidator(Validator):
                  min_value: Number = None,
                  max_value: Number = None,
                  error_messages: dict = None):
+        if min_value is not None and max_value is not None \
+            and min_value > max_value:
+            raise ValueError('"min_value" can\'t be greater than "max_value".')
+
         self.min_value = min_value
         self.max_value = max_value
 
         error_messages = error_messages or {}
         if min_value is not None:
-            error_messages['too_small'] = "Ensure value >= %d" % min_value
+            error_messages.setdefault('too_small', f'Ensure value >= {min_value}.')
         if max_value is not None:
-            error_messages['too_large'] = "Ensure value <= %d" % max_value
+            error_messages.setdefault('too_large', f'Ensure value <= {max_value}.')
         super().__init__(error_messages=error_messages)
 
     def __call__(self, value):

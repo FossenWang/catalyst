@@ -51,8 +51,11 @@ class CatalystMeta(type):
 class Catalyst(metaclass=CatalystMeta):
     _field_dict = {}  # type: FieldDict
 
-    def __init__(self, fields: Iterable[str] = None, dump_fields: Iterable[str] = None,
-                 load_fields: Iterable[str] = None, raise_error: bool = False,
+    def __init__(self,
+                 fields: Iterable[str] = None,
+                 dump_fields: Iterable[str] = None,
+                 load_fields: Iterable[str] = None,
+                 raise_error: bool = False,
                  dump_from: Callable[[Any, str], Any] = None):
         if not fields:
             fields = set(self._field_dict.keys())
@@ -91,19 +94,19 @@ class Catalyst(metaclass=CatalystMeta):
     def dump(self, obj) -> dict:
         obj_dict = {}
         for field in self._dump_field_dict.values():
-            value = self.get_dump_value(obj, field)
+            try:
+                value = self.dump_from(obj, field.name)
+            except (AttributeError, KeyError) as e:
+                if field.dump_default is missing:
+                    if field.dump_required:
+                        # raise error when field is missing
+                        raise e
+                    # ignore missing field
+                    continue
+                # set default value for missing field
+                value = field.dump_default
             obj_dict[field.key] = field.dump(value)
         return obj_dict
-
-    def get_dump_value(self, obj, field: Field):
-        try:
-            value = self.dump_from(obj, field.name)
-        except (AttributeError, KeyError) as e:
-            if field.dump_default is missing:
-                if field.dump_required:
-                    raise e
-            value = field.dump_default
-        return value
 
     def dump_to_json(self, obj) -> str:
         return json.dumps(self.dump(obj))

@@ -20,8 +20,8 @@ class ErrorMessageMixin:
         messages.update(error_messages or {})
         self.error_messages = messages
 
-    def error(self, error_key: str):
-        raise ValidationError(
+    def error(self, error_key: str, error_class=ValidationError):
+        raise error_class(
             self.error_messages.get(error_key, self.unknown_error))
 
 
