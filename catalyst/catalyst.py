@@ -36,13 +36,13 @@ class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
         # collect fields to cls._field_dict
         fields = {}  # type: FieldDict
-        for key, value in attrs.items():
+        for attr_name, value in attrs.items():
             if isinstance(value, Field):
                 if value.name is None:
-                    value.name = key
+                    value.name = attr_name
                 if value.key is None:
-                    value.key = key
-                fields[key] = value
+                    value.key = attr_name
+                fields[attr_name] = value
         attrs['_field_dict'] = fields
         new_cls = type.__new__(cls, name, bases, attrs)
         return new_cls
@@ -55,7 +55,7 @@ class Catalyst(metaclass=CatalystMeta):
                  fields: Iterable[str] = None,
                  dump_fields: Iterable[str] = None,
                  load_fields: Iterable[str] = None,
-                 raise_error: bool = False,
+                 raise_error: bool = True,
                  dump_from: Callable[[Any, str], Any] = None):
         if not fields:
             fields = set(self._field_dict.keys())
@@ -87,7 +87,7 @@ class Catalyst(metaclass=CatalystMeta):
         return new_fields
 
     def set_dump_from(self, dump_from: Callable[[Any, str], Any]):
-        if not isinstance(dump_from, Callable):
+        if not callable(dump_from):
             raise TypeError('Argument "dump_from" must be Callable.')
         self.dump_from = dump_from
 
@@ -97,14 +97,15 @@ class Catalyst(metaclass=CatalystMeta):
             try:
                 value = self.dump_from(obj, field.name)
             except (AttributeError, KeyError) as e:
-                if field.dump_default is missing:
+                default = field.dump_default
+                if default is missing:
                     if field.dump_required:
-                        # raise error when field is missing
+                        # raise error when field is missing and required
                         raise e
-                    # ignore missing field
+                    # ignore missing field not required
                     continue
                 # set default value for missing field
-                value = field.dump_default
+                value = default() if callable(default) else default
             obj_dict[field.key] = field.dump(value)
         return obj_dict
 
@@ -121,11 +122,17 @@ class Catalyst(metaclass=CatalystMeta):
 
         for field in self._load_field_dict.values():
             try:
-                raw_value = data.get(field.key, field.load_default)
+                default = field.load_default
+                if callable(default):
+                    default = default()
+                raw_value = data.get(field.key, default)
                 if raw_value is missing:
                     if field.load_required:
+                        # raise error when field is missing and required
                         field.error('required')
+                    # ignore missing field not required
                     continue
+                # set default value for missing field
                 value = field.load(raw_value)
             except Exception as e:
                 errors[field.key] = e

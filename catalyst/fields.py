@@ -86,7 +86,7 @@ class Field(ErrorMessageMixin):
             self.validators = [validators]
 
         for v in self.validators:
-            if not isinstance(v, Callable):
+            if not callable(v):
                 raise TypeError(
                     'Argument "validators" must be ether Callable '
                     'or Iterable which contained Callable.')
@@ -94,7 +94,7 @@ class Field(ErrorMessageMixin):
         return validators
 
     def add_validator(self, validator: ValidatorType):
-        if not isinstance(validator, Callable):
+        if not callable(validator):
             raise TypeError('Argument "validator" must be Callable.')
 
         self.validators.append(validator)
@@ -111,9 +111,10 @@ class Field(ErrorMessageMixin):
 
     def load(self, value):
         if value is None:
-            if self.allow_none:
+            if not self.allow_none:
+                self.error('none')
+            elif not self.parse_none:
                 return None
-            self.error('none')
 
         value = self.parser(value)
         self.validate(value)
@@ -243,7 +244,7 @@ class CallableField(Field):
     def dump(self, func: Callable):
         value = None
 
-        if isinstance(func, Callable):
+        if callable(func):
             value = func(*self.func_args, **self.func_kwargs)
         elif func is not None:
             raise TypeError(
