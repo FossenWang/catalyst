@@ -47,6 +47,15 @@ class CatalystTest(TestCase):
             'string': 'xxx', 'integer': 1, 'float': 1.1,
             'bool': True, 'list_': ['a', 'b']}
 
+    def create_catalyst(self, **kwargs):
+        class C(Catalyst):
+            s = StringField(**kwargs)
+        return C(raise_error=False)
+
+    def assert_field_dump_args(self, data, result=None, **kwargs):
+        catalyst = self.create_catalyst(**kwargs)
+        self.assertEqual(catalyst.dump(data), result)
+
     def test_init(self):
         "Test initializing Catalyst."
 
@@ -129,66 +138,44 @@ class CatalystTest(TestCase):
             catalyst = TestDataCatalyst(dump_from='wrong')
 
     def test_field_args_which_affect_dumping(self):
-        class C(Catalyst):
-            s = StringField()
-
-        catalyst = C()
-
         # default behavior
         # missing field will raise error
         with self.assertRaises(AttributeError):
-            catalyst.dump(None)
+            self.assert_field_dump_args(None)
         with self.assertRaises(KeyError):
-            catalyst.dump({})
-
-        # change default field args
-        def change_args(
-                format_none=False,
-                dump_required=True,
-                dump_default=missing):
-            catalyst.s.format_none = format_none
-            catalyst.s.dump_default = dump_default
-            catalyst.s.dump_required = dump_required
+            self.assert_field_dump_args({})
 
         # ignore missing field
-        change_args(dump_required=False)
-        result = catalyst.dump({})
-        self.assertEqual(result, {})
+        self.assert_field_dump_args({}, {}, dump_required=False)
 
         # default value for missing field
-        change_args(dump_default='default')
-        result = catalyst.dump({})
-        self.assertEqual(result['s'], 'default')
+        self.assert_field_dump_args(
+            {}, {'s': 'default'}, dump_default='default')
 
-        result = catalyst.dump({'s': 1})
-        self.assertEqual(result['s'], '1')
+        self.assert_field_dump_args(
+            {'s': 1}, {'s': '1'}, dump_default='default')
 
-        change_args(dump_default=None)
-        result = catalyst.dump({})
-        self.assertEqual(result['s'], None)
+        self.assert_field_dump_args(
+            {}, {'s': None}, dump_default=None)
 
         # callable default
-        change_args(dump_default=lambda: 1)
-        result = catalyst.dump({})
-        self.assertEqual(result['s'], '1')
+        self.assert_field_dump_args(
+            {}, {'s': '1'}, dump_default=lambda: 1)
+
+        # dump_required has no effect if dump_default is set
+        with self.assertWarns(Warning):
+            self.assert_field_dump_args(
+                {}, {'s': None}, dump_required=True, dump_default=None)
 
         # pass None to formatter
-        change_args(format_none=True)
-        result = catalyst.dump({'s': None})
-        self.assertEqual(result['s'], 'None')
+        self.assert_field_dump_args(
+            {'s': None}, {'s': 'None'}, format_none=True)
 
-        change_args(format_none=True, dump_default=None)
-        result = catalyst.dump({})
-        self.assertEqual(result['s'], 'None')
+        self.assert_field_dump_args(
+            {}, {'s': 'None'}, format_none=True, dump_default=None)
 
         # no_dump means ignore this field
-        class CC(Catalyst):
-            s = StringField(no_dump=True)
-
-        catalyst = CC()
-
-        result = catalyst.dump({})
-        self.assertEqual(result, {})
+        self.assert_field_dump_args({1: 1}, {}, no_dump=True)
 
     def test_base_loading(self):
         "Test loading data."
@@ -265,30 +252,16 @@ class CatalystTest(TestCase):
             result = test_data_catalyst.load_from_json(s, raise_error=True)
 
     def test_field_args_which_affect_loading(self):
-        class C(Catalyst):
-            s = StringField()
-
-        catalyst = C(raise_error=False)
 
         # default behavior
         # missing field will be excluded
+        catalyst = self.create_catalyst()
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
         self.assertTrue(result.valid_data == {})
 
-        # change default field args
-        def change_args(
-                parse_none=False,
-                allow_none=True,
-                load_default=missing,
-                load_required=False):
-            catalyst.s.parse_none = parse_none
-            catalyst.s.allow_none = allow_none
-            catalyst.s.load_default = load_default
-            catalyst.s.load_required = load_required
-
         # default value for missing field
-        change_args(load_default=None)
+        catalyst = self.create_catalyst(load_default=None)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
         self.assertEqual(result['s'], None)
@@ -297,19 +270,19 @@ class CatalystTest(TestCase):
         self.assertTrue(result.is_valid)
         self.assertEqual(result['s'], '1')
 
-        change_args(load_default=1)
+        catalyst = self.create_catalyst(load_default=1)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
         self.assertEqual(result['s'], '1')
 
         # callable default
-        change_args(load_default=lambda: 1)
+        catalyst = self.create_catalyst(load_default=lambda: 1)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
         self.assertEqual(result['s'], '1')
 
         # invalid when required field is missing
-        change_args(load_required=True)
+        catalyst = self.create_catalyst(load_required=True)
         result = catalyst.load({})
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.valid_data, {})
@@ -317,32 +290,34 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {'s'})
 
         # load_required has no effect if load_default is set
-        change_args(load_required=True, load_default=None)
+        with self.assertWarns(Warning):
+            catalyst = self.create_catalyst(load_required=True, load_default=None)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
         self.assertEqual(result['s'], None)
 
         # pass None to parser and validators
-        change_args(parse_none=True)
+        catalyst = self.create_catalyst(parse_none=True)
         result = catalyst.load({'s': None})
         self.assertTrue(result.is_valid)
         self.assertEqual(result['s'], 'None')
 
-        change_args(parse_none=True, load_default=None)
+        catalyst = self.create_catalyst(parse_none=True, load_default=None)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
         self.assertEqual(result['s'], 'None')
 
         # parse_none has no effect if allow_none is False
-        change_args(parse_none=True, allow_none=False)
+        with self.assertWarns(Warning):
+            catalyst = self.create_catalyst(parse_none=True, allow_none=False)
         result = catalyst.load({'s': None})
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.valid_data, {})
         self.assertDictEqual(result.invalid_data, {'s': None})
         self.assertEqual(set(result.errors), {'s'})
 
-        # always invalid if load_default is None and allow_none is True
-        change_args(allow_none=False, load_default=None)
+        # always invalid if load_default is None and allow_none is False
+        catalyst = self.create_catalyst(allow_none=False, load_default=None)
         result = catalyst.load({})
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.valid_data, {})

@@ -2,6 +2,7 @@
 
 from typing import Callable, Any, Iterable, Union
 from datetime import datetime, time, date
+from warnings import warn
 
 from .utils import ErrorMessageMixin, missing
 from .exceptions import ValidationError
@@ -34,18 +35,38 @@ class Field(ErrorMessageMixin):
                  key: str = None,
                  formatter: FormatterType = None,
                  format_none: bool = False,
-                 dump_required: bool = True,
+                 dump_required: bool = None,
                  dump_default: Any = missing,
                  no_dump: bool = False,
                  parser: ParserType = None,
                  parse_none: bool = False,
                  allow_none: bool = True,
                  validators: MultiValidator = None,
-                 load_required: bool = False,
+                 load_required: bool = None,
                  load_default: Any = missing,
                  no_load: bool = False,
                  error_messages: dict = None,
                  ):
+        # Handle redundant arguments
+        if dump_required is None:
+            # Field is required when default is not set, otherwise not required.
+            dump_required = dump_default is missing
+        elif dump_required and dump_default is not missing:
+            warn('Some args of Field may redundant, '
+                 'if "dump_default" is set, "dump_required=True" has no effect.')
+
+        if load_required is None:
+            # Field is not required by default
+            load_required = False
+        elif load_required and load_default is not missing:
+            warn('Some args of Field may redundant, '
+                 'if "load_default" is set, "load_required=True" has no effect.')
+
+        if not allow_none and parse_none:
+            warn('Some args of Field may redundant, '
+                 'if "allow_none" is false, "parse_none=True" has no effect.')
+
+        # parse_none has no effect if allow_none is False
         self.name = name
         self.key = key
 
