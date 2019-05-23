@@ -5,7 +5,7 @@ from catalyst import Catalyst
 from catalyst.fields import StringField, IntegerField, \
     FloatField, BoolField, CallableField, ListField
 from catalyst.exceptions import ValidationError
-from catalyst.utils import dump_from_attribute, dump_from_key, missing
+from catalyst.utils import dump_from_attribute, dump_from_key
 
 
 class TestData:

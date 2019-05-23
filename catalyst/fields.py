@@ -5,7 +5,6 @@ from datetime import datetime, time, date
 from warnings import warn
 
 from .utils import ErrorMessageMixin, missing
-from .exceptions import ValidationError
 from .validators import (
     LengthValidator,
     ComparisonValidator,
@@ -30,6 +29,10 @@ class Field(ErrorMessageMixin):
         'none': 'Field may not be None.'
     }
 
+    default_formatter = staticmethod(no_processing)
+    default_parser = staticmethod(no_processing)
+    default_validators = None
+
     def __init__(self,
                  name: str = None,
                  key: str = None,
@@ -47,7 +50,7 @@ class Field(ErrorMessageMixin):
                  no_load: bool = False,
                  error_messages: dict = None,
                  ):
-        # Handle redundant arguments
+        # Warn of redundant arguments
         if dump_required is None:
             # Field is required when default is not set, otherwise not required.
             dump_required = dump_default is missing
@@ -66,22 +69,21 @@ class Field(ErrorMessageMixin):
             warn('Some args of Field may redundant, '
                  'if "allow_none" is false, "parse_none=True" has no effect.')
 
-        # parse_none has no effect if allow_none is False
         self.name = name
         self.key = key
 
         # Arguments used for dumping
-        self.formatter = formatter if formatter else no_processing
+        self.formatter = formatter if formatter else self.default_formatter
         self.format_none = format_none
         self.dump_required = dump_required
         self.dump_default = dump_default
         self.no_dump = no_dump
 
         # Arguments used for loading
-        self.parser = parser if parser else no_processing
+        self.parser = parser if parser else self.default_parser
         self.parse_none = parse_none
         self.allow_none = allow_none
-        self.set_validators(validators)
+        self.set_validators(validators if validators else self.default_validators)
         self.load_required = load_required
         self.load_default = load_default
         self.no_load = no_load
@@ -147,11 +149,12 @@ class Field(ErrorMessageMixin):
 
 
 class StringField(Field):
+    default_formatter = str
+    default_parser = str
+
     def __init__(self,
                  min_length: int = None,
                  max_length: int = None,
-                 formatter: FormatterType = str,
-                 parser: ParserType = str,
                  validators: MultiValidator = None,
                  **kwargs):
         self.min_length = min_length
@@ -159,18 +162,17 @@ class StringField(Field):
         if validators is None and \
                 (min_length is not None or max_length is not None):
             validators = LengthValidator(min_length, max_length)
-        super().__init__(
-            formatter=formatter, parser=parser, validators=validators, **kwargs)
+        super().__init__(validators=validators, **kwargs)
 
 
 class NumberField(Field):
     type_ = float
+    default_formatter = float
+    default_parser = float
 
     def __init__(self,
-                 min_value: type_ = None,
-                 max_value: type_ = None,
-                 formatter: FormatterType = None,
-                 parser: ParserType = None,
+                 min_value: float = None,
+                 max_value: float = None,
                  validators: MultiValidator = None,
                  **kwargs):
         self.max_value = self.type_(max_value) \
@@ -178,42 +180,27 @@ class NumberField(Field):
         self.min_value = self.type_(min_value) \
             if min_value is not None else min_value
 
-        if not formatter:
-            formatter = self.type_
-
-        if not parser:
-            parser = self.type_
-
         if validators is None and \
                 (min_value is not None or max_value is not None):
             validators = ComparisonValidator(min_value, max_value)
 
-        super().__init__(
-            formatter=formatter, parser=parser, validators=validators, **kwargs)
+        super().__init__(validators=validators, **kwargs)
+
+
+class FloatField(NumberField):
+    pass
 
 
 class IntegerField(NumberField):
     type_ = int
-
-
-class FloatField(NumberField):
-    type_ = float
+    default_formatter = int
+    default_parser = int
 
 
 class BoolField(Field):
-    def __init__(self,
-                 formatter: FormatterType = bool,
-                 parser: ParserType = bool,
-                 validators: MultiValidator = None,
-                 error_messages: dict = None,
-                 **kwargs):
-
-        if not validators:
-            validators = BoolValidator(error_messages)
-
-        super().__init__(
-            formatter=formatter, parser=parser, validators=validators,
-            error_messages=error_messages, **kwargs)
+    default_formatter = bool
+    default_parser = bool
+    default_validators = BoolValidator()
 
 
 class ListField(Field):
@@ -253,14 +240,10 @@ class CallableField(Field):
     def __init__(self,
                  func_args: list = None,
                  func_kwargs: dict = None,
-                 formatter: FormatterType = None,
                  **kwargs):
-
         self.func_args = func_args if func_args else []
-
         self.func_kwargs = func_kwargs if func_kwargs else {}
-
-        super().__init__(formatter=formatter, no_load=True, **kwargs)
+        super().__init__(no_load=True, **kwargs)
 
     def dump(self, func: Callable):
         value = None
@@ -284,28 +267,14 @@ class DatetimeField(Field):
     type_ = datetime
     default_fmt = r'%Y-%m-%d %H:%M:%S.%f'
 
-    def __init__(self,
-                 fmt: str = None,
-                 formatter: FormatterType = None,
-                 parser: ParserType = None,
-                 validators: MultiValidator = None,
-                 **kwargs):
-
+    def __init__(self, fmt: str = None, **kwargs):
         self.fmt = fmt if fmt else self.default_fmt
+        super().__init__(**kwargs)
 
-        if not formatter:
-            formatter = self._format
-
-        if not parser:
-            parser = self._parse
-
-        super().__init__(
-            formatter=formatter, parser=parser, validators=validators, **kwargs)
-
-    def _format(self, dt: type_):
+    def default_formatter(self, dt: type_):
         return self.type_.strftime(dt, self.fmt)
 
-    def _parse(self, date_string: str):
+    def default_parser(self, date_string: str):
         return datetime.strptime(date_string, self.fmt)
 
 
@@ -313,7 +282,7 @@ class TimeField(DatetimeField):
     type_ = time
     default_fmt = r'%H:%M:%S.%f'
 
-    def _parse(self, date_string: str):
+    def default_parser(self, date_string: str):
         return datetime.strptime(date_string, self.fmt).time()
 
 
@@ -321,32 +290,17 @@ class DateField(DatetimeField):
     type_ = date
     default_fmt = r'%Y-%m-%d'
 
-    def _parse(self, date_string: str):
+    def default_parser(self, date_string: str):
         return datetime.strptime(date_string, self.fmt).date()
 
 
 class NestedField(Field):
-    def __init__(self,
-                 catalyst,
-                 parser: ParserType = None,
-                 validators: MultiValidator = None,
-                 **kwargs):
-
+    def __init__(self, catalyst, **kwargs):
         self.catalyst = catalyst
+        super().__init__(**kwargs)
 
-        if not parser:
-            parser = self._get_parser(catalyst)
+    def default_formatter(self, value):
+        return self.catalyst.dump(value)
 
-        super().__init__(parser=parser, validators=validators, **kwargs)
-
-    def dump(self, value):
-        value = self.catalyst.dump(value)
-        return value
-
-    def _get_parser(self, catalyst):
-        def parser(obj):
-            r = catalyst.load(obj)
-            if not r.is_valid:
-                raise ValidationError(r)
-            return r
-        return parser
+    def default_parser(self, value):
+        return self.catalyst.load(value)
