@@ -154,8 +154,7 @@ class FieldTest(TestCase):
         self.assertEqual(bool_field.load([]), False)
 
     def test_list_field(self):
-        list_field = ListField(
-            name='list_', key='list', item_field=FloatField(), load_required=True)
+        list_field = ListField(item_field=FloatField())
 
         # dump
         self.assertListEqual(list_field.dump([1, 2, 3]), [1.0, 2.0, 3.0])
@@ -167,11 +166,8 @@ class FieldTest(TestCase):
         # load
         self.assertListEqual(list_field.load([1, 2, 3]), [1.0, 2.0, 3.0])
         self.assertListEqual(list_field.load([]), [])
-
-        with self.assertRaises(ValidationError) as c:
+        with self.assertRaises(TypeError):
             list_field.load(1)
-        self.assertEqual(c.exception.msg, list_field.error_messages['iterable'])
-
         self.assertIsNone(list_field.load(None))
         list_field.allow_none = False
         with self.assertRaises(ValidationError) as c:
@@ -197,7 +193,7 @@ class FieldTest(TestCase):
             # dump
             field = FieldClass(name='time', key='time')
             dt_str = field.dump(now)
-            self.assertEqual(dt_str, now.strftime(field.default_fmt))
+            self.assertEqual(dt_str, now.strftime(field._default_fmt))
 
             field = FieldClass(name='time', key='time', fmt=fmt)
             dt_str = field.dump(now)

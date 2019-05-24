@@ -1,6 +1,6 @@
 "Fields"
 
-from typing import Callable, Any, Iterable, Union
+from typing import Callable, Any, Iterable, Union, Mapping
 from datetime import datetime, time, date
 from warnings import warn
 
@@ -166,7 +166,7 @@ class StringField(Field):
 
 
 class NumberField(Field):
-    type_ = float
+    _type = float
     default_formatter = float
     default_parser = float
 
@@ -175,9 +175,9 @@ class NumberField(Field):
                  max_value: float = None,
                  validators: MultiValidator = None,
                  **kwargs):
-        self.max_value = self.type_(max_value) \
+        self.max_value = self._type(max_value) \
             if max_value is not None else max_value
-        self.min_value = self.type_(min_value) \
+        self.min_value = self._type(min_value) \
             if min_value is not None else min_value
 
         if validators is None and \
@@ -192,7 +192,7 @@ class FloatField(NumberField):
 
 
 class IntegerField(NumberField):
-    type_ = int
+    _type = int
     default_formatter = int
     default_parser = int
 
@@ -204,59 +204,28 @@ class BoolField(Field):
 
 
 class ListField(Field):
-    default_error_messages = {
-        'iterable': 'The field value is not Iterable.',
-    }
-
     def __init__(self, item_field: Field, **kwargs):
         self.item_field = item_field
         super().__init__(**kwargs)
 
-    def dump(self, list_: Iterable):
-        if isinstance(list_, Iterable):
-            list_ = [self.item_field.dump(item) for item in list_]
-        elif list_ is not None:
-            raise TypeError(
-                f'The value of "{self.name}" field is not Iterable.')
-        return list_
+    def default_formatter(self, value: Iterable):
+        return [self.item_field.dump(item) for item in value]
 
-    def load(self, list_: Iterable):
-        if list_ is None:
-            if self.allow_none:
-                return None
-            self.error('none')
-
-        if not isinstance(list_, Iterable):
-            self.error('iterable')
-
-        for i, value in enumerate(list_):
-            value = self.item_field.parser(value)
-            self.item_field.validate(value)
-            list_[i] = value
-        return list_
+    def default_parser(self, value):
+        return [self.item_field.load(item) for item in value]
 
 
 class CallableField(Field):
     def __init__(self,
-                 func_args: list = None,
-                 func_kwargs: dict = None,
+                 func_args: Iterable = None,
+                 func_kwargs: Mapping = None,
                  **kwargs):
         self.func_args = func_args if func_args else []
         self.func_kwargs = func_kwargs if func_kwargs else {}
         super().__init__(no_load=True, **kwargs)
 
-    def dump(self, func: Callable):
-        value = None
-
-        if callable(func):
-            value = func(*self.func_args, **self.func_kwargs)
-        elif func is not None:
-            raise TypeError(
-                f'The value of "{self.name}" field is not Callable.')
-
-        if self.formatter and value is not None:
-            value = self.formatter(value)
-        return value
+    def default_formatter(self, func: Callable):
+        return func(*self.func_args, **self.func_kwargs)
 
     def set_args(self, *args, **kwargs):
         self.func_args = args
@@ -264,31 +233,31 @@ class CallableField(Field):
 
 
 class DatetimeField(Field):
-    type_ = datetime
-    default_fmt = r'%Y-%m-%d %H:%M:%S.%f'
+    _type = datetime
+    _default_fmt = r'%Y-%m-%d %H:%M:%S.%f'
 
     def __init__(self, fmt: str = None, **kwargs):
-        self.fmt = fmt if fmt else self.default_fmt
+        self.fmt = fmt if fmt else self._default_fmt
         super().__init__(**kwargs)
 
-    def default_formatter(self, dt: type_):
-        return self.type_.strftime(dt, self.fmt)
+    def default_formatter(self, dt: _type):
+        return self._type.strftime(dt, self.fmt)
 
     def default_parser(self, date_string: str):
         return datetime.strptime(date_string, self.fmt)
 
 
 class TimeField(DatetimeField):
-    type_ = time
-    default_fmt = r'%H:%M:%S.%f'
+    _type = time
+    _default_fmt = r'%H:%M:%S.%f'
 
     def default_parser(self, date_string: str):
         return datetime.strptime(date_string, self.fmt).time()
 
 
 class DateField(DatetimeField):
-    type_ = date
-    default_fmt = r'%Y-%m-%d'
+    _type = date
+    _default_fmt = r'%Y-%m-%d'
 
     def default_parser(self, date_string: str):
         return datetime.strptime(date_string, self.fmt).date()
