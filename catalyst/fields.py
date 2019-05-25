@@ -91,29 +91,36 @@ class Field(ErrorMessageMixin):
         self.collect_error_messages(error_messages)
 
     def set_formatter(self, formatter: FormatterType):
+        if not callable(formatter):
+            raise TypeError('Argument "formatter" must be Callable.')
+
         self.formatter = formatter
         return formatter
 
     def set_parser(self, parser: ParserType):
+        if not callable(parser):
+            raise TypeError('Argument "parser" must be Callable.')
+
         self.parser = parser
         return parser
 
-    def set_validators(self, validators: MultiValidator):
+    @staticmethod
+    def ensure_validators(validators: MultiValidator):
         if validators is None:
-            self.validators = []
-            return validators
+            return []
 
-        if isinstance(validators, Iterable):
-            self.validators = validators
-        else:
-            self.validators = [validators]
+        if not isinstance(validators, Iterable):
+            validators = [validators]
 
-        for v in self.validators:
+        for v in validators:
             if not callable(v):
                 raise TypeError(
                     'Argument "validators" must be ether Callable '
                     'or Iterable which contained Callable.')
+        return validators
 
+    def set_validators(self, validators: MultiValidator):
+        self.validators = self.ensure_validators(validators)
         return validators
 
     def add_validator(self, validator: ValidatorType):
@@ -222,6 +229,7 @@ class CallableField(Field):
                  **kwargs):
         self.func_args = func_args if func_args else []
         self.func_kwargs = func_kwargs if func_kwargs else {}
+        kwargs.pop('no_load', None)
         super().__init__(no_load=True, **kwargs)
 
     def default_formatter(self, func: Callable):
