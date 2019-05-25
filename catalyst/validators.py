@@ -1,7 +1,5 @@
 "Validators"
 
-from numbers import Number
-
 from .utils import ErrorMessageMixin
 
 
@@ -16,7 +14,11 @@ class Validator(ErrorMessageMixin):
 
 
 class LengthValidator(Validator):
-    """length validator"""
+    """
+    Compares length between values.
+    error_messages:
+    includ keys ('too_small', 'too_large')
+    """
 
     def __init__(self,
                  min_length: int = None,
@@ -28,13 +30,12 @@ class LengthValidator(Validator):
 
         self.min_length = min_length
         self.max_length = max_length
+        super().__init__(error_messages)
 
-        error_messages = error_messages or {}
         if min_length is not None:
-            error_messages.setdefault('too_small', f'Ensure string length >= {min_length}.')
+            self.error_messages.setdefault('too_small', f'Ensure string length >= {min_length}.')
         if max_length is not None:
-            error_messages.setdefault('too_large', f'Ensure string length <= {max_length}.')
-        super().__init__(error_messages=error_messages)
+            self.error_messages.setdefault('too_large', f'Ensure string length <= {max_length}.')
 
     def __call__(self, value):
         if self.min_length is not None and len(value) < self.min_length:
@@ -46,14 +47,14 @@ class LengthValidator(Validator):
 
 class ComparisonValidator(Validator):
     """
-    Compares between values.
+    Compare between values.
     error_messages:
     includ keys ('too_small', 'too_large')
     """
 
     def __init__(self,
-                 min_value: Number = None,
-                 max_value: Number = None,
+                 min_value=None,
+                 max_value=None,
                  error_messages: dict = None):
         if min_value is not None and max_value is not None \
             and min_value > max_value:
@@ -61,13 +62,12 @@ class ComparisonValidator(Validator):
 
         self.min_value = min_value
         self.max_value = max_value
+        super().__init__(error_messages)
 
-        error_messages = error_messages or {}
         if min_value is not None:
-            error_messages.setdefault('too_small', f'Ensure value >= {min_value}.')
+            self.error_messages.setdefault('too_small', f'Ensure value >= {min_value}.')
         if max_value is not None:
-            error_messages.setdefault('too_large', f'Ensure value <= {max_value}.')
-        super().__init__(error_messages=error_messages)
+            self.error_messages.setdefault('too_large', f'Ensure value <= {max_value}.')
 
     def __call__(self, value):
         if self.min_value is not None and value < self.min_value:

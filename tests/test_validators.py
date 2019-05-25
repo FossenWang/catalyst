@@ -33,14 +33,17 @@ class ValidationTest(TestCase):
         self.assertDictEqual(NewValidator.default_error_messages, {'msg': 'default'})
 
     def test_comparison_validator(self):
-        compare_integer = ComparisonValidator(0, 100)
+        ComparisonValidator.default_error_messages = {'too_small': 'too_small'}
+        compare_integer = ComparisonValidator(0, 100, {'too_large': 'too_large'})
         compare_integer(1)
         compare_integer(0)
         compare_integer(100)
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(ValidationError) as c:
             compare_integer(-1)
-        with self.assertRaises(ValidationError):
+        self.assertEqual(str(c.exception), 'too_small')
+        with self.assertRaises(ValidationError) as c:
             compare_integer(101)
+        self.assertEqual(str(c.exception), 'too_large')
         with self.assertRaises(TypeError):
             compare_integer('1')
         with self.assertRaises(TypeError):
@@ -66,16 +69,19 @@ class ValidationTest(TestCase):
             ComparisonValidator(1, 0)
 
     def test_length_validator(self):
-        validator = LengthValidator(2, 10)
+        LengthValidator.default_error_messages = {'too_small': 'too_small'}
+        validator = LengthValidator(2, 10, {'too_large': 'too_large'})
 
         validator('x' * 2)
         validator('x' * 5)
         validator('x' * 10)
         validator(['xzc', 1])
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(ValidationError) as c:
             validator('x')
-        with self.assertRaises(ValidationError):
+        self.assertEqual(str(c.exception), 'too_small')
+        with self.assertRaises(ValidationError) as c:
             validator('x' * 11)
+        self.assertEqual(str(c.exception), 'too_large')
         with self.assertRaises(ValidationError):
             validator('')
         with self.assertRaises(TypeError):
