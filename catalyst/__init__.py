@@ -8,6 +8,5 @@ from .validators import (
     Validator,
     LengthValidator,
     ComparisonValidator,
-    BoolValidator,
 )
 from .exceptions import ValidationError

@@ -75,14 +75,3 @@ class ComparisonValidator(Validator):
 
         if self.max_value is not None and value > self.max_value:
             self.error('too_large')
-
-
-class BoolValidator(Validator):
-    """bool validator"""
-    default_error_messages = {
-        'type_error': 'Ensure value is bool',
-    }
-
-    def __call__(self, value):
-        if not isinstance(value, bool):
-            self.error('type_error')

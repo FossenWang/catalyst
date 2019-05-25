@@ -7,8 +7,7 @@ from warnings import warn
 from .utils import ErrorMessageMixin, missing
 from .validators import (
     LengthValidator,
-    ComparisonValidator,
-    BoolValidator
+    ComparisonValidator
 )
 
 
@@ -73,14 +72,14 @@ class Field(ErrorMessageMixin):
         self.key = key
 
         # Arguments used for dumping
-        self.formatter = formatter if formatter else self.default_formatter
+        self.set_formatter(formatter if formatter else self.default_formatter)
         self.format_none = format_none
         self.dump_required = dump_required
         self.dump_default = dump_default
         self.no_dump = no_dump
 
         # Arguments used for loading
-        self.parser = parser if parser else self.default_parser
+        self.set_parser(parser if parser else self.default_parser)
         self.parse_none = parse_none
         self.allow_none = allow_none
         self.set_validators(validators if validators else self.default_validators)
@@ -159,17 +158,10 @@ class StringField(Field):
     default_formatter = str
     default_parser = str
 
-    def __init__(self,
-                 min_length: int = None,
-                 max_length: int = None,
-                 validators: MultiValidator = None,
-                 **kwargs):
-        self.min_length = min_length
-        self.max_length = max_length
-        if validators is None and \
-                (min_length is not None or max_length is not None):
-            validators = LengthValidator(min_length, max_length)
-        super().__init__(validators=validators, **kwargs)
+    def __init__(self, min_length: int = None, max_length: int = None, **kwargs):
+        super().__init__(**kwargs)
+        if min_length is not None or max_length is not None:
+            self.add_validator(LengthValidator(min_length, max_length))
 
 
 class NumberField(Field):
@@ -177,21 +169,10 @@ class NumberField(Field):
     default_formatter = float
     default_parser = float
 
-    def __init__(self,
-                 min_value: float = None,
-                 max_value: float = None,
-                 validators: MultiValidator = None,
-                 **kwargs):
-        self.max_value = self._type(max_value) \
-            if max_value is not None else max_value
-        self.min_value = self._type(min_value) \
-            if min_value is not None else min_value
-
-        if validators is None and \
-                (min_value is not None or max_value is not None):
-            validators = ComparisonValidator(min_value, max_value)
-
-        super().__init__(validators=validators, **kwargs)
+    def __init__(self, min_value=None, max_value=None, **kwargs):
+        super().__init__(**kwargs)
+        if min_value is not None or max_value is not None:
+            self.add_validator(ComparisonValidator(min_value, max_value))
 
 
 class FloatField(NumberField):
@@ -207,7 +188,6 @@ class IntegerField(NumberField):
 class BoolField(Field):
     default_formatter = bool
     default_parser = bool
-    default_validators = BoolValidator()
 
 
 class ListField(Field):
@@ -227,8 +207,11 @@ class CallableField(Field):
                  func_args: Iterable = None,
                  func_kwargs: Mapping = None,
                  **kwargs):
-        self.func_args = func_args if func_args else []
-        self.func_kwargs = func_kwargs if func_kwargs else {}
+        if func_args is None:
+            func_args = tuple()
+        if func_kwargs is None:
+            func_kwargs = {}
+        self.set_args(*func_args, **func_kwargs)
         kwargs.pop('no_load', None)
         super().__init__(no_load=True, **kwargs)
 
@@ -244,9 +227,11 @@ class DatetimeField(Field):
     _type = datetime
     _default_fmt = r'%Y-%m-%d %H:%M:%S.%f'
 
-    def __init__(self, fmt: str = None, **kwargs):
+    def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
         self.fmt = fmt if fmt else self._default_fmt
         super().__init__(**kwargs)
+        if min_time is not None or max_time is not None:
+            self.add_validator(ComparisonValidator(min_time, max_time))
 
     def default_formatter(self, dt: _type):
         return self._type.strftime(dt, self.fmt)

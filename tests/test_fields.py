@@ -1,5 +1,5 @@
 from unittest import TestCase
-from datetime import datetime, time, date
+from datetime import datetime, time, date, timedelta
 
 from catalyst import Catalyst
 from catalyst.fields import (
@@ -188,32 +188,43 @@ class FieldTest(TestCase):
         with self.assertRaises(TypeError):
             callable_field.dump(1)
 
+        # init
+        CallableField()
+        with self.assertRaises(TypeError):
+            CallableField(func_args=0)
+        with self.assertRaises(TypeError):
+            CallableField(func_kwargs=0)
+
     def test_datetime_field(self):
-        def base_test(now, type_, FieldClass, fmt):
-            # dump
-            field = FieldClass(name='time', key='time')
-            dt_str = field.dump(now)
-            self.assertEqual(dt_str, now.strftime(field._default_fmt))
+        dt = datetime(2019, 1, 1)
+        invalid_dt = dt + timedelta(days=1, seconds=1)
+        self.base_test_datetime_field(
+            dt, invalid_dt, datetime, DatetimeField, '%Y%m%d%H%M%S')
+        self.base_test_datetime_field(
+            dt.time(), invalid_dt.time(), time, TimeField, '%H%M%S')
+        self.base_test_datetime_field(
+            dt.date(), invalid_dt.date(), date, DateField, '%Y%m%d')
 
-            field = FieldClass(name='time', key='time', fmt=fmt)
-            dt_str = field.dump(now)
-            self.assertEqual(dt_str, now.strftime(fmt))
+    def base_test_datetime_field(
+            self, dt, invalid_dt, type_, FieldClass, fmt):
+        # dump
+        field = FieldClass()
+        dt_str = field.dump(dt)
+        self.assertEqual(dt_str, dt.strftime(field._default_fmt))
 
-            # load
-            if type_ is datetime:
-                dt = datetime.strptime(dt_str, fmt)
-            elif type_ is time:
-                dt = datetime.strptime(dt_str, fmt).time()
-            elif type_ is date:
-                dt = datetime.strptime(dt_str, fmt).date()
-            self.assertEqual(field.load(dt_str), dt)
-            with self.assertRaises(ValueError):
-                field.load('2018Y')
+        field = FieldClass(fmt=fmt)
+        dt_str = field.dump(dt)
+        self.assertEqual(dt_str, dt.strftime(fmt))
 
-        now = datetime.now()
-        base_test(now, datetime, DatetimeField, '%Y%m%d%H%M%S')
-        base_test(now.time(), time, TimeField, '%H%M%S')
-        base_test(now.date(), date, DateField, '%Y%m%d')
+        # load
+        field = FieldClass(max_time=dt)
+        dt_str = field.dump(dt)
+        self.assertEqual(field.load(dt_str), dt)
+        with self.assertRaises(ValueError):
+            field.load('2018Y')
+        with self.assertRaises(ValidationError):
+            dt_str = field.dump(invalid_dt)
+            field.load(dt_str)
 
     def test_nest_field(self):
         class A:

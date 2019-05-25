@@ -3,7 +3,7 @@ from unittest import TestCase
 from catalyst.exceptions import ValidationError
 from catalyst.validators import (
     Validator, LengthValidator,
-    ComparisonValidator, BoolValidator
+    ComparisonValidator
 )
 
 
@@ -97,17 +97,3 @@ class ValidationTest(TestCase):
 
         with self.assertRaises(ValueError):
             LengthValidator(1, 0)
-
-    def test_bool_validator(self):
-        validator = BoolValidator()
-
-        validator(True)
-        validator(False)
-        with self.assertRaises(ValidationError):
-            validator('')
-        with self.assertRaises(ValidationError):
-            validator(1)
-        with self.assertRaises(ValidationError):
-            validator(None)
-        with self.assertRaises(ValidationError):
-            validator([])
