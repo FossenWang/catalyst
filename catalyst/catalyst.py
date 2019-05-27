@@ -1,8 +1,9 @@
 import json
 
 from typing import Dict, Iterable, Callable, Mapping, Any
+from types import MappingProxyType
 
-from .fields import Field
+from .fields import Field, NestedField
 from .exceptions import ValidationError
 from .utils import dump_from_attribute_or_key, missing
 
@@ -12,8 +13,8 @@ FieldDict = Dict[str, Field]
 
 class LoadResult(dict):
     def __init__(self, valid_data: dict = None, errors: dict = None, invalid_data: dict = None):
-        self.valid_data = valid_data if valid_data else {}
-        super().__init__(valid_data)
+        super().__init__(valid_data if valid_data else {})
+        self.valid_data = MappingProxyType(self)
         self.is_valid = not errors
         self.errors = errors if errors else {}
         self.invalid_data = invalid_data if invalid_data else {}
@@ -32,23 +33,7 @@ class LoadResult(dict):
         return {k: str(self.errors[k]) for k in self.errors}
 
 
-class CatalystMeta(type):
-    def __new__(cls, name, bases, attrs):
-        # collect fields to cls._field_dict
-        fields = {}  # type: FieldDict
-        for attr_name, value in attrs.items():
-            if isinstance(value, Field):
-                if value.name is None:
-                    value.name = attr_name
-                if value.key is None:
-                    value.key = attr_name
-                fields[attr_name] = value
-        attrs['_field_dict'] = fields
-        new_cls = type.__new__(cls, name, bases, attrs)
-        return new_cls
-
-
-class Catalyst(metaclass=CatalystMeta):
+class BaseCatalyst:
     _field_dict = {}  # type: FieldDict
 
     def __init__(self,
@@ -150,3 +135,31 @@ class Catalyst(metaclass=CatalystMeta):
 
     def load_from_json(self, s: str, raise_error: bool = None) -> LoadResult:
         return self.load(json.loads(s), raise_error=raise_error)
+
+
+class CatalystMeta(type):
+    def __new__(cls, name, bases, attrs):
+        # collect fields to cls._field_dict
+        fields = {}  # type: FieldDict
+        for key, value in attrs.items():
+            if isinstance(value, cls):
+                value = value()
+
+            if isinstance(value, BaseCatalyst):
+                value = NestedField(value)
+                attrs[key] = value
+
+            if isinstance(value, Field):
+                if value.name is None:
+                    value.name = key
+                if value.key is None:
+                    value.key = key
+                fields[key] = value
+
+        attrs['_field_dict'] = fields
+        new_cls = type.__new__(cls, name, bases, attrs)
+        return new_cls
+
+
+class Catalyst(BaseCatalyst, metaclass=CatalystMeta):
+    __doc__ = BaseCatalyst.__doc__
