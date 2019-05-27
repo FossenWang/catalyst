@@ -40,7 +40,8 @@ class BaseCatalyst:
                  fields: Iterable[str] = None,
                  dump_fields: Iterable[str] = None,
                  load_fields: Iterable[str] = None,
-                 raise_error: bool = True,
+                 raise_error: bool = False,
+                 collect_errors: bool = True,
                  dump_from: Callable[[Any, str], Any] = None):
         if not fields:
             fields = set(self._field_dict.keys())
@@ -58,6 +59,7 @@ class BaseCatalyst:
             lambda k: not self._field_dict[k].no_load)
 
         self.raise_error = raise_error
+        self.collect_errors = collect_errors
 
         if not dump_from:
             dump_from = dump_from_attribute_or_key
@@ -97,9 +99,17 @@ class BaseCatalyst:
     def dump_to_json(self, obj) -> str:
         return json.dumps(self.dump(obj))
 
-    def load(self, data: dict, raise_error: bool = None) -> LoadResult:
+    def load(self,
+             data: dict,
+             raise_error: bool = None,
+             collect_errors: bool = None
+             ) -> LoadResult:
+
         if not isinstance(data, Mapping):
             raise TypeError('Argument "data" must be a mapping object.')
+
+        if collect_errors is None:
+            collect_errors = self.collect_errors
 
         invalid_data = {}
         valid_data = {}
@@ -120,6 +130,8 @@ class BaseCatalyst:
                 # set default value for missing field
                 value = field.load(raw_value)
             except Exception as e:
+                if not collect_errors:
+                    raise e
                 errors[field.key] = e
                 if raw_value is not missing:
                     invalid_data[field.key] = raw_value
@@ -133,8 +145,14 @@ class BaseCatalyst:
             raise ValidationError(load_result)
         return load_result
 
-    def load_from_json(self, s: str, raise_error: bool = None) -> LoadResult:
-        return self.load(json.loads(s), raise_error=raise_error)
+    def load_from_json(self,
+                       s: str,
+                       raise_error: bool = None,
+                       collect_errors: bool = None
+                       ) -> LoadResult:
+        return self.load(
+            json.loads(s), raise_error=raise_error,
+            collect_errors=collect_errors)
 
 
 class CatalystMeta(type):

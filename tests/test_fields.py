@@ -233,7 +233,7 @@ class FieldTest(TestCase):
 
         class ACatalyst(Catalyst):
             name = StringField(max_length=3, load_required=True)
-        a_cata = ACatalyst()
+        a_cata = ACatalyst(raise_error=True)
         field = NestedField(a_cata, name='a', key='a')
 
         self.assertEqual(field.dump(A('1')), {'name': '1'})

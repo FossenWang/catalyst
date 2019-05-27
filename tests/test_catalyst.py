@@ -57,13 +57,8 @@ class CatalystTest(TestCase):
         self.assertEqual(catalyst.dump(data), result)
 
     def test_metaclass(self):
-        class Article(Catalyst):
-            title = StringField()
-            content = StringField()
-            class author(Catalyst):
-                uid = IntegerField()
-                name = StringField()
-        catalyst = Article()
+        "Test metaclass of Catalyst."
+
         data = {
             'title': 'x',
             'content': 'x',
@@ -72,7 +67,40 @@ class CatalystTest(TestCase):
                 'name': 'x'
             }
         }
+
+        # Automatic wrap an object of Catalyst as NestedField
+        class User(Catalyst):
+            uid = IntegerField()
+            name = StringField()
+
+        user_catalyst = User()
+
+        class Article1(Catalyst):
+            title = StringField()
+            content = StringField()
+            author = user_catalyst
+
+        catalyst = Article1()
+
         r = catalyst.dump(data)
+        self.assertEqual(data, r)
+        r = catalyst.load(data)
+        self.assertEqual(data, r)
+
+        # Automatic wrap a subclass of Catalyst as NestedField
+        class Article2(Catalyst):
+            title = StringField()
+            content = StringField()
+
+            class author(Catalyst):
+                uid = IntegerField()
+                name = StringField()
+
+        catalyst = Article2()
+
+        r = catalyst.dump(data)
+        self.assertEqual(data, r)
+        r = catalyst.load(data)
         self.assertEqual(data, r)
 
     def test_init(self):
@@ -268,6 +296,25 @@ class CatalystTest(TestCase):
         s = json.dumps(invalid_data)
         with self.assertRaises(ValidationError):
             result = test_data_catalyst.load_from_json(s, raise_error=True)
+
+        # don't collect errors
+        # set "collect_errors" when init
+        no_collect_err_catalyst = TestDataCatalyst(collect_errors=False)
+        with self.assertRaises(Exception):
+            no_collect_err_catalyst.load(invalid_data)
+
+        # set "collect_errors" when call load
+        result = no_collect_err_catalyst.load(invalid_data, collect_errors=True, raise_error=False)
+        self.assertFalse(result.is_valid)
+
+        # set "collect_errors" when call load
+        with self.assertRaises(Exception):
+            test_data_catalyst.load(invalid_data, collect_errors=False)
+
+        # set "collect_errors" when call load_from_json
+        s = json.dumps(invalid_data)
+        with self.assertRaises(Exception):
+            result = test_data_catalyst.load_from_json(s, collect_errors=False)
 
     def test_field_args_which_affect_loading(self):
 
