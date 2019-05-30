@@ -63,7 +63,9 @@ class BaseCatalyst:
 
         if not dump_from:
             dump_from = dump_from_attribute_or_key
-        self.set_dump_from(dump_from)
+        if not callable(dump_from):
+            raise TypeError('Argument "dump_from" must be Callable.')
+        self.dump_from = dump_from
 
     def _copy_fields(self, fields: FieldDict, keys: Iterable[str],
                      is_copying: Callable[[str], bool]) -> FieldDict:
@@ -73,13 +75,10 @@ class BaseCatalyst:
                 new_fields[key] = fields[key]
         return new_fields
 
-    def set_dump_from(self, dump_from: Callable[[Any, str], Any]):
-        if not callable(dump_from):
-            raise TypeError('Argument "dump_from" must be Callable.')
-        self.dump_from = dump_from
-
     def dump(self, obj) -> dict:
-        obj_dict = {}
+        obj = self.pre_dump(obj)
+
+        result = {}
         for field in self._dump_field_dict.values():
             try:
                 value = self.dump_from(obj, field.name)
@@ -93,11 +92,19 @@ class BaseCatalyst:
                     continue
                 # set default value for missing field
                 value = default() if callable(default) else default
-            obj_dict[field.key] = field.dump(value)
-        return obj_dict
+            result[field.key] = field.dump(value)
+
+        result = self.post_dump(result)
+        return result
 
     def dump_to_json(self, obj) -> str:
         return json.dumps(self.dump(obj))
+
+    def pre_dump(self, obj):
+        return obj
+
+    def post_dump(self, result: dict) -> dict:
+        return result
 
     def load(self,
              data: dict,
@@ -108,39 +115,57 @@ class BaseCatalyst:
         if not isinstance(data, Mapping):
             raise TypeError('Argument "data" must be a mapping object.')
 
+        if raise_error is None:
+            raise_error = self.raise_error
         if collect_errors is None:
             collect_errors = self.collect_errors
 
-        invalid_data = {}
-        valid_data = {}
         errors = {}
 
-        for field in self._load_field_dict.values():
+        try:
+            data = self.pre_load(data)
+        except Exception as e:
+            if not collect_errors:
+                raise e
+            error_key = getattr(self.pre_load, 'error_key', 'pre_load')
+            errors[error_key] = e
+
+        invalid_data = {}
+        valid_data = {}
+        if not errors:
+            for field in self._load_field_dict.values():
+                try:
+                    default = field.load_default
+                    if callable(default):
+                        default = default()
+                    raw_value = data.get(field.key, default)
+                    if raw_value is missing:
+                        if field.load_required:
+                            # raise error when field is missing and required
+                            field.error('required')
+                        # ignore missing field not required
+                        continue
+                    # set default value for missing field
+                    value = field.load(raw_value)
+                except Exception as e:
+                    if not collect_errors:
+                        raise e
+                    errors[field.key] = e
+                    if raw_value is not missing:
+                        invalid_data[field.key] = raw_value
+                else:
+                    valid_data[field.key] = value
+
+        if not errors:
             try:
-                default = field.load_default
-                if callable(default):
-                    default = default()
-                raw_value = data.get(field.key, default)
-                if raw_value is missing:
-                    if field.load_required:
-                        # raise error when field is missing and required
-                        field.error('required')
-                    # ignore missing field not required
-                    continue
-                # set default value for missing field
-                value = field.load(raw_value)
+                valid_data = self.post_load(valid_data)
             except Exception as e:
                 if not collect_errors:
                     raise e
-                errors[field.key] = e
-                if raw_value is not missing:
-                    invalid_data[field.key] = raw_value
-            else:
-                valid_data[field.key] = value
+                error_key = getattr(self.post_load, 'error_key', 'post_load')
+                errors[error_key] = e
 
         load_result = LoadResult(valid_data, errors, invalid_data)
-        if raise_error is None:
-            raise_error = self.raise_error
         if not load_result.is_valid and raise_error:
             raise ValidationError(load_result)
         return load_result
@@ -153,6 +178,14 @@ class BaseCatalyst:
         return self.load(
             json.loads(s), raise_error=raise_error,
             collect_errors=collect_errors)
+
+    def pre_load(self, data: dict) -> dict:
+        return data
+    pre_load.error_key = 'pre_load'
+
+    def post_load(self, data: dict) -> dict:
+        return data
+    post_load.error_key = 'post_load'
 
 
 class CatalystMeta(type):

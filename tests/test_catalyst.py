@@ -398,3 +398,68 @@ class CatalystTest(TestCase):
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
         self.assertDictEqual(result, {})
+
+    def test_pre_and_post_process(self):
+        class C(Catalyst):
+            max_value = IntegerField()
+            min_value = IntegerField()
+
+            def pre_dump(self, obj):
+                return self.pre_load(obj)
+
+            def post_dump(self, data):
+                return self.post_load(data)
+
+            def pre_load(self, data):
+                keys = {field.key for field in self._load_field_dict.values()}
+                extra_keys = set(data.keys()) - keys
+                if extra_keys:
+                    raise ValidationError(f'This keys should not be present: {extra_keys}.')
+                return data
+
+            def post_load(self, data):
+                if data['max_value'] < data['min_value']:
+                    raise ValidationError('"max_value" must be larger than "min_value".')
+                return data
+
+        c = C()
+
+        # dump valid
+        c.dump({'max_value': 2, 'min_value': 1})
+
+        # pre_dump invalid
+        with self.assertRaises(ValidationError):
+            c.dump({'max_value': 2, 'min_value': 1, 'xxx': 1})
+
+        # post_dump invalid
+        with self.assertRaises(ValidationError):
+            c.dump({'max_value': 1, 'min_value': 2})
+
+        # load valid
+        result = c.load({'max_value': 2, 'min_value': 1})
+        self.assertTrue(result.is_valid)
+
+        # pre_load invalid
+        result = c.load({'max_value': 2, 'min_value': 1, 'xxx': 1})
+        self.assertFalse(result.is_valid)
+        self.assertTrue('pre_load' in result.errors)
+        # pre_load error_key
+        C.pre_load.error_key = 'not_allowed_keys'
+        result = c.load({'max_value': 2, 'min_value': 1, 'xxx': 1})
+        self.assertFalse(result.is_valid)
+        self.assertTrue('not_allowed_keys' in result.errors)
+        # pre_load raise error
+        with self.assertRaises(ValidationError) as ct:
+            c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, raise_error=True)
+        with self.assertRaises(ValidationError) as ct:
+            c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, collect_errors=False)
+
+        # post_load invalid
+        result = c.load({'max_value': 1, 'min_value': 2})
+        self.assertFalse(result.is_valid)
+        self.assertTrue('post_load' in result.errors)
+        # post_load error_key
+        C.post_load.error_key = 'wrong_value'
+        result = c.load({'max_value': 1, 'min_value': 2})
+        self.assertFalse(result.is_valid)
+        self.assertTrue('wrong_value' in result.errors)
