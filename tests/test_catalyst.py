@@ -5,7 +5,8 @@ from catalyst import Catalyst
 from catalyst.fields import Field, StringField, IntegerField, \
     FloatField, BoolField, CallableField, ListField
 from catalyst.exceptions import ValidationError
-from catalyst.utils import dump_from_attribute, dump_from_key
+from catalyst.utils import dump_from_attribute, dump_from_key, \
+    snake_to_camel
 
 
 class TestData:
@@ -469,11 +470,7 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertTrue('wrong_value' in result.errors)
 
-    def test_format_field_name_and_key(self):
-        def snake_to_camel(snake: str) -> str:
-            words = snake.lower().split('_')
-            return words[0] + ''.join(w.title() for w in words[1:])
-
+    def test_change_field_name_and_key_naming_style(self):
         # change field key naming style
         class A(Catalyst):
             __format_key__ = snake_to_camel

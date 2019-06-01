@@ -49,3 +49,10 @@ class _Missing:
 # KeyError or AttributeError will be raised if dumping field is missing.
 # Field will be excluded from load result if loading field is missing.
 missing = _Missing()
+
+
+def snake_to_camel(snake: str) -> str:
+    camel = snake.title().replace('_', '')
+    if camel:
+        camel = camel[0].lower() + camel[1:]
+    return camel
