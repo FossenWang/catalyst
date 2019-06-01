@@ -3,7 +3,7 @@ import json
 from typing import Dict, Iterable, Callable, Mapping, Any
 from types import MappingProxyType
 
-from .fields import Field, NestedField
+from .fields import Field, NestedField, no_processing
 from .exceptions import ValidationError
 from .utils import dump_from_attribute_or_key, missing
 
@@ -35,6 +35,8 @@ class LoadResult(dict):
 
 class BaseCatalyst:
     _field_dict = {}  # type: FieldDict
+    __format_key__ = None
+    __format_name__ = None
 
     def __init__(self,
                  fields: Iterable[str] = None,
@@ -154,7 +156,7 @@ class BaseCatalyst:
                     if raw_value is not missing:
                         invalid_data[field.key] = raw_value
                 else:
-                    valid_data[field.key] = value
+                    valid_data[field.name] = value
 
         if not errors:
             try:
@@ -192,6 +194,14 @@ class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
         # collect fields to cls._field_dict
         fields = {}  # type: FieldDict
+
+        format_key = attrs.get('__format_key__', None)
+        if not format_key:
+            format_key = no_processing
+        format_name = attrs.get('__format_name__', None)
+        if not format_name:
+            format_name = no_processing
+
         for key, value in attrs.items():
             if isinstance(value, cls):
                 value = value()
@@ -202,9 +212,9 @@ class CatalystMeta(type):
 
             if isinstance(value, Field):
                 if value.name is None:
-                    value.name = key
+                    value.name = format_name(key)
                 if value.key is None:
-                    value.key = key
+                    value.key = format_key(key)
                 fields[key] = value
 
         attrs['_field_dict'] = fields

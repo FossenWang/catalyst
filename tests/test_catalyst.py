@@ -2,7 +2,7 @@ import json
 from unittest import TestCase
 
 from catalyst import Catalyst
-from catalyst.fields import StringField, IntegerField, \
+from catalyst.fields import Field, StringField, IntegerField, \
     FloatField, BoolField, CallableField, ListField
 from catalyst.exceptions import ValidationError
 from catalyst.utils import dump_from_attribute, dump_from_key
@@ -46,6 +46,10 @@ class CatalystTest(TestCase):
         self.valid_data = {
             'string': 'xxx', 'integer': 1, 'float': 1.1,
             'bool': True, 'list_': ['a', 'b']}
+
+        self.load_result = {
+            'string': 'xxx', 'integer': 1, 'float_': 1.1,
+            'bool_': True, 'list_': ['a', 'b']}
 
     def create_catalyst(self, **kwargs):
         class C(Catalyst):
@@ -129,13 +133,13 @@ class CatalystTest(TestCase):
         # "load_fields" takes precedence over "fields"
         catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])
         self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
-        self.assertDictEqual(catalyst.load(valid_data), {'bool': True})
+        self.assertDictEqual(catalyst.load(valid_data), {'bool_': True})
 
         # When "dump_fields" and "load_fields" are given, fields is not used.
         catalyst = TestDataCatalyst(
             fields=['integer'], dump_fields=['string'], load_fields=['bool_field'])
         self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
-        self.assertDictEqual(catalyst.load(valid_data), {'bool': True})
+        self.assertDictEqual(catalyst.load(valid_data), {'bool_': True})
 
         with self.assertRaises(KeyError):
             TestDataCatalyst(fields=['wrong_name'])
@@ -228,19 +232,20 @@ class CatalystTest(TestCase):
         "Test loading data."
 
         valid_data = self.valid_data
+        load_result = self.load_result
 
         # test valid_data
         result = test_data_catalyst.load(valid_data)
         self.assertTrue(result.is_valid)
         self.assertDictEqual(result.invalid_data, {})
         self.assertDictEqual(result.errors, {})
-        self.assertDictEqual(result, valid_data)
+        self.assertDictEqual(result, load_result)
 
         # load from json
         s = json.dumps(valid_data)
         result = test_data_catalyst.load_from_json(s)
         self.assertTrue(result.is_valid)
-        self.assertDictEqual(result, valid_data)
+        self.assertDictEqual(result, load_result)
 
         # test repr
         self.assertTrue(str(result).startswith('{'))
@@ -463,3 +468,51 @@ class CatalystTest(TestCase):
         result = c.load({'max_value': 1, 'min_value': 2})
         self.assertFalse(result.is_valid)
         self.assertTrue('wrong_value' in result.errors)
+
+    def test_format_field_name_and_key(self):
+        def snake_to_camel(snake: str) -> str:
+            words = snake.lower().split('_')
+            return words[0] + ''.join(w.title() for w in words[1:])
+
+        # change field key naming style
+        class A(Catalyst):
+            __format_key__ = snake_to_camel
+            naming_style = Field()
+
+        self.assertEqual(A.naming_style.name, 'naming_style')
+        self.assertEqual(A.naming_style.key, 'namingStyle')
+
+        a = A()
+        result = a.dump({'naming_style': 'snake'})
+        self.assertIn('namingStyle', result)
+        result = a.load({'namingStyle': 'snake'})
+        self.assertIn('naming_style', result)
+
+        # change field name naming style
+        class B(Catalyst):
+            __format_name__ = snake_to_camel
+            naming_style = Field()
+
+        self.assertEqual(B.naming_style.name, 'namingStyle')
+        self.assertEqual(B.naming_style.key, 'naming_style')
+
+        b = B()
+        result = b.dump({'namingStyle': 'snake'})
+        self.assertIn('naming_style', result)
+        result = b.load({'naming_style': 'snake'})
+        self.assertIn('namingStyle', result)
+
+        # change field name and key naming style
+        class C(Catalyst):
+            __format_name__ = snake_to_camel
+            __format_key__ = snake_to_camel
+            naming_style = Field()
+
+        self.assertEqual(C.naming_style.name, 'namingStyle')
+        self.assertEqual(C.naming_style.key, 'namingStyle')
+
+        c = C()
+        result = c.dump({'namingStyle': 'snake'})
+        self.assertIn('namingStyle', result)
+        result = c.load({'namingStyle': 'snake'})
+        self.assertIn('namingStyle', result)
