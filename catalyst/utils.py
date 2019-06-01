@@ -4,6 +4,7 @@ from .exceptions import ValidationError
 
 
 class ErrorMessageMixin:
+    default_error_class = ValidationError
     default_error_messages = {}
     unknown_error = "Unknown error."
 
@@ -20,7 +21,9 @@ class ErrorMessageMixin:
         messages.update(error_messages or {})
         self.error_messages = messages
 
-    def error(self, error_key: str, error_class=ValidationError):
+    def error(self, error_key: str, error_class=None):
+        if not error_class:
+            error_class = self.default_error_class
         raise error_class(
             self.error_messages.get(error_key, self.unknown_error))
 
@@ -49,6 +52,10 @@ class _Missing:
 # KeyError or AttributeError will be raised if dumping field is missing.
 # Field will be excluded from load result if loading field is missing.
 missing = _Missing()
+
+
+def no_processing(value):
+    return value
 
 
 def snake_to_camel(snake: str) -> str:

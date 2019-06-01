@@ -455,9 +455,9 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
         # pre_load raise error
-        with self.assertRaises(ValidationError) as ct:
+        with self.assertRaises(ValidationError):
             c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, raise_error=True)
-        with self.assertRaises(ValidationError) as ct:
+        with self.assertRaises(ValidationError):
             c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, collect_errors=False)
 
         # post_load invalid

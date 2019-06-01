@@ -4,7 +4,7 @@ from typing import Callable, Any, Iterable, Union, Mapping
 from datetime import datetime, time, date
 from warnings import warn
 
-from .utils import ErrorMessageMixin, missing
+from .utils import ErrorMessageMixin, missing, no_processing
 from .validators import (
     LengthValidator,
     ComparisonValidator
@@ -16,10 +16,6 @@ FormatterType = ParserType = Callable[[Any], Any]
 ValidatorType = Callable[[Any], None]
 
 MultiValidator = Union[ValidatorType, Iterable[ValidatorType]]
-
-
-def no_processing(value):
-    return value
 
 
 class Field(ErrorMessageMixin):
