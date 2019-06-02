@@ -1,4 +1,4 @@
-from typing import Mapping
+from typing import Mapping, Callable
 
 from .exceptions import ValidationError
 
@@ -63,3 +63,9 @@ def snake_to_camel(snake: str) -> str:
     if camel:
         camel = camel[0].lower() + camel[1:]
     return camel
+
+
+def ensure_staticmethod(func: Callable) -> staticmethod:
+    if isinstance(func, staticmethod):
+        return func
+    return staticmethod(func)

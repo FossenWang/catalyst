@@ -5,7 +5,8 @@ from types import MappingProxyType
 
 from .fields import Field, NestedField, no_processing
 from .exceptions import ValidationError
-from .utils import dump_from_attribute_or_key, missing
+from .utils import dump_from_attribute_or_key, missing, \
+    ensure_staticmethod
 
 
 FieldDict = Dict[str, Field]
@@ -35,8 +36,8 @@ class LoadResult(dict):
 
 class BaseCatalyst:
     _field_dict = {}  # type: FieldDict
-    __format_key__ = None
-    __format_name__ = None
+    __format_key__ = no_processing
+    __format_name__ = no_processing
 
     def __init__(self,
                  fields: Iterable[str] = None,
@@ -192,33 +193,32 @@ class BaseCatalyst:
 
 class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
+        new_cls = type.__new__(cls, name, bases, attrs)
+
+        new_cls.__format_name__ = ensure_staticmethod(new_cls.__format_name__)
+        new_cls.__format_key__ = ensure_staticmethod(new_cls.__format_key__)
+        format_name = new_cls.__format_name__
+        format_key = new_cls.__format_key__
+
         # collect fields to cls._field_dict
         fields = {}  # type: FieldDict
-
-        format_key = attrs.get('__format_key__', None)
-        if not format_key:
-            format_key = no_processing
-        format_name = attrs.get('__format_name__', None)
-        if not format_name:
-            format_name = no_processing
-
-        for key, value in attrs.items():
+        for attr in dir(new_cls):
+            value = getattr(new_cls, attr)
             if isinstance(value, cls):
                 value = value()
 
             if isinstance(value, BaseCatalyst):
                 value = NestedField(value)
-                attrs[key] = value
+                setattr(new_cls, attr, value)
 
             if isinstance(value, Field):
                 if value.name is None:
-                    value.name = format_name(key)
+                    value.name = format_name(attr)
                 if value.key is None:
-                    value.key = format_key(key)
-                fields[key] = value
+                    value.key = format_key(attr)
+                fields[attr] = value
 
-        attrs['_field_dict'] = fields
-        new_cls = type.__new__(cls, name, bases, attrs)
+        new_cls._field_dict = fields
         return new_cls
 
 

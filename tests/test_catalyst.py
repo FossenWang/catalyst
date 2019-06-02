@@ -513,3 +513,21 @@ class CatalystTest(TestCase):
         self.assertIn('namingStyle', result)
         result = c.load({'namingStyle': 'snake'})
         self.assertIn('namingStyle', result)
+
+    def test_inherit(self):
+        class A(Catalyst):
+            a = Field()
+
+        class B(A):
+            b = Field()
+
+        a = A()
+        b = B()
+
+        self.assertTrue(hasattr(a, 'a'))
+        self.assertTrue(hasattr(b, 'a'))
+        self.assertTrue(hasattr(b, 'b'))
+        self.assertEqual(b.a, a.a)
+
+        data = {'a': 'a', 'b': 'b'}
+        self.assertDictEqual(b.dump(data), data)

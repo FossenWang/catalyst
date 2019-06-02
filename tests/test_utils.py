@@ -1,6 +1,7 @@
 from unittest import TestCase
 
-from catalyst.utils import snake_to_camel, ErrorMessageMixin
+from catalyst.utils import snake_to_camel, ErrorMessageMixin, \
+    ensure_staticmethod
 from catalyst.exceptions import ValidationError
 
 
@@ -37,4 +38,11 @@ class UtilsTest(TestCase):
             b.error('b')
         self.assertEqual(str(context.exception), 'bb')
 
-        print(A, B)
+    def test_ensure_staticmethod(self):
+        def func():
+            pass
+
+        static_func = ensure_staticmethod(func)
+        self.assertIs(static_func.__func__, func)
+        self.assertIs(static_func, ensure_staticmethod(static_func))
+        self.assertIs(ensure_staticmethod(static_func).__func__, func)
