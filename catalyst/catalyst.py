@@ -2,6 +2,7 @@ import json
 
 from typing import Dict, Iterable, Callable, Mapping, Any
 from types import MappingProxyType
+from functools import wraps, partial
 
 from .fields import Field, NestedField, no_processing
 from .exceptions import ValidationError
@@ -36,8 +37,8 @@ class LoadResult(dict):
 
 class BaseCatalyst:
     _field_dict = {}  # type: FieldDict
-    __format_key__ = no_processing
-    __format_name__ = no_processing
+    __format_key__ = staticmethod(no_processing)
+    __format_name__ = staticmethod(no_processing)
 
     def __init__(self,
                  fields: Iterable[str] = None,
@@ -78,6 +79,12 @@ class BaseCatalyst:
                 new_fields[key] = fields[key]
         return new_fields
 
+    def pre_dump(self, obj):
+        return obj
+
+    def post_dump(self, result: dict) -> dict:
+        return result
+
     def dump(self, obj) -> dict:
         obj = self.pre_dump(obj)
 
@@ -103,11 +110,13 @@ class BaseCatalyst:
     def dump_to_json(self, obj) -> str:
         return json.dumps(self.dump(obj))
 
-    def pre_dump(self, obj):
-        return obj
+    def pre_load(self, data: dict) -> dict:
+        return data
+    pre_load.error_key = 'pre_load'
 
-    def post_dump(self, result: dict) -> dict:
-        return result
+    def post_load(self, data: dict) -> dict:
+        return data
+    post_load.error_key = 'post_load'
 
     def load(self,
              data: dict,
@@ -182,14 +191,16 @@ class BaseCatalyst:
             json.loads(s), raise_error=raise_error,
             collect_errors=collect_errors)
 
-    def pre_load(self, data: dict) -> dict:
-        return data
-    pre_load.error_key = 'pre_load'
+    def load_kwargs(self, func=None, collect_errors=None):
+        'decorator, certainly raise error'
+        if func:
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                kwargs = self.load(kwargs, raise_error=True, collect_errors=collect_errors)
+                return func(*args, **kwargs)
+            return wrapper
 
-    def post_load(self, data: dict) -> dict:
-        return data
-    post_load.error_key = 'post_load'
-
+        return partial(self.load_kwargs, collect_errors=collect_errors)
 
 class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
@@ -204,13 +215,14 @@ class CatalystMeta(type):
         fields = {}  # type: FieldDict
         for attr in dir(new_cls):
             value = getattr(new_cls, attr)
+            # init calalyst object
             if isinstance(value, cls):
                 value = value()
-
+            # wrap catalyst object as NestedField
             if isinstance(value, BaseCatalyst):
                 value = NestedField(value)
                 setattr(new_cls, attr, value)
-
+            # automatic generate field name or key
             if isinstance(value, Field):
                 if value.name is None:
                     value.name = format_name(attr)

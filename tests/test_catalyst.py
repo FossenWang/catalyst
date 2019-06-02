@@ -55,7 +55,7 @@ class CatalystTest(TestCase):
     def create_catalyst(self, **kwargs):
         class C(Catalyst):
             s = StringField(**kwargs)
-        return C(raise_error=False)
+        return C()
 
     def assert_field_dump_args(self, data, result=None, **kwargs):
         catalyst = self.create_catalyst(**kwargs)
@@ -474,45 +474,52 @@ class CatalystTest(TestCase):
         # change field key naming style
         class A(Catalyst):
             __format_key__ = snake_to_camel
-            naming_style = Field()
+            snake_to_camel = Field()
 
-        self.assertEqual(A.naming_style.name, 'naming_style')
-        self.assertEqual(A.naming_style.key, 'namingStyle')
+        self.assertEqual(A.snake_to_camel.name, 'snake_to_camel')
+        self.assertEqual(A.snake_to_camel.key, 'snakeToCamel')
 
         a = A()
-        result = a.dump({'naming_style': 'snake'})
-        self.assertIn('namingStyle', result)
-        result = a.load({'namingStyle': 'snake'})
-        self.assertIn('naming_style', result)
+        result = a.dump({'snake_to_camel': 'snake'})
+        self.assertIn('snakeToCamel', result)
+        result = a.load({'snakeToCamel': 'snake'})
+        self.assertIn('snake_to_camel', result)
 
         # change field name naming style
         class B(Catalyst):
             __format_name__ = snake_to_camel
-            naming_style = Field()
+            snake_to_camel = Field()
 
-        self.assertEqual(B.naming_style.name, 'namingStyle')
-        self.assertEqual(B.naming_style.key, 'naming_style')
+        self.assertEqual(B.snake_to_camel.name, 'snakeToCamel')
+        self.assertEqual(B.snake_to_camel.key, 'snake_to_camel')
 
         b = B()
-        result = b.dump({'namingStyle': 'snake'})
-        self.assertIn('naming_style', result)
-        result = b.load({'naming_style': 'snake'})
-        self.assertIn('namingStyle', result)
+        result = b.dump({'snakeToCamel': 'snake'})
+        self.assertIn('snake_to_camel', result)
+        result = b.load({'snake_to_camel': 'snake'})
+        self.assertIn('snakeToCamel', result)
 
         # change field name and key naming style
         class C(Catalyst):
             __format_name__ = snake_to_camel
             __format_key__ = snake_to_camel
-            naming_style = Field()
+            snake_to_camel = Field()
+            still_snake = Field(name='still_snake', key='still_snake')
 
-        self.assertEqual(C.naming_style.name, 'namingStyle')
-        self.assertEqual(C.naming_style.key, 'namingStyle')
+        self.assertEqual(C.snake_to_camel.name, 'snakeToCamel')
+        self.assertEqual(C.snake_to_camel.key, 'snakeToCamel')
+        self.assertEqual(C.still_snake.name, 'still_snake')
+        self.assertEqual(C.still_snake.key, 'still_snake')
 
         c = C()
-        result = c.dump({'namingStyle': 'snake'})
-        self.assertIn('namingStyle', result)
-        result = c.load({'namingStyle': 'snake'})
-        self.assertIn('namingStyle', result)
+        self.assertIs(c.__format_key__, snake_to_camel)
+        self.assertIs(c.__format_name__, snake_to_camel)
+        result = c.dump({'snakeToCamel': None, 'still_snake': None})
+        self.assertIn('snakeToCamel', result)
+        self.assertIn('still_snake', result)
+        result = c.load({'snakeToCamel': None, 'still_snake': None})
+        self.assertIn('snakeToCamel', result)
+        self.assertIn('still_snake', result)
 
     def test_inherit(self):
         class A(Catalyst):
@@ -531,3 +538,25 @@ class CatalystTest(TestCase):
 
         data = {'a': 'a', 'b': 'b'}
         self.assertDictEqual(b.dump(data), data)
+
+    def test_load_kwargs(self):
+        class C(Catalyst):
+            i = IntegerField()
+
+        c = C()
+
+        @c.load_kwargs
+        def to_int(i):
+            return i
+
+        self.assertEqual(to_int(i='0'), 0)
+        with self.assertRaises(ValidationError):
+            to_int(i='a')
+
+        @c.load_kwargs(collect_errors=False)
+        def to_int_2(i):
+            return i
+
+        self.assertEqual(to_int_2(i='0'), 0)
+        with self.assertRaises(ValueError):
+            to_int_2(i='a')
