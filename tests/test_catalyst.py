@@ -539,24 +539,80 @@ class CatalystTest(TestCase):
         data = {'a': 'a', 'b': 'b'}
         self.assertDictEqual(b.dump(data), data)
 
-    def test_load_kwargs(self):
-        class C(Catalyst):
-            i = IntegerField()
+    def test_load_and_dump_kwargs(self):
+        class A(Catalyst):
+            a = IntegerField()
+            b = IntegerField()
+            c = IntegerField()
 
-        c = C()
+        a = A()
 
-        @c.load_kwargs
-        def to_int(i):
-            return i
+        @a.load_kwargs
+        def func_1(a, b=1, **kwargs):
+            return a + b + kwargs['c']
 
-        self.assertEqual(to_int(i='0'), 0)
+        self.assertEqual(func_1(a='1', b='2', c='3'), 6)
+        # raise error if kwargs are invalid
         with self.assertRaises(ValidationError):
-            to_int(i='a')
+            func_1(a='a', b='2', c='3')
+        # takes kwargs only
+        with self.assertRaises(TypeError):
+            func_1('1', b='2', c='3')
 
-        @c.load_kwargs(collect_errors=False)
-        def to_int_2(i):
-            return i
+        @a.load_kwargs(collect_errors=False)
+        def func_2(a, b=1, **kwargs):
+            return a + b + kwargs['c']
 
-        self.assertEqual(to_int_2(i='0'), 0)
+        self.assertEqual(func_2(a='1', b='2', c='3'), 6)
+        # don't collect error
         with self.assertRaises(ValueError):
-            to_int_2(i='a')
+            func_2(a='a')
+
+        @a.dump_kwargs
+        def func_3(a, b=1, **kwargs):
+            return a + b + kwargs['c']
+
+        self.assertEqual(func_3(a='1', b='2', c='3'), 6)
+        # raise error if kwargs are invalid
+        with self.assertRaises(ValueError):
+            func_3(a='a', b='2', c='3')
+        # takes kwargs only
+        with self.assertRaises(TypeError):
+            func_3('1', b='2', c='3')
+
+    def test_load_and_dump_args(self):
+        class A(Catalyst):
+            a = IntegerField()
+            b = IntegerField()
+            args = ListField(IntegerField())
+            class kwargs(Catalyst):
+                c = IntegerField()
+
+        a = A()
+
+        @a.load_args
+        def func_1(a, *args, b=1, **kwargs):
+            return a + sum(args) + b + kwargs['c']
+
+        self.assertEqual(func_1('1', '2', b='3', c='4'), 10)
+        # raise error if kwargs are invalid
+        with self.assertRaises(ValidationError):
+            func_1('a', '2', b='3', c='4')
+
+        @a.load_args(collect_errors=False)
+        def func_2(a, *args, b=1, **kwargs):
+            return a + sum(args) + b + kwargs['c']
+
+        self.assertEqual(func_2(1, 2, b=3, c=4), 10)
+        # don't collect error
+        with self.assertRaises(ValueError):
+            func_2('a', '2', b='3', c='4')
+
+        @a.dump_args
+        def func_3(a, *args, b=1, **kwargs):
+            return a + sum(args) + b + kwargs['c']
+
+        self.assertEqual(func_3('1', '2', b='3', c='4'), 10)
+        # raise error if kwargs are invalid
+        with self.assertRaises(ValueError):
+            func_3('a', '2', b='3', c='4')

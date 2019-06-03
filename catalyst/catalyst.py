@@ -1,4 +1,5 @@
 import json
+import inspect
 
 from typing import Dict, Iterable, Callable, Mapping, Any
 from types import MappingProxyType
@@ -110,6 +111,34 @@ class BaseCatalyst:
     def dump_to_json(self, obj) -> str:
         return json.dumps(self.dump(obj))
 
+    def dump_args(self, func: Callable) -> Callable:
+        """Decorator for dumping args by catalyst before function is called.
+        The wrapper function takes args as same as args of the raw function.
+        If args are invalid, error will be raised.
+        In general, `*args` should be handled by ListField,
+        and `**kwargs` should be handled by NestedField.
+        """
+        sig = inspect.signature(func)
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            ba = sig.bind(*args, **kwargs)
+            result = self.dump(ba.arguments)
+            ba.arguments.update(result)
+            return func(*ba.args, **ba.kwargs)
+        return wrapper
+
+    def dump_kwargs(self, func: Callable) -> Callable:
+        """Decorator for dumping kwargs by catalyst before function is called.
+        The wrapper function only takes kwargs, and unpacks dumping result to
+        the raw function. If kwargs are invalid, error will be raised.
+        """
+        @wraps(func)
+        def wrapper(**kwargs):
+            kwargs = self.dump(kwargs)
+            return func(**kwargs)
+        return wrapper
+
+
     def pre_load(self, data: dict) -> dict:
         return data
     pre_load.error_key = 'pre_load'
@@ -191,16 +220,45 @@ class BaseCatalyst:
             json.loads(s), raise_error=raise_error,
             collect_errors=collect_errors)
 
-    def load_kwargs(self, func=None, collect_errors=None):
-        'decorator, certainly raise error'
+    def load_args(self,
+                  func: Callable = None,
+                  collect_errors: bool = None
+                  ) -> Callable:
+        """Decorator for loading args by catalyst before function is called.
+        The wrapper function takes args as same as args of the raw function.
+        If args are invalid, error will be raised.
+        In general, `*args` should be handled by ListField,
+        and `**kwargs` should be handled by NestedField.
+        """
         if func:
+            sig = inspect.signature(func)
             @wraps(func)
             def wrapper(*args, **kwargs):
+                ba = sig.bind(*args, **kwargs)
+                result = self.load(ba.arguments, raise_error=True, collect_errors=collect_errors)
+                ba.arguments.update(result)
+                return func(*ba.args, **ba.kwargs)
+            return wrapper
+
+        return partial(self.load_args, collect_errors=collect_errors)
+
+    def load_kwargs(self,
+                    func: Callable = None,
+                    collect_errors: bool = None
+                    ) -> Callable:
+        """Decorator for loading kwargs by catalyst before function is called.
+        The wrapper function only takes kwargs, and unpacks loading result to
+        the raw function. If kwargs are invalid, error will be raised.
+        """
+        if func:
+            @wraps(func)
+            def wrapper(**kwargs):
                 kwargs = self.load(kwargs, raise_error=True, collect_errors=collect_errors)
-                return func(*args, **kwargs)
+                return func(**kwargs)
             return wrapper
 
         return partial(self.load_kwargs, collect_errors=collect_errors)
+
 
 class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
