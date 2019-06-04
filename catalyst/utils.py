@@ -1,6 +1,38 @@
 from typing import Mapping, Callable
+from types import MappingProxyType
 
 from .exceptions import ValidationError
+
+
+class LoadResult(dict):
+    def __init__(self, valid_data: dict = None, errors: dict = None, invalid_data: dict = None):
+        super().__init__(valid_data if valid_data else {})
+        self.valid_data = MappingProxyType(self)
+        self.errors = errors if errors else {}
+        self.invalid_data = invalid_data if invalid_data else {}
+
+    def __repr__(self):
+        if not self.is_valid:
+            return 'LoadResult(is_valid=%s, errors=%s)' % (self.is_valid, self.format_errors())
+        return 'LoadResult(is_valid=%s, valid_data=%s)' % (self.is_valid, super().__repr__())
+
+    def __str__(self):
+        if not self.is_valid:
+            return str(self.format_errors())
+        return super().__repr__()
+
+    def format_errors(self):
+        return {k: str(self.errors[k]) for k in self.errors}
+
+    def update(self, E, **F):
+        if isinstance(E, self.__class__):
+            self.invalid_data.update(E.invalid_data)
+            self.errors.update(E.errors)
+        super().update(E, **F)
+
+    @property
+    def is_valid(self):
+        return not self.errors
 
 
 class ErrorMessageMixin:
