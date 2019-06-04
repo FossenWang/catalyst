@@ -5,7 +5,7 @@ from typing import Dict, Iterable, Callable, Mapping, Any
 from types import MappingProxyType
 from functools import wraps, partial
 
-from .packer import Packer
+from .packer import CatalystPacker
 from .fields import Field, NestedField, no_processing
 from .exceptions import ValidationError
 from .utils import dump_from_attribute_or_key, missing, \
@@ -260,7 +260,7 @@ class BaseCatalyst:
         return partial(self.load_kwargs, collect_errors=collect_errors)
 
     def pack(self, data):
-        packer = Packer()
+        packer = CatalystPacker()
         return packer.pack(self, data)
 
 
