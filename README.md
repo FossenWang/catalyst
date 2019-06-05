@@ -54,7 +54,7 @@ pprint(dump_result)
 load_result = articleCatalyst.load(dump_result)
 
 pprint(type(load_result))
-# <class 'catalyst.catalyst.LoadResult'>
+# <class 'catalyst.catalyst.LoadDict'>
 pprint(load_result)
 # {'author': LoadResult(is_valid=True, valid_data={'name': 'fossen'}),
 #  'content': 'content',

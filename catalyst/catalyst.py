@@ -8,7 +8,7 @@ from .packer import CatalystPacker
 from .fields import Field, NestedField, no_processing
 from .exceptions import ValidationError
 from .utils import dump_from_attribute_or_key, missing, \
-    ensure_staticmethod, LoadResult
+    ensure_staticmethod, LoadDict
 
 
 FieldDict = Dict[str, Field]
@@ -128,7 +128,7 @@ class BaseCatalyst:
              data: dict,
              raise_error: bool = None,
              collect_errors: bool = None
-             ) -> LoadResult:
+             ) -> LoadDict:
 
         if not isinstance(data, Mapping):
             raise TypeError('Argument "data" must be a mapping object.')
@@ -183,7 +183,7 @@ class BaseCatalyst:
                 error_key = getattr(self.post_load, 'error_key', 'post_load')
                 errors[error_key] = e
 
-        load_result = LoadResult(valid_data, errors, invalid_data)
+        load_result = LoadDict(valid_data, errors, invalid_data)
         if not load_result.is_valid and raise_error:
             raise ValidationError(load_result)
         return load_result
@@ -192,7 +192,7 @@ class BaseCatalyst:
                        s: str,
                        raise_error: bool = None,
                        collect_errors: bool = None
-                       ) -> LoadResult:
+                       ) -> LoadDict:
         return self.load(
             json.loads(s), raise_error=raise_error,
             collect_errors=collect_errors)

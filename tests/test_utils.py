@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 from catalyst.utils import snake_to_camel, ErrorMessageMixin, \
-    ensure_staticmethod
+    ensure_staticmethod, LoadDict
 from catalyst.exceptions import ValidationError
 
 
@@ -46,3 +46,23 @@ class UtilsTest(TestCase):
         self.assertIs(static_func.__func__, func)
         self.assertIs(static_func, ensure_staticmethod(static_func))
         self.assertIs(ensure_staticmethod(static_func).__func__, func)
+
+    def test_load_result(self):
+        result = LoadDict()
+        self.assertTrue(result.is_valid)
+        self.assertEqual(str(result), '{}')
+        self.assertEqual(repr(result), 'LoadResult(is_valid=True, valid_data={})')
+
+        result_2 = LoadDict(errors={'error': 'error'}, invalid_data={0: 0})
+        self.assertFalse(result_2.is_valid)
+        self.assertEqual(str(result_2), "{'error': 'error'}")
+        self.assertEqual(repr(result_2), "LoadResult(is_valid=False, errors={'error': 'error'})")
+
+        result.update({1: 1})
+        self.assertDictEqual(result, {1: 1})
+        self.assertTrue(result.is_valid)
+
+        result.update(result_2)
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.errors, result_2.errors)
+        self.assertDictEqual(result.invalid_data, result_2.invalid_data)

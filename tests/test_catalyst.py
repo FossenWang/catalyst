@@ -248,10 +248,6 @@ class CatalystTest(TestCase):
         self.assertTrue(result.is_valid)
         self.assertDictEqual(result, load_result)
 
-        # test repr
-        self.assertTrue(str(result).startswith('{'))
-        self.assertTrue(repr(result).startswith('LoadResult(is_valid=True'))
-
         # test invalid_data
         with self.assertRaises(TypeError):
             test_data_catalyst.load(1)
@@ -270,10 +266,6 @@ class CatalystTest(TestCase):
         result = test_data_catalyst.load_from_json(s)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, invalid_data)
-
-        # test repr
-        self.assertTrue(str(result).startswith('{'))
-        self.assertTrue(repr(result).startswith('LoadResult(is_valid=False'))
 
         # test invalid_data: parse errors
         invalid_data = {'string': 'x', 'integer': 'str', 'float': []}
