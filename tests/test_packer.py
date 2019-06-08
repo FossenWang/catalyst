@@ -28,7 +28,7 @@ class PackerTest(TestCase):
         result = packer.dump()
         self.assertDictEqual(result, all_data)
         result = packer.load()
-        self.assertDictEqual(result, all_data)
+        self.assertDictEqual(result.data, all_data)
 
         packer.clear()
         packer.pack(a, {'a': 'a'}) \

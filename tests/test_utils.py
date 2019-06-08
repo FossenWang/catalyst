@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 from catalyst.utils import snake_to_camel, ErrorMessageMixin, \
-    ensure_staticmethod, LoadDict
+    ensure_staticmethod, LoadResult
 from catalyst.exceptions import ValidationError
 
 
@@ -48,21 +48,16 @@ class UtilsTest(TestCase):
         self.assertIs(ensure_staticmethod(static_func).__func__, func)
 
     def test_load_result(self):
-        result = LoadDict()
+        result = LoadResult({}, {}, {})
         self.assertTrue(result.is_valid)
+        s = 'LoadResult(data={}, errors={}, invalid_data={})'
+        self.assertEqual(repr(result), s)
         self.assertEqual(str(result), '{}')
-        self.assertEqual(repr(result), 'LoadResult(is_valid=True, valid_data={})')
 
-        result_2 = LoadDict(errors={'error': 'error'}, invalid_data={0: 0})
-        self.assertFalse(result_2.is_valid)
-        self.assertEqual(str(result_2), "{'error': 'error'}")
-        self.assertEqual(repr(result_2), "LoadResult(is_valid=False, errors={'error': 'error'})")
-
-        result.update({1: 1})
-        self.assertDictEqual(result, {1: 1})
-        self.assertTrue(result.is_valid)
-
-        result.update(result_2)
+        result = LoadResult(
+            data={}, errors={'error': ValidationError('error')}, invalid_data={0: 0})
         self.assertFalse(result.is_valid)
-        self.assertDictEqual(result.errors, result_2.errors)
-        self.assertDictEqual(result.invalid_data, result_2.invalid_data)
+        s = "LoadResult(data={}, errors={'error': 'error'}, invalid_data={0: 0})"
+        self.assertEqual(repr(result), s)
+        self.assertDictEqual(result.format_errors(), {'error': 'error'})
+        self.assertEqual(str(result), "{'error': 'error'}")

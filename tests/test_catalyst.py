@@ -90,7 +90,7 @@ class CatalystTest(TestCase):
         r = catalyst.dump(data)
         self.assertEqual(data, r)
         r = catalyst.load(data)
-        self.assertEqual(data, r)
+        self.assertEqual(data, r.data)
 
         # Automatic wrap a subclass of Catalyst as NestedField
         class Article2(Catalyst):
@@ -106,7 +106,7 @@ class CatalystTest(TestCase):
         r = catalyst.dump(data)
         self.assertEqual(data, r)
         r = catalyst.load(data)
-        self.assertEqual(data, r)
+        self.assertEqual(data, r.data)
 
     def test_init(self):
         "Test initializing Catalyst."
@@ -124,23 +124,23 @@ class CatalystTest(TestCase):
         # Specify "fields" for dumping and loading
         catalyst = TestDataCatalyst(fields=['string'])
         self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
-        self.assertDictEqual(catalyst.load(valid_data), {'string': 'xxx'})
+        self.assertDictEqual(catalyst.load(valid_data).data, {'string': 'xxx'})
 
         # "dump_fields" takes precedence over "fields"
         catalyst = TestDataCatalyst(fields=['string'], dump_fields=['bool_field'])
         self.assertDictEqual(catalyst.dump(test_data), {'bool': True})
-        self.assertDictEqual(catalyst.load(valid_data), {'string': 'xxx'})
+        self.assertDictEqual(catalyst.load(valid_data).data, {'string': 'xxx'})
 
         # "load_fields" takes precedence over "fields"
         catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])
         self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
-        self.assertDictEqual(catalyst.load(valid_data), {'bool_': True})
+        self.assertDictEqual(catalyst.load(valid_data).data, {'bool_': True})
 
         # When "dump_fields" and "load_fields" are given, fields is not used.
         catalyst = TestDataCatalyst(
             fields=['integer'], dump_fields=['string'], load_fields=['bool_field'])
         self.assertDictEqual(catalyst.dump(test_data), {'string': 'xxx'})
-        self.assertDictEqual(catalyst.load(valid_data), {'bool_': True})
+        self.assertDictEqual(catalyst.load(valid_data).data, {'bool_': True})
 
         with self.assertRaises(KeyError):
             TestDataCatalyst(fields=['wrong_name'])
@@ -240,13 +240,13 @@ class CatalystTest(TestCase):
         self.assertTrue(result.is_valid)
         self.assertDictEqual(result.invalid_data, {})
         self.assertDictEqual(result.errors, {})
-        self.assertDictEqual(result, load_result)
+        self.assertDictEqual(result.data, load_result)
 
         # load from json
         s = json.dumps(valid_data)
         result = test_data_catalyst.load_from_json(s)
         self.assertTrue(result.is_valid)
-        self.assertDictEqual(result, load_result)
+        self.assertDictEqual(result.data, load_result)
 
         # test invalid_data
         with self.assertRaises(TypeError):
@@ -259,7 +259,7 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.invalid_data, invalid_data)
         self.assertEqual(set(result.errors), {
             'string', 'integer', 'float'})
-        self.assertDictEqual(result, {})
+        self.assertDictEqual(result.data, {})
 
         # load from json
         s = json.dumps(invalid_data)
@@ -321,34 +321,34 @@ class CatalystTest(TestCase):
         catalyst = self.create_catalyst()
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
-        self.assertTrue(result == {})
+        self.assertTrue(result.data == {})
 
         # default value for missing field
         catalyst = self.create_catalyst(load_default=None)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
-        self.assertEqual(result['s'], None)
+        self.assertEqual(result.data['s'], None)
 
         result = catalyst.load({'s': 1})
         self.assertTrue(result.is_valid)
-        self.assertEqual(result['s'], '1')
+        self.assertEqual(result.data['s'], '1')
 
         catalyst = self.create_catalyst(load_default=1)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
-        self.assertEqual(result['s'], '1')
+        self.assertEqual(result.data['s'], '1')
 
         # callable default
         catalyst = self.create_catalyst(load_default=lambda: 1)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
-        self.assertEqual(result['s'], '1')
+        self.assertEqual(result.data['s'], '1')
 
         # invalid when required field is missing
         catalyst = self.create_catalyst(load_required=True)
         result = catalyst.load({})
         self.assertFalse(result.is_valid)
-        self.assertDictEqual(result, {})
+        self.assertDictEqual(result.data, {})
         self.assertDictEqual(result.invalid_data, {})
         self.assertEqual(set(result.errors), {'s'})
 
@@ -357,25 +357,25 @@ class CatalystTest(TestCase):
             catalyst = self.create_catalyst(load_required=True, load_default=None)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
-        self.assertEqual(result['s'], None)
+        self.assertEqual(result.data['s'], None)
 
         # pass None to parser and validators
         catalyst = self.create_catalyst(parse_none=True)
         result = catalyst.load({'s': None})
         self.assertTrue(result.is_valid)
-        self.assertEqual(result['s'], 'None')
+        self.assertEqual(result.data['s'], 'None')
 
         catalyst = self.create_catalyst(parse_none=True, load_default=None)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
-        self.assertEqual(result['s'], 'None')
+        self.assertEqual(result.data['s'], 'None')
 
         # parse_none has no effect if allow_none is False
         with self.assertWarns(Warning):
             catalyst = self.create_catalyst(parse_none=True, allow_none=False)
         result = catalyst.load({'s': None})
         self.assertFalse(result.is_valid)
-        self.assertDictEqual(result, {})
+        self.assertDictEqual(result.data, {})
         self.assertDictEqual(result.invalid_data, {'s': None})
         self.assertEqual(set(result.errors), {'s'})
 
@@ -383,7 +383,7 @@ class CatalystTest(TestCase):
         catalyst = self.create_catalyst(allow_none=False, load_default=None)
         result = catalyst.load({})
         self.assertFalse(result.is_valid)
-        self.assertDictEqual(result, {})
+        self.assertDictEqual(result.data, {})
         self.assertDictEqual(result.invalid_data, {'s': None})
         self.assertEqual(set(result.errors), {'s'})
 
@@ -395,7 +395,7 @@ class CatalystTest(TestCase):
 
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
-        self.assertDictEqual(result, {})
+        self.assertDictEqual(result.data, {})
 
     def test_pre_and_post_process(self):
         class C(Catalyst):
@@ -475,7 +475,7 @@ class CatalystTest(TestCase):
         result = a.dump({'snake_to_camel': 'snake'})
         self.assertIn('snakeToCamel', result)
         result = a.load({'snakeToCamel': 'snake'})
-        self.assertIn('snake_to_camel', result)
+        self.assertIn('snake_to_camel', result.data)
 
         # change field name naming style
         class B(Catalyst):
@@ -489,7 +489,7 @@ class CatalystTest(TestCase):
         result = b.dump({'snakeToCamel': 'snake'})
         self.assertIn('snake_to_camel', result)
         result = b.load({'snake_to_camel': 'snake'})
-        self.assertIn('snakeToCamel', result)
+        self.assertIn('snakeToCamel', result.data)
 
         # change field name and key naming style
         class C(Catalyst):
@@ -510,8 +510,8 @@ class CatalystTest(TestCase):
         self.assertIn('snakeToCamel', result)
         self.assertIn('still_snake', result)
         result = c.load({'snakeToCamel': None, 'still_snake': None})
-        self.assertIn('snakeToCamel', result)
-        self.assertIn('still_snake', result)
+        self.assertIn('snakeToCamel', result.data)
+        self.assertIn('still_snake', result.data)
 
     def test_inherit(self):
         class A(Catalyst):
@@ -608,3 +608,11 @@ class CatalystTest(TestCase):
         # raise error if kwargs are invalid
         with self.assertRaises(ValueError):
             func_3('a', '2', b='3', c='4')
+
+    def __test_load_many(self):
+        c = self.create_catalyst()
+
+        data = [{'s': 1} for _ in range(5)]
+        result = c.load_many(data)
+
+        print(result)

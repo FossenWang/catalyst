@@ -1,4 +1,4 @@
-from .utils import LoadDict
+from .utils import LoadResult
 
 
 class CatalystPacker:
@@ -19,11 +19,14 @@ class CatalystPacker:
     def load(self,
              raise_error: bool = None,
              collect_errors: bool = None
-             ) -> LoadDict:
-        result = LoadDict()
+             ) -> LoadResult:
+        valid_data, errors, invalid_data = {}, {}, {}
         for catalyst, data in self.packages:
-            temp = catalyst.load(data, raise_error=raise_error, collect_errors=collect_errors)
-            result.update(temp)
+            temp = catalyst.load(data, raise_error, collect_errors)
+            valid_data.update(temp.data)
+            errors.update(temp.errors)
+            invalid_data.update(temp.invalid_data)
+        result = LoadResult(valid_data, errors, invalid_data)
         return result
 
     def clear(self):

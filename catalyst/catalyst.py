@@ -8,7 +8,7 @@ from .packer import CatalystPacker
 from .fields import Field, NestedField, no_processing
 from .exceptions import ValidationError
 from .utils import dump_from_attribute_or_key, missing, \
-    ensure_staticmethod, LoadDict
+    ensure_staticmethod, LoadResult
 
 
 FieldDict = Dict[str, Field]
@@ -128,7 +128,7 @@ class BaseCatalyst:
              data: dict,
              raise_error: bool = None,
              collect_errors: bool = None
-             ) -> LoadDict:
+             ) -> LoadResult:
 
         if not isinstance(data, Mapping):
             raise TypeError('Argument "data" must be a mapping object.')
@@ -183,16 +183,34 @@ class BaseCatalyst:
                 error_key = getattr(self.post_load, 'error_key', 'post_load')
                 errors[error_key] = e
 
-        load_result = LoadDict(valid_data, errors, invalid_data)
+        load_result = LoadResult(valid_data, errors, invalid_data)
         if not load_result.is_valid and raise_error:
             raise ValidationError(load_result)
         return load_result
+
+    def load_many(self,
+                  data: Iterable,
+                  raise_error: bool = None,
+                  collect_errors: bool = None
+                  ) -> LoadResult:
+        if raise_error is None:
+            raise_error = self.raise_error
+        if collect_errors is None:
+            collect_errors = self.collect_errors
+
+        result = LoadResult()
+        for item in data:
+            result.append(self.load(item, False, collect_errors))
+
+        if raise_error:
+            raise ValidationError(result)
+        return result
 
     def load_from_json(self,
                        s: str,
                        raise_error: bool = None,
                        collect_errors: bool = None
-                       ) -> LoadDict:
+                       ) -> LoadResult:
         return self.load(
             json.loads(s), raise_error=raise_error,
             collect_errors=collect_errors)
@@ -213,7 +231,7 @@ class BaseCatalyst:
             def wrapper(*args, **kwargs):
                 ba = sig.bind(*args, **kwargs)
                 result = self.load(ba.arguments, raise_error=True, collect_errors=collect_errors)
-                ba.arguments.update(result)
+                ba.arguments.update(result.data)
                 return func(*ba.args, **ba.kwargs)
             return wrapper
 
@@ -230,8 +248,8 @@ class BaseCatalyst:
         if func:
             @wraps(func)
             def wrapper(**kwargs):
-                kwargs = self.load(kwargs, raise_error=True, collect_errors=collect_errors)
-                return func(**kwargs)
+                result = self.load(kwargs, raise_error=True, collect_errors=collect_errors)
+                return func(**result.data)
             return wrapper
 
         return partial(self.load_kwargs, collect_errors=collect_errors)
