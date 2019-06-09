@@ -261,4 +261,4 @@ class NestedField(Field):
         return self.catalyst.dump(value)
 
     def default_parser(self, value):
-        return self.catalyst.load(value, True).data
+        return self.catalyst.load(value, True).valid_data

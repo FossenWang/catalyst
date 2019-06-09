@@ -23,7 +23,7 @@ class CatalystPacker:
         valid_data, errors, invalid_data = {}, {}, {}
         for catalyst, data in self.packages:
             temp = catalyst.load(data, raise_error, collect_errors)
-            valid_data.update(temp.data)
+            valid_data.update(temp.valid_data)
             errors.update(temp.errors)
             invalid_data.update(temp.invalid_data)
         result = LoadResult(valid_data, errors, invalid_data)

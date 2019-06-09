@@ -50,14 +50,15 @@ class UtilsTest(TestCase):
     def test_load_result(self):
         result = LoadResult({}, {}, {})
         self.assertTrue(result.is_valid)
-        s = 'LoadResult(data={}, errors={}, invalid_data={})'
+        s = 'LoadResult(valid_data={}, errors={}, invalid_data={})'
         self.assertEqual(repr(result), s)
         self.assertEqual(str(result), '{}')
 
         result = LoadResult(
-            data={}, errors={'error': ValidationError('error')}, invalid_data={0: 0})
+            valid_data={}, errors={'error': ValidationError('error')}, invalid_data={0: 0})
         self.assertFalse(result.is_valid)
-        s = "LoadResult(data={}, errors={'error': 'error'}, invalid_data={0: 0})"
+        s = ("LoadResult(valid_data={}, "
+             "errors={'error': ValidationError('error')}, invalid_data={0: 0})")
         self.assertEqual(repr(result), s)
         self.assertDictEqual(result.format_errors(), {'error': 'error'})
         self.assertEqual(str(result), "{'error': 'error'}")

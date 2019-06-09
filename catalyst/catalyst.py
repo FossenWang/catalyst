@@ -1,8 +1,9 @@
 import json
 import inspect
 
-from typing import Dict, Iterable, Callable, Mapping, Any
+from typing import Dict, Iterable, Callable, Mapping, Sequence, Any
 from functools import wraps, partial
+from collections import OrderedDict
 
 from .packer import CatalystPacker
 from .fields import Field, NestedField, no_processing
@@ -85,6 +86,9 @@ class BaseCatalyst:
 
         result = self.post_dump(result)
         return result
+
+    def dump_many(self, objs: Sequence) -> list:
+        return [self.dump(obj) for obj in objs]
 
     def dump_to_json(self, obj) -> str:
         return json.dumps(self.dump(obj))
@@ -189,7 +193,7 @@ class BaseCatalyst:
         return load_result
 
     def load_many(self,
-                  data: Iterable,
+                  data: Sequence,
                   raise_error: bool = None,
                   collect_errors: bool = None
                   ) -> LoadResult:
@@ -198,13 +202,18 @@ class BaseCatalyst:
         if collect_errors is None:
             collect_errors = self.collect_errors
 
-        result = LoadResult()
-        for item in data:
-            result.append(self.load(item, False, collect_errors))
+        valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
+        for i, item in enumerate(data):
+            result = self.load(item, False, collect_errors)
+            valid_data.append(result.valid_data)
+            if not result.is_valid:
+                errors[i] = result.errors
+                invalid_data[i] = result.invalid_data
 
+        results = LoadResult(valid_data, errors, invalid_data)
         if raise_error:
-            raise ValidationError(result)
-        return result
+            raise ValidationError(results)
+        return results
 
     def load_from_json(self,
                        s: str,
@@ -231,7 +240,7 @@ class BaseCatalyst:
             def wrapper(*args, **kwargs):
                 ba = sig.bind(*args, **kwargs)
                 result = self.load(ba.arguments, raise_error=True, collect_errors=collect_errors)
-                ba.arguments.update(result.data)
+                ba.arguments.update(result.valid_data)
                 return func(*ba.args, **ba.kwargs)
             return wrapper
 
@@ -249,7 +258,7 @@ class BaseCatalyst:
             @wraps(func)
             def wrapper(**kwargs):
                 result = self.load(kwargs, raise_error=True, collect_errors=collect_errors)
-                return func(**result.data)
+                return func(**result.valid_data)
             return wrapper
 
         return partial(self.load_kwargs, collect_errors=collect_errors)

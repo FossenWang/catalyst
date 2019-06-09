@@ -1,28 +1,34 @@
-from typing import Mapping, Callable
+from typing import Mapping, Callable, Iterable
 
 from .exceptions import ValidationError
 
 
 class LoadResult:
-    def __init__(self, data, errors, invalid_data):
-        self.data = data
+    def __init__(self, valid_data: Iterable, errors: Mapping, invalid_data: Mapping):
+        self.valid_data = valid_data
         self.errors = errors
         self.invalid_data = invalid_data
 
     def __repr__(self):
         return (
-            f'LoadResult(data={self.data}, '
-            f'errors={self.format_errors()}, '
+            f'LoadResult(valid_data={self.valid_data}, '
+            f'errors={self.errors}, '
             f'invalid_data={self.invalid_data})'
         )
 
     def __str__(self):
         if self.is_valid:
-            return str(self.data)
+            return str(self.valid_data)
         return str(self.format_errors())
 
+    @classmethod
+    def _format_errors(cls, errors: Mapping):
+        if isinstance(errors, Mapping):
+            return {k: cls._format_errors(errors[k]) for k in errors}
+        return str(errors)
+
     def format_errors(self):
-        return {k: str(self.errors[k]) for k in self.errors}
+        return self._format_errors(self.errors)
 
     @property
     def is_valid(self):
