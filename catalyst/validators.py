@@ -1,5 +1,7 @@
 "Validators"
 
+from typing import Sequence
+
 from .utils import ErrorMessageMixin
 
 
@@ -33,9 +35,9 @@ class LengthValidator(Validator):
         super().__init__(error_messages)
 
         if min_length is not None:
-            self.error_messages.setdefault('too_small', f'Ensure string length >= {min_length}.')
+            self.error_messages.setdefault('too_small', f'Ensure length >= {min_length}.')
         if max_length is not None:
-            self.error_messages.setdefault('too_large', f'Ensure string length <= {max_length}.')
+            self.error_messages.setdefault('too_large', f'Ensure length <= {max_length}.')
 
     def __call__(self, value):
         if self.min_length is not None and len(value) < self.min_length:
@@ -75,3 +77,18 @@ class ComparisonValidator(Validator):
 
         if self.max_value is not None and value > self.max_value:
             self.error('too_large')
+
+
+class TypeValidator(Validator):
+    def __init__(self, class_or_tuple, error_messages: dict = None):
+        self.class_or_tuple = class_or_tuple
+        super().__init__(error_messages)
+        if isinstance(class_or_tuple, Sequence):
+            msg = f'Type must be one of {class_or_tuple}.'
+        else:
+            msg = f'Type must be {class_or_tuple}.'
+        self.error_messages.setdefault('wrong_type', msg)
+
+    def __call__(self, value):
+        if not isinstance(value, self.class_or_tuple):
+            self.error('wrong_type', TypeError)

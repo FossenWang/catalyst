@@ -7,7 +7,8 @@ from warnings import warn
 from .utils import ErrorMessageMixin, missing, no_processing
 from .validators import (
     LengthValidator,
-    ComparisonValidator
+    ComparisonValidator,
+    TypeValidator,
 )
 
 
@@ -27,6 +28,7 @@ class Field(ErrorMessageMixin):
     default_formatter = staticmethod(no_processing)
     default_parser = staticmethod(no_processing)
     default_validators = None
+    _type = None
 
     def __init__(self,
                  name: str = None,
@@ -130,8 +132,7 @@ class Field(ErrorMessageMixin):
             # don't pass value to formatter
             return value
 
-        if self.formatter:
-            value = self.formatter(value)
+        value = self.formatter(value)
         return value
 
     def load(self, value):

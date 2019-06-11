@@ -3,7 +3,7 @@ from unittest import TestCase
 from catalyst.exceptions import ValidationError
 from catalyst.validators import (
     Validator, LengthValidator,
-    ComparisonValidator
+    ComparisonValidator, TypeValidator
 )
 
 
@@ -103,3 +103,15 @@ class ValidationTest(TestCase):
 
         with self.assertRaises(ValueError):
             LengthValidator(1, 0)
+
+    def test_type_validator(self):
+        validator = TypeValidator(int)
+        validator(0)
+        with self.assertRaises(TypeError):
+            validator('')
+
+        validator = TypeValidator((int, str))
+        validator(0)
+        validator('')
+        with self.assertRaises(TypeError):
+            validator(0.0)
