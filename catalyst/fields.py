@@ -61,10 +61,6 @@ class Field(ErrorMessageMixin):
             warn('Some args of Field may redundant, '
                  'if "load_default" is set, "load_required=True" has no effect.')
 
-        if not allow_none and parse_none:
-            warn('Some args of Field may redundant, '
-                 'if "allow_none" is false, "parse_none=True" has no effect.')
-
         self.name = name
         self.key = key
 
@@ -78,12 +74,13 @@ class Field(ErrorMessageMixin):
         # Arguments used for loading
         self.set_parser(parser if parser else self.default_parser)
         self.parse_none = parse_none
-        self.allow_none = allow_none
-        self.set_validators(validators if validators else self.default_validators)
         self.load_required = load_required
         self.load_default = load_default
         self.no_load = no_load
 
+        # Arguments used for validation
+        self.allow_none = allow_none
+        self.set_validators(validators if validators else self.default_validators)
         self.collect_error_messages(error_messages)
 
     def set_formatter(self, formatter: FormatterType):
@@ -135,17 +132,23 @@ class Field(ErrorMessageMixin):
         return value
 
     def load(self, value):
-        if value is None:
-            if not self.allow_none:
-                self.error('none')
-            elif not self.parse_none:
-                return None
-
-        value = self.parser(value)
+        value = self.parse(value)
         self.validate(value)
         return value
 
+    def parse(self, value):
+        if value is None and not self.parse_none:
+            return None
+
+        value = self.parser(value)
+        return value
+
     def validate(self, value):
+        if value is None:
+            if self.allow_none:
+                return
+            self.error('none')
+
         for validator in self.validators:
             validator(value)
 
@@ -261,7 +264,7 @@ class DateField(DatetimeField):
         return datetime.strptime(date_string, self.fmt).date()
 
 
-class NestedField(Field):    
+class NestedField(Field):
     default_validators = [TypeValidator(Mapping)]
 
     def __init__(self, catalyst, **kwargs):

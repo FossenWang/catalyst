@@ -380,14 +380,10 @@ class CatalystTest(TestCase):
         self.assertTrue(result.is_valid)
         self.assertEqual(result.valid_data['s'], 'None')
 
-        # parse_none has no effect if allow_none is False
-        with self.assertWarns(Warning):
-            catalyst = self.create_catalyst(parse_none=True, allow_none=False)
+        catalyst = self.create_catalyst(parse_none=True, allow_none=False)
         result = catalyst.load({'s': None})
-        self.assertFalse(result.is_valid)
-        self.assertDictEqual(result.valid_data, {})
-        self.assertDictEqual(result.invalid_data, {'s': None})
-        self.assertEqual(set(result.errors), {'s'})
+        self.assertTrue(result.is_valid)
+        self.assertEqual(result.valid_data['s'], 'None')
 
         # always invalid if load_default is None and allow_none is False
         catalyst = self.create_catalyst(allow_none=False, load_default=None)
