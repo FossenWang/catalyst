@@ -1,6 +1,6 @@
 "Fields"
 
-from typing import Callable, Any, Iterable, Union, Mapping
+from typing import Callable, Any, Iterable, Union, Mapping, Sequence
 from datetime import datetime, time, date
 from warnings import warn
 
@@ -28,7 +28,6 @@ class Field(ErrorMessageMixin):
     default_formatter = staticmethod(no_processing)
     default_parser = staticmethod(no_processing)
     default_validators = None
-    _type = None
 
     def __init__(self,
                  name: str = None,
@@ -117,7 +116,7 @@ class Field(ErrorMessageMixin):
         return validators
 
     def set_validators(self, validators: MultiValidator):
-        self.validators = self.ensure_validators(validators)
+        self.validators = list(self.ensure_validators(validators))
         return validators
 
     def add_validator(self, validator: ValidatorType):
@@ -154,6 +153,7 @@ class Field(ErrorMessageMixin):
 class StringField(Field):
     default_formatter = str
     default_parser = str
+    default_validators = [TypeValidator(str)]
 
     def __init__(self, min_length: int = None, max_length: int = None, **kwargs):
         super().__init__(**kwargs)
@@ -162,9 +162,9 @@ class StringField(Field):
 
 
 class NumberField(Field):
-    _type = float
     default_formatter = float
     default_parser = float
+    default_validators = [TypeValidator(float)]
 
     def __init__(self, min_value=None, max_value=None, **kwargs):
         super().__init__(**kwargs)
@@ -177,17 +177,20 @@ class FloatField(NumberField):
 
 
 class IntegerField(NumberField):
-    _type = int
     default_formatter = int
     default_parser = int
+    default_validators = [TypeValidator(int)]
 
 
 class BoolField(Field):
     default_formatter = bool
     default_parser = bool
+    default_validators = [TypeValidator(bool)]
 
 
 class ListField(Field):
+    default_validators = [TypeValidator(Sequence)]
+
     def __init__(self, item_field: Field, **kwargs):
         self.item_field = item_field
         super().__init__(**kwargs)
@@ -200,6 +203,8 @@ class ListField(Field):
 
 
 class CallableField(Field):
+    default_validators = [TypeValidator(Callable)]
+
     def __init__(self,
                  func_args: Iterable = None,
                  func_kwargs: Mapping = None,
@@ -223,6 +228,7 @@ class CallableField(Field):
 class DatetimeField(Field):
     _type = datetime
     _default_fmt = r'%Y-%m-%d %H:%M:%S.%f'
+    default_validators = [TypeValidator(datetime)]
 
     def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
         self.fmt = fmt if fmt else self._default_fmt
@@ -230,7 +236,7 @@ class DatetimeField(Field):
         if min_time is not None or max_time is not None:
             self.add_validator(ComparisonValidator(min_time, max_time))
 
-    def default_formatter(self, dt: _type):
+    def default_formatter(self, dt):
         return self._type.strftime(dt, self.fmt)
 
     def default_parser(self, date_string: str):
@@ -240,6 +246,7 @@ class DatetimeField(Field):
 class TimeField(DatetimeField):
     _type = time
     _default_fmt = r'%H:%M:%S.%f'
+    default_validators = [TypeValidator(time)]
 
     def default_parser(self, date_string: str):
         return datetime.strptime(date_string, self.fmt).time()
@@ -248,12 +255,15 @@ class TimeField(DatetimeField):
 class DateField(DatetimeField):
     _type = date
     _default_fmt = r'%Y-%m-%d'
+    default_validators = [TypeValidator(date)]
 
     def default_parser(self, date_string: str):
         return datetime.strptime(date_string, self.fmt).date()
 
 
-class NestedField(Field):
+class NestedField(Field):    
+    default_validators = [TypeValidator(Mapping)]
+
     def __init__(self, catalyst, **kwargs):
         self.catalyst = catalyst
         super().__init__(**kwargs)

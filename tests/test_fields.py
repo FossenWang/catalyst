@@ -70,6 +70,7 @@ class FieldTest(TestCase):
 
     def test_string_field(self):
         string_field = StringField(name='string', key='string', min_length=2, max_length=12)
+        field = StringField(name='string', key='string', min_length=2, max_length=12)
 
         # dump
         self.assertEqual(string_field.dump('xxx'), 'xxx')
