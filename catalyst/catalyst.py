@@ -142,36 +142,28 @@ class BaseCatalyst:
         if collect_errors is None:
             collect_errors = self.collect_errors
 
-        errors = {}
+        data, errors = self._side_effect(
+            data, {}, 'pre_load', not collect_errors)
 
-        try:
-            data = self.pre_load(data)
-        except Exception as e:
-            if not collect_errors:
-                raise e
-            error_key = getattr(self.pre_load, 'error_key', 'pre_load')
-            errors[error_key] = e
+        valid_data, invalid_data = {}, {}
 
-        invalid_data = {}
-        valid_data = {}
         if not errors:
             for field in self._load_field_dict.values():
                 try:
-                    default = field.load_default
-                    if callable(default):
-                        default = default()
-                    raw_value = data.get(field.key, default)
+                    raw_value = data.get(field.key, field.load_default)
+
+                    # raise error when field is missing and required
+                    # ignore missing field not required
                     if raw_value is missing:
                         if field.load_required:
-                            # raise error when field is missing and required
                             field.error('required')
-                        # ignore missing field not required
                         continue
-                    # set default value for missing field
+
                     value = field.load(raw_value)
                 except Exception as e:
                     if not collect_errors:
                         raise e
+                    # collect errors and invalid data
                     errors[field.key] = e
                     if raw_value is not missing:
                         invalid_data[field.key] = raw_value
@@ -179,16 +171,11 @@ class BaseCatalyst:
                     valid_data[field.name] = value
 
         if not errors:
-            try:
-                valid_data = self.post_load(valid_data)
-            except Exception as e:
-                if not collect_errors:
-                    raise e
-                error_key = getattr(self.post_load, 'error_key', 'post_load')
-                errors[error_key] = e
+            data, errors = self._side_effect(
+                data, errors, 'post_load', not collect_errors)
 
         load_result = LoadResult(valid_data, errors, invalid_data)
-        if not load_result.is_valid and raise_error:
+        if errors and raise_error:
             raise ValidationError(load_result)
         return load_result
 
@@ -263,6 +250,17 @@ class BaseCatalyst:
 
         return partial(self.load_kwargs, collect_errors=collect_errors)
 
+    def _side_effect(self, data, errors, name, raise_error):
+        handle = getattr(self, name)
+        try:
+            data = handle(data)
+        except Exception as e:
+            if raise_error:
+                raise e
+            error_key = getattr(handle, 'error_key', name)
+            errors[error_key] = e
+        return data, errors
+
     def pack(self, data):
         packer = CatalystPacker()
         return packer.pack(self, data)
@@ -279,8 +277,7 @@ class CatalystMeta(type):
 
         # collect fields to cls._field_dict
         fields = {}  # type: FieldDict
-        for attr in dir(new_cls):
-            value = getattr(new_cls, attr)
+        for attr, value in attrs.items():
             # init calalyst object
             if isinstance(value, cls):
                 value = value()
@@ -296,6 +293,8 @@ class CatalystMeta(type):
                     value.key = format_key(attr)
                 fields[attr] = value
 
+        # inherit fields
+        fields.update(new_cls._field_dict)
         new_cls._field_dict = fields
         return new_cls
 

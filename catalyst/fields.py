@@ -68,14 +68,14 @@ class Field(ErrorMessageMixin):
         self.set_formatter(formatter if formatter else self.default_formatter)
         self.format_none = format_none
         self.dump_required = dump_required
-        self.dump_default = dump_default
+        self._dump_default = dump_default
         self.no_dump = no_dump
 
         # Arguments used for loading
         self.set_parser(parser if parser else self.default_parser)
         self.parse_none = parse_none
         self.load_required = load_required
-        self.load_default = load_default
+        self._load_default = load_default
         self.no_load = no_load
 
         # Arguments used for validation
@@ -146,11 +146,27 @@ class Field(ErrorMessageMixin):
     def validate(self, value):
         if value is None:
             if self.allow_none:
-                return
+                return None
             self.error('none')
 
         for validator in self.validators:
             validator(value)
+
+        return value
+
+    @property
+    def dump_default(self):
+        default = self._dump_default
+        if callable(default):
+            default = default()
+        return default
+
+    @property
+    def load_default(self):
+        default = self._load_default
+        if callable(default):
+            default = default()
+        return default
 
 
 class StringField(Field):
