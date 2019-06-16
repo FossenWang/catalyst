@@ -1,4 +1,4 @@
-from .catalyst import Catalyst, LoadResult
+from .catalyst import Catalyst, LoadResult, DumpResult
 from .fields import (
     Field, StringField, IntegerField, FloatField,
     DatetimeField, DateField, TimeField,

@@ -9,7 +9,7 @@ from .packer import CatalystPacker
 from .fields import Field, NestedField, no_processing
 from .exceptions import ValidationError
 from .utils import dump_from_attribute_or_key, missing, \
-    ensure_staticmethod, LoadResult
+    ensure_staticmethod, LoadResult, DumpResult
 
 
 FieldDict = Dict[str, Field]
@@ -59,41 +59,89 @@ class BaseCatalyst:
                 new_fields[key] = fields[key]
         return new_fields
 
-    def pre_dump(self, obj):
-        return obj
+    def pack(self, data):
+        packer = CatalystPacker()
+        return packer.pack(self, data)
 
-    def post_dump(self, result: dict) -> dict:
-        return result
+    def dump(self,
+             data,
+             raise_error: bool = None,
+             collect_errors: bool = None
+             ) -> DumpResult:
 
-    def dump(self, obj) -> dict:
-        obj = self.pre_dump(obj)
+        if raise_error is None:
+            raise_error = self.raise_error
+        if collect_errors is None:
+            collect_errors = self.collect_errors
 
-        result = {}
-        for field in self._dump_field_dict.values():
-            try:
-                value = self.dump_from(obj, field.name)
-            except (AttributeError, KeyError) as e:
-                default = field.dump_default
-                if default is missing:
-                    if field.dump_required:
-                        # raise error when field is missing and required
+        data, errors = self._side_effect(
+            data, {}, 'pre_dump', not collect_errors)
+
+        valid_data, invalid_data = {}, {}
+
+        if not errors:
+            for field in self._dump_field_dict.values():
+                try:
+                    raw_value = missing
+                    raw_value = self.dump_from(data, field.name, field.dump_default)
+
+                    # if the field's value is missing
+                    # raise error if required otherwise skip
+                    if raw_value is missing:
+                        if field.dump_required:
+                            field.error('required')
+                        continue
+
+                    value = field.dump(raw_value)
+                except Exception as e:
+                    if not collect_errors:
                         raise e
-                    # ignore missing field not required
-                    continue
-                # set default value for missing field
-                value = default() if callable(default) else default
-            result[field.key] = field.dump(value)
+                    # collect errors and invalid data
+                    errors[field.name] = e
+                    if raw_value is not missing:
+                        invalid_data[field.name] = raw_value
+                else:
+                    valid_data[field.key] = value
 
-        result = self.post_dump(result)
-        return result
+        if not errors:
+            data, errors = self._side_effect(
+                data, errors, 'post_dump', not collect_errors)
 
-    def dump_many(self, objs: Sequence) -> list:
-        return [self.dump(obj) for obj in objs]
+        dump_result = DumpResult(valid_data, errors, invalid_data)
+        if errors and raise_error:
+            raise ValidationError(dump_result)
+        return dump_result
+
+    def dump_many(self,
+                  data: Sequence,
+                  raise_error: bool = None,
+                  collect_errors: bool = None
+                  ) -> DumpResult:
+        if raise_error is None:
+            raise_error = self.raise_error
+        if collect_errors is None:
+            collect_errors = self.collect_errors
+
+        valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
+        for i, item in enumerate(data):
+            result = self.dump(item, False, collect_errors)
+            valid_data.append(result.valid_data)
+            if not result.is_valid:
+                errors[i] = result.errors
+                invalid_data[i] = result.invalid_data
+
+        results = DumpResult(valid_data, errors, invalid_data)
+        if raise_error:
+            raise ValidationError(results)
+        return results
 
     def dump_to_json(self, obj) -> str:
-        return json.dumps(self.dump(obj))
+        return json.dumps(self.dump(obj, True).valid_data)
 
-    def dump_args(self, func: Callable) -> Callable:
+    def dump_args(self,
+                  func: Callable,
+                  collect_errors: bool = None
+                  ) -> Callable:
         """Decorator for dumping args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
         If args are invalid, error will be raised.
@@ -104,29 +152,27 @@ class BaseCatalyst:
         @wraps(func)
         def wrapper(*args, **kwargs):
             ba = sig.bind(*args, **kwargs)
-            result = self.dump(ba.arguments)
-            ba.arguments.update(result)
+            result = self.dump(ba.arguments, True, collect_errors)
+            ba.arguments.update(result.valid_data)
             return func(*ba.args, **ba.kwargs)
         return wrapper
 
-    def dump_kwargs(self, func: Callable) -> Callable:
+    def dump_kwargs(self,
+                    func: Callable = None,
+                    collect_errors: bool = None
+                    ) -> Callable:
         """Decorator for dumping kwargs by catalyst before function is called.
         The wrapper function only takes kwargs, and unpacks dumping result to
         the raw function. If kwargs are invalid, error will be raised.
         """
-        @wraps(func)
-        def wrapper(**kwargs):
-            kwargs = self.dump(kwargs)
-            return func(**kwargs)
-        return wrapper
+        if func:
+            @wraps(func)
+            def wrapper(**kwargs):
+                result = self.dump(kwargs, True, collect_errors)
+                return func(**result.valid_data)
+            return wrapper
 
-    def pre_load(self, data: dict) -> dict:
-        return data
-    pre_load.error_key = 'pre_load'
-
-    def post_load(self, data: dict) -> dict:
-        return data
-    post_load.error_key = 'post_load'
+        return partial(self.dump_kwargs, collect_errors=collect_errors)
 
     def load(self,
              data: dict,
@@ -152,8 +198,8 @@ class BaseCatalyst:
                 try:
                     raw_value = data.get(field.key, field.load_default)
 
-                    # raise error when field is missing and required
-                    # ignore missing field not required
+                    # if the field's value is missing
+                    # raise error if required otherwise skip
                     if raw_value is missing:
                         if field.load_required:
                             field.error('required')
@@ -226,7 +272,7 @@ class BaseCatalyst:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 ba = sig.bind(*args, **kwargs)
-                result = self.load(ba.arguments, raise_error=True, collect_errors=collect_errors)
+                result = self.load(ba.arguments, True, collect_errors)
                 ba.arguments.update(result.valid_data)
                 return func(*ba.args, **ba.kwargs)
             return wrapper
@@ -244,7 +290,7 @@ class BaseCatalyst:
         if func:
             @wraps(func)
             def wrapper(**kwargs):
-                result = self.load(kwargs, raise_error=True, collect_errors=collect_errors)
+                result = self.load(kwargs, True, collect_errors)
                 return func(**result.valid_data)
             return wrapper
 
@@ -261,9 +307,21 @@ class BaseCatalyst:
             errors[error_key] = e
         return data, errors
 
-    def pack(self, data):
-        packer = CatalystPacker()
-        return packer.pack(self, data)
+    def pre_dump(self, data):
+        return data
+    pre_dump.error_key = 'pre_dump'
+
+    def post_dump(self, data):
+        return data
+    post_dump.error_key = 'post_dump'
+
+    def pre_load(self, data):
+        return data
+    pre_load.error_key = 'pre_load'
+
+    def post_load(self, data):
+        return data
+    post_load.error_key = 'post_load'
 
 
 class CatalystMeta(type):

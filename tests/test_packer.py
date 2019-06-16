@@ -26,7 +26,7 @@ class PackerTest(TestCase):
             .pack(c, c_data)
 
         result = packer.dump()
-        self.assertDictEqual(result, all_data)
+        self.assertDictEqual(result.valid_data, all_data)
         result = packer.load()
         self.assertDictEqual(result.valid_data, all_data)
 
@@ -35,8 +35,8 @@ class PackerTest(TestCase):
             .pack(b, {'b': 'b'}) \
             .pack(c, {'c': 'c'})
 
-        with self.assertRaises(ValueError):
-            packer.dump()
+        with self.assertRaises(ValidationError):
+            packer.dump(True)
 
         result = packer.load()
         self.assertFalse(result.is_valid)

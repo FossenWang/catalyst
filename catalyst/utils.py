@@ -3,7 +3,7 @@ from typing import Mapping, Callable, Iterable
 from .exceptions import ValidationError
 
 
-class LoadResult:
+class Result:
     def __init__(self, valid_data: Iterable, errors: Mapping, invalid_data: Mapping):
         self.valid_data = valid_data
         self.errors = errors
@@ -11,7 +11,8 @@ class LoadResult:
 
     def __repr__(self):
         return (
-            f'LoadResult(valid_data={self.valid_data}, '
+            f'{self.__class__.__name__}('
+            f'valid_data={self.valid_data}, '
             f'errors={self.errors}, '
             f'invalid_data={self.invalid_data})'
         )
@@ -33,6 +34,14 @@ class LoadResult:
     @property
     def is_valid(self):
         return not self.errors
+
+
+class DumpResult(Result):
+    pass
+
+
+class LoadResult(Result):
+    pass
 
 
 class ErrorMessageMixin:
@@ -60,14 +69,16 @@ class ErrorMessageMixin:
             self.error_messages.get(error_key, self.unknown_error))
 
 
-def get_attr_or_item(obj, name):
+def get_attr_or_item(obj, name, default):
     if isinstance(obj, Mapping):
-        return obj[name]
-    return getattr(obj, name)
+        return obj.get(name, default)
+    return getattr(obj, name, default)
 
 
-def get_item(mapping, key):
-    return mapping[key]
+def get_item(mapping, key, default):
+    if isinstance(mapping, Mapping):
+        return mapping.get(key, default)
+    raise TypeError(f'{mapping} is not Mapping.')
 
 
 dump_from_attribute_or_key = get_attr_or_item

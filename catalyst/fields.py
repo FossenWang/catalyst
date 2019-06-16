@@ -39,11 +39,11 @@ class Field(ErrorMessageMixin):
                  no_dump: bool = False,
                  parser: ParserType = None,
                  parse_none: bool = False,
-                 allow_none: bool = True,
-                 validators: MultiValidator = None,
                  load_required: bool = None,
                  load_default: Any = missing,
                  no_load: bool = False,
+                 allow_none: bool = True,
+                 validators: MultiValidator = None,
                  error_messages: dict = None,
                  ):
         # Warn of redundant arguments
@@ -86,14 +86,12 @@ class Field(ErrorMessageMixin):
     def set_formatter(self, formatter: FormatterType):
         if not callable(formatter):
             raise TypeError('Argument "formatter" must be Callable.')
-
         self.formatter = formatter
         return formatter
 
     def set_parser(self, parser: ParserType):
         if not callable(parser):
             raise TypeError('Argument "parser" must be Callable.')
-
         self.parser = parser
         return parser
 
@@ -119,15 +117,17 @@ class Field(ErrorMessageMixin):
     def add_validator(self, validator: ValidatorType):
         if not callable(validator):
             raise TypeError('Argument "validator" must be Callable.')
-
         self.validators.append(validator)
         return validator
 
     def dump(self, value):
-        if value is None and not self.format_none:
-            # don't pass value to formatter
-            return value
+        self.validate(value)
+        value = self.format(value)
+        return value
 
+    def format(self, value):
+        if value is None and not self.format_none:
+            return None
         value = self.formatter(value)
         return value
 
@@ -139,7 +139,6 @@ class Field(ErrorMessageMixin):
     def parse(self, value):
         if value is None and not self.parse_none:
             return None
-
         value = self.parser(value)
         return value
 
@@ -148,10 +147,8 @@ class Field(ErrorMessageMixin):
             if self.allow_none:
                 return None
             self.error('none')
-
         for validator in self.validators:
             validator(value)
-
         return value
 
     @property
@@ -288,7 +285,7 @@ class NestedField(Field):
         super().__init__(**kwargs)
 
     def default_formatter(self, value):
-        return self.catalyst.dump(value)
+        return self.catalyst.dump(value, True).valid_data
 
     def default_parser(self, value):
         return self.catalyst.load(value, True).valid_data

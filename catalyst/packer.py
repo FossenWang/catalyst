@@ -1,4 +1,4 @@
-from .utils import LoadResult
+from .utils import LoadResult, DumpResult
 
 
 class CatalystPacker:
@@ -9,11 +9,17 @@ class CatalystPacker:
         self.packages.append((catalyst, data))
         return self
 
-    def dump(self) -> dict:
-        result = {}
+    def dump(self,
+             raise_error: bool = None,
+             collect_errors: bool = None
+             ) -> DumpResult:
+        valid_data, errors, invalid_data = {}, {}, {}
         for catalyst, data in self.packages:
-            temp = catalyst.dump(data)
-            result.update(temp)
+            temp = catalyst.dump(data, raise_error, collect_errors)
+            valid_data.update(temp.valid_data)
+            errors.update(temp.errors)
+            invalid_data.update(temp.invalid_data)
+        result = DumpResult(valid_data, errors, invalid_data)
         return result
 
     def load(self,

@@ -59,7 +59,7 @@ class CatalystTest(TestCase):
 
     def assert_field_dump_args(self, data, result=None, **kwargs):
         catalyst = self.create_catalyst(**kwargs)
-        self.assertEqual(catalyst.dump(data), result)
+        self.assertEqual(catalyst.dump(data, True).valid_data, result)
 
     def test_metaclass(self):
         "Test metaclass of Catalyst."
@@ -88,7 +88,7 @@ class CatalystTest(TestCase):
         catalyst = Article1()
 
         r = catalyst.dump(data)
-        self.assertEqual(data, r)
+        self.assertEqual(data, r.valid_data)
         r = catalyst.load(data)
         self.assertEqual(data, r.valid_data)
 
@@ -104,7 +104,7 @@ class CatalystTest(TestCase):
         catalyst = Article2()
 
         r = catalyst.dump(data)
-        self.assertEqual(data, r)
+        self.assertEqual(data, r.valid_data)
         r = catalyst.load(data)
         self.assertEqual(data, r.valid_data)
 
@@ -126,21 +126,21 @@ class CatalystTest(TestCase):
         # Specify "fields" for dumping and loading
         catalyst = TestDataCatalyst(fields=['string'])
         self.assertDictEqual(
-            catalyst.dump(test_data), {'string': 'xxx'})
+            catalyst.dump(test_data).valid_data, {'string': 'xxx'})
         self.assertDictEqual(
             catalyst.load(valid_data).valid_data, {'string': 'xxx'})
 
         # "dump_fields" takes precedence over "fields"
         catalyst = TestDataCatalyst(fields=['string'], dump_fields=['bool_field'])
         self.assertDictEqual(
-            catalyst.dump(test_data), {'bool': True})
+            catalyst.dump(test_data).valid_data, {'bool': True})
         self.assertDictEqual(
             catalyst.load(valid_data).valid_data, {'string': 'xxx'})
 
         # "load_fields" takes precedence over "fields"
         catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])
         self.assertDictEqual(
-            catalyst.dump(test_data), {'string': 'xxx'})
+            catalyst.dump(test_data).valid_data, {'string': 'xxx'})
         self.assertDictEqual(
             catalyst.load(valid_data).valid_data, {'bool_': True})
 
@@ -148,7 +148,7 @@ class CatalystTest(TestCase):
         catalyst = TestDataCatalyst(
             fields=['integer'], dump_fields=['string'], load_fields=['bool_field'])
         self.assertDictEqual(
-            catalyst.dump(test_data), {'string': 'xxx'})
+            catalyst.dump(test_data).valid_data, {'string': 'xxx'})
         self.assertDictEqual(
             catalyst.load(valid_data).valid_data, {'bool_': True})
 
@@ -167,7 +167,7 @@ class CatalystTest(TestCase):
         test_data = self.test_data
 
         # dump from object
-        result = test_data_catalyst.dump(test_data)
+        result = test_data_catalyst.dump(test_data).valid_data
         self.assertDictEqual(result, {
             'bool': True, 'float': 1.1, 'func': 6,
             'integer': 1, 'list_': ['a', 'b'], 'string': 'xxx'})
@@ -181,19 +181,21 @@ class CatalystTest(TestCase):
             'float_': 1.1, 'integer': 1, 'string': 'xxx',
             'bool_': True, 'func': test_data.func, 'list_': ['a', 'b']
         }
-        self.assertEqual(test_data_catalyst.dump(test_data_dict), result)
+        self.assertEqual(
+            test_data_catalyst.dump(test_data_dict).valid_data,
+            result)
 
         # only get dump value from attribute
         catalyst = TestDataCatalyst(dump_from=dump_from_attribute)
         catalyst.dump(test_data)
-        with self.assertRaises(AttributeError):
-            catalyst.dump(test_data_dict)
+        with self.assertRaises(ValidationError):
+            catalyst.dump(test_data_dict, True)
 
         # only get dump value from key
         catalyst = TestDataCatalyst(dump_from=dump_from_key)
         catalyst.dump(test_data_dict)
         with self.assertRaises(TypeError):
-            catalyst.dump(test_data)
+            catalyst.dump(test_data, collect_errors=False)
 
         # wrong args
         with self.assertRaises(TypeError):
@@ -202,9 +204,9 @@ class CatalystTest(TestCase):
     def test_field_args_which_affect_dumping(self):
         # default behavior
         # missing field will raise error
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(ValidationError):
             self.assert_field_dump_args(None)
-        with self.assertRaises(KeyError):
+        with self.assertRaises(ValidationError):
             self.assert_field_dump_args({})
 
         # ignore missing field
@@ -215,14 +217,14 @@ class CatalystTest(TestCase):
             {}, {'s': 'default'}, dump_default='default')
 
         self.assert_field_dump_args(
-            {'s': 1}, {'s': '1'}, dump_default='default')
+            {'s': '1'}, {'s': '1'}, dump_default='default')
 
         self.assert_field_dump_args(
             {}, {'s': None}, dump_default=None)
 
         # callable default
         self.assert_field_dump_args(
-            {}, {'s': '1'}, dump_default=lambda: 1)
+            {}, {'s': '1'}, dump_default=lambda: '1')
 
         # dump_required has no effect if dump_default is set
         with self.assertWarns(Warning):
@@ -432,12 +434,26 @@ class CatalystTest(TestCase):
         c.dump({'max_value': 2, 'min_value': 1})
 
         # pre_dump invalid
+        result = c.dump({'max_value': 2, 'min_value': 1, 'xxx': 1})
+        self.assertFalse(result.is_valid)
+        self.assertTrue('pre_dump' in result.errors)
         with self.assertRaises(ValidationError):
-            c.dump({'max_value': 2, 'min_value': 1, 'xxx': 1})
+            c.dump({'max_value': 2, 'min_value': 1, 'xxx': 1}, raise_error=True)
+        C.pre_dump.error_key = 'not_allowed_keys'
+        result = c.dump({'max_value': 2, 'min_value': 1, 'xxx': 1})
+        self.assertFalse(result.is_valid)
+        self.assertTrue('not_allowed_keys' in result.errors)
 
         # post_dump invalid
+        result = c.dump({'max_value': 1, 'min_value': 2})
+        self.assertFalse(result.is_valid)
+        self.assertTrue('post_dump' in result.errors)
         with self.assertRaises(ValidationError):
-            c.dump({'max_value': 1, 'min_value': 2})
+            c.dump({'max_value': 1, 'min_value': 2}, raise_error=True)
+        C.post_dump.error_key = 'wrong_value'
+        result = c.dump({'max_value': 1, 'min_value': 2})
+        self.assertFalse(result.is_valid)
+        self.assertTrue('wrong_value' in result.errors)
 
         # load valid
         result = c.load({'max_value': 2, 'min_value': 1})
@@ -479,7 +495,7 @@ class CatalystTest(TestCase):
 
         a = A()
         result = a.dump({'snake_to_camel': 'snake'})
-        self.assertIn('snakeToCamel', result)
+        self.assertIn('snakeToCamel', result.valid_data)
         result = a.load({'snakeToCamel': 'snake'})
         self.assertIn('snake_to_camel', result.valid_data)
 
@@ -493,7 +509,7 @@ class CatalystTest(TestCase):
 
         b = B()
         result = b.dump({'snakeToCamel': 'snake'})
-        self.assertIn('snake_to_camel', result)
+        self.assertIn('snake_to_camel', result.valid_data)
         result = b.load({'snake_to_camel': 'snake'})
         self.assertIn('snakeToCamel', result.valid_data)
 
@@ -513,8 +529,8 @@ class CatalystTest(TestCase):
         self.assertIs(c.__format_key__, snake_to_camel)
         self.assertIs(c.__format_name__, snake_to_camel)
         result = c.dump({'snakeToCamel': None, 'still_snake': None})
-        self.assertIn('snakeToCamel', result)
-        self.assertIn('still_snake', result)
+        self.assertIn('snakeToCamel', result.valid_data)
+        self.assertIn('still_snake', result.valid_data)
         result = c.load({'snakeToCamel': None, 'still_snake': None})
         self.assertIn('snakeToCamel', result.valid_data)
         self.assertIn('still_snake', result.valid_data)
@@ -535,7 +551,7 @@ class CatalystTest(TestCase):
         self.assertEqual(b.a, a.a)
 
         data = {'a': 'a', 'b': 'b'}
-        self.assertDictEqual(b.dump(data), data)
+        self.assertDictEqual(b.dump(data).valid_data, data)
 
     def test_load_and_dump_kwargs(self):
         class A(Catalyst):
@@ -570,13 +586,13 @@ class CatalystTest(TestCase):
         def func_3(a, b=1, **kwargs):
             return a + b + kwargs['c']
 
-        self.assertEqual(func_3(a='1', b='2', c='3'), 6)
+        self.assertEqual(func_3(a=1, b=2, c=3), 6)
         # raise error if kwargs are invalid
-        with self.assertRaises(ValueError):
-            func_3(a='a', b='2', c='3')
+        with self.assertRaises(ValidationError):
+            func_3(a='1', b=2, c=3)
         # takes kwargs only
         with self.assertRaises(TypeError):
-            func_3('1', b='2', c='3')
+            func_3(1, b=2, c=3)
 
     def test_load_and_dump_args(self):
         class A(Catalyst):
@@ -610,17 +626,17 @@ class CatalystTest(TestCase):
         def func_3(a, *args, b=1, **kwargs):
             return a + sum(args) + b + kwargs['c']
 
-        self.assertEqual(func_3('1', '2', b='3', c='4'), 10)
+        self.assertEqual(func_3(1, 2, b=3, c=4), 10)
         # raise error if kwargs are invalid
-        with self.assertRaises(ValueError):
-            func_3('a', '2', b='3', c='4')
+        with self.assertRaises(ValidationError):
+            func_3('1', 2, b=3, c=4)
 
     def test_load_and_dump_many(self):
         c = self.create_catalyst(min_length=1, max_length=2)
 
         data = [{'s': 's'} for _ in range(5)]
         result = c.dump_many(data)
-        self.assertListEqual(result, data)
+        self.assertListEqual(result.valid_data, data)
 
         result = c.load_many(data)
         self.assertTrue(result.is_valid)
