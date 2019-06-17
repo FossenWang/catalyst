@@ -87,6 +87,7 @@ def get_attr_or_item(obj, name, default):
 
 
 def get_item(mapping, key, default):
+    # return mapping.get(key, default)
     if isinstance(mapping, Mapping):
         return mapping.get(key, default)
     raise TypeError(f'{mapping} is not Mapping.')

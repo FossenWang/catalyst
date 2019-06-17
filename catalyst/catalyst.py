@@ -1,6 +1,6 @@
 import inspect
 
-from typing import Dict, Iterable, Callable, Mapping, Sequence, Any
+from typing import Dict, Iterable, Callable, Sequence, Any
 from functools import wraps, partial
 from collections import OrderedDict
 
@@ -18,14 +18,18 @@ FieldDict = Dict[str, Field]
 class BaseCatalyst:
     _field_dict = {}  # type: FieldDict
     default_dump_from = staticmethod(get_attr_or_item)
+    default_load_from = staticmethod(get_item)
 
     def __init__(self,
                  fields: Iterable[str] = None,
                  dump_fields: Iterable[str] = None,
                  dump_from: Callable[[Any, str], Any] = None,
+                 dump_raise_error: bool = False,
+                 dump_collect_errors: bool = True,
                  load_fields: Iterable[str] = None,
-                 raise_error: bool = False,
-                 collect_errors: bool = True
+                 load_from: Callable[[Any, str], Any] = None,
+                 load_raise_error: bool = False,
+                 load_collect_errors: bool = True,
                  ):
         if not fields:
             fields = set(self._field_dict.keys())
@@ -42,14 +46,21 @@ class BaseCatalyst:
             self._field_dict, load_fields,
             lambda k: not self._field_dict[k].no_load)
 
-        self.raise_error = raise_error
-        self.collect_errors = collect_errors
+        self.dump_raise_error = dump_raise_error
+        self.dump_collect_errors = dump_collect_errors
+        self.load_raise_error = load_raise_error
+        self.load_collect_errors = load_collect_errors
 
         if not dump_from:
             dump_from = self.default_dump_from
         if not callable(dump_from):
-            raise TypeError('Argument "dump_from" must be Callable.')
+            raise TypeError('"dump_from" must be Callable.')
+        if not load_from:
+            load_from = self.default_load_from
+        if not callable(load_from):
+            raise TypeError('"load_from" must be Callable.')
         self.dump_from = dump_from
+        self.load_from = load_from
 
     @staticmethod
     def _format_field_key(key):
@@ -79,9 +90,9 @@ class BaseCatalyst:
              ) -> DumpResult:
 
         if raise_error is None:
-            raise_error = self.raise_error
+            raise_error = self.dump_raise_error
         if collect_errors is None:
-            collect_errors = self.collect_errors
+            collect_errors = self.dump_collect_errors
 
         data, errors = self._side_effect(
             data, {}, 'pre_dump', not collect_errors)
@@ -90,10 +101,9 @@ class BaseCatalyst:
 
         if not errors:
             for field in self._dump_field_dict.values():
+                raw_value = missing
+                raw_value = self.dump_from(data, field.name, field.dump_default)
                 try:
-                    raw_value = missing
-                    raw_value = self.dump_from(data, field.name, field.dump_default)
-
                     # if the field's value is missing
                     # raise error if required otherwise skip
                     if raw_value is missing:
@@ -127,9 +137,9 @@ class BaseCatalyst:
                   collect_errors: bool = None
                   ) -> DumpResult:
         if raise_error is None:
-            raise_error = self.raise_error
+            raise_error = self.dump_raise_error
         if collect_errors is None:
-            collect_errors = self.collect_errors
+            collect_errors = self.dump_collect_errors
 
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):
@@ -186,13 +196,10 @@ class BaseCatalyst:
              collect_errors: bool = None
              ) -> LoadResult:
 
-        if not isinstance(data, Mapping):
-            raise TypeError('Argument "data" must be a mapping object.')
-
         if raise_error is None:
-            raise_error = self.raise_error
+            raise_error = self.load_raise_error
         if collect_errors is None:
-            collect_errors = self.collect_errors
+            collect_errors = self.load_collect_errors
 
         data, errors = self._side_effect(
             data, {}, 'pre_load', not collect_errors)
@@ -201,9 +208,9 @@ class BaseCatalyst:
 
         if not errors:
             for field in self._load_field_dict.values():
+                raw_value = missing
+                raw_value = self.load_from(data, field.key, field.load_default)
                 try:
-                    raw_value = data.get(field.key, field.load_default)
-
                     # if the field's value is missing
                     # raise error if required otherwise skip
                     if raw_value is missing:
@@ -237,9 +244,9 @@ class BaseCatalyst:
                   collect_errors: bool = None
                   ) -> LoadResult:
         if raise_error is None:
-            raise_error = self.raise_error
+            raise_error = self.dump_raise_error
         if collect_errors is None:
-            collect_errors = self.collect_errors
+            collect_errors = self.dump_collect_errors
 
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):

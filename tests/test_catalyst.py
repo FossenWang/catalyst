@@ -33,7 +33,7 @@ class TestDataCatalyst(Catalyst):
     list_ = ListField(StringField())
 
 
-test_data_catalyst = TestDataCatalyst(raise_error=False)
+test_data_catalyst = TestDataCatalyst()
 
 
 class CatalystTest(TestCase):
@@ -275,7 +275,7 @@ class CatalystTest(TestCase):
 
         # raise error while validating
         # set "raise_error" when init
-        raise_err_catalyst = TestDataCatalyst(raise_error=True)
+        raise_err_catalyst = TestDataCatalyst(load_raise_error=True)
         result = raise_err_catalyst.load(valid_data)
         self.assertTrue(result.is_valid)
         with self.assertRaises(ValidationError):
@@ -287,12 +287,13 @@ class CatalystTest(TestCase):
 
         # don't collect errors
         # set "collect_errors" when init
-        no_collect_err_catalyst = TestDataCatalyst(collect_errors=False)
+        no_collect_err_catalyst = TestDataCatalyst(load_collect_errors=False)
         with self.assertRaises(Exception):
             no_collect_err_catalyst.load(invalid_data)
 
         # set "collect_errors" when call load
-        result = no_collect_err_catalyst.load(invalid_data, collect_errors=True, raise_error=False)
+        result = no_collect_err_catalyst.load(
+            invalid_data, collect_errors=True, raise_error=False)
         self.assertFalse(result.is_valid)
 
         # set "collect_errors" when call load

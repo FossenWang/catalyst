@@ -24,7 +24,6 @@ class Field(ErrorMessageMixin):
         'required': 'Missing data for required field.',
         'none': 'Field may not be None.'
     }
-
     default_formatter = staticmethod(no_processing)
     default_parser = staticmethod(no_processing)
     default_validators = None
