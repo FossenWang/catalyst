@@ -5,10 +5,11 @@ from functools import wraps, partial
 from collections import OrderedDict
 
 from .packer import CatalystPacker
-from .fields import Field, NestedField, no_processing
+from .fields import Field, NestedField
 from .exceptions import ValidationError
-from .utils import dump_from_attribute_or_key, missing, \
-    ensure_staticmethod, LoadResult, DumpResult
+from .utils import missing, \
+    get_attr_or_item, get_item, \
+    LoadResult, DumpResult
 
 
 FieldDict = Dict[str, Field]
@@ -16,16 +17,16 @@ FieldDict = Dict[str, Field]
 
 class BaseCatalyst:
     _field_dict = {}  # type: FieldDict
-    __format_key__ = staticmethod(no_processing)
-    __format_name__ = staticmethod(no_processing)
+    default_dump_from = staticmethod(get_attr_or_item)
 
     def __init__(self,
                  fields: Iterable[str] = None,
                  dump_fields: Iterable[str] = None,
+                 dump_from: Callable[[Any, str], Any] = None,
                  load_fields: Iterable[str] = None,
                  raise_error: bool = False,
-                 collect_errors: bool = True,
-                 dump_from: Callable[[Any, str], Any] = None):
+                 collect_errors: bool = True
+                 ):
         if not fields:
             fields = set(self._field_dict.keys())
         if not dump_fields:
@@ -45,12 +46,21 @@ class BaseCatalyst:
         self.collect_errors = collect_errors
 
         if not dump_from:
-            dump_from = dump_from_attribute_or_key
+            dump_from = self.default_dump_from
         if not callable(dump_from):
             raise TypeError('Argument "dump_from" must be Callable.')
         self.dump_from = dump_from
 
-    def _copy_fields(self, fields: FieldDict, keys: Iterable[str],
+    @staticmethod
+    def _format_field_key(key):
+        return key
+
+    @staticmethod
+    def _format_field_name(name):
+        return name
+
+    @staticmethod
+    def _copy_fields(fields: FieldDict, keys: Iterable[str],
                      is_copying: Callable[[str], bool]) -> FieldDict:
         new_fields = {}  # type: FieldDict
         for key in keys:
@@ -315,11 +325,6 @@ class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
         new_cls = type.__new__(cls, name, bases, attrs)
 
-        new_cls.__format_name__ = ensure_staticmethod(new_cls.__format_name__)
-        new_cls.__format_key__ = ensure_staticmethod(new_cls.__format_key__)
-        format_name = new_cls.__format_name__
-        format_key = new_cls.__format_key__
-
         # collect fields to cls._field_dict
         fields = {}  # type: FieldDict
         for attr, value in attrs.items():
@@ -333,9 +338,9 @@ class CatalystMeta(type):
             # automatic generate field name or key
             if isinstance(value, Field):
                 if value.name is None:
-                    value.name = format_name(attr)
+                    value.name = new_cls._format_field_name(attr)
                 if value.key is None:
-                    value.key = format_key(attr)
+                    value.key = new_cls._format_field_key(attr)
                 fields[attr] = value
 
         # inherit fields

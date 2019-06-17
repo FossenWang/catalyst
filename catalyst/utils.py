@@ -69,6 +69,17 @@ class ErrorMessageMixin:
             self.error_messages.get(error_key, self.unknown_error))
 
 
+class _Missing:
+    def __repr__(self):
+        return '<catalyst.missing>'
+
+# Default value for field args `dump_default` and `load_default`
+# which means that the field does not exist in data.
+# KeyError or AttributeError will be raised if dumping field is missing.
+# Field will be excluded from load result if loading field is missing.
+missing = _Missing()
+
+
 def get_attr_or_item(obj, name, default):
     if isinstance(obj, Mapping):
         return obj.get(name, default)
@@ -79,22 +90,6 @@ def get_item(mapping, key, default):
     if isinstance(mapping, Mapping):
         return mapping.get(key, default)
     raise TypeError(f'{mapping} is not Mapping.')
-
-
-dump_from_attribute_or_key = get_attr_or_item
-dump_from_attribute = getattr
-dump_from_key = get_item
-
-
-class _Missing:
-    def __repr__(self):
-        return '<catalyst.missing>'
-
-# Default value for field args `dump_default` and `load_default`
-# which means that the field does not exist in data.
-# KeyError or AttributeError will be raised if dumping field is missing.
-# Field will be excluded from load result if loading field is missing.
-missing = _Missing()
 
 
 def no_processing(value):

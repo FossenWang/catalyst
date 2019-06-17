@@ -4,7 +4,7 @@ from catalyst import Catalyst
 from catalyst.fields import Field, StringField, IntegerField, \
     FloatField, BoolField, CallableField, ListField
 from catalyst.exceptions import ValidationError
-from catalyst.utils import dump_from_attribute, dump_from_key, \
+from catalyst.utils import get_item, \
     snake_to_camel
 
 
@@ -181,13 +181,13 @@ class CatalystTest(TestCase):
             result)
 
         # only get dump value from attribute
-        catalyst = TestDataCatalyst(dump_from=dump_from_attribute)
+        catalyst = TestDataCatalyst(dump_from=getattr)
         catalyst.dump(test_data)
         with self.assertRaises(ValidationError):
             catalyst.dump(test_data_dict, True)
 
         # only get dump value from key
-        catalyst = TestDataCatalyst(dump_from=dump_from_key)
+        catalyst = TestDataCatalyst(dump_from=get_item)
         catalyst.dump(test_data_dict)
         with self.assertRaises(TypeError):
             catalyst.dump(test_data, collect_errors=False)
@@ -460,7 +460,7 @@ class CatalystTest(TestCase):
     def test_change_field_name_and_key_naming_style(self):
         # change field key naming style
         class A(Catalyst):
-            __format_key__ = snake_to_camel
+            _format_field_key = staticmethod(snake_to_camel)
             snake_to_camel = Field()
 
         self.assertEqual(A.snake_to_camel.name, 'snake_to_camel')
@@ -474,7 +474,7 @@ class CatalystTest(TestCase):
 
         # change field name naming style
         class B(Catalyst):
-            __format_name__ = snake_to_camel
+            _format_field_name = staticmethod(snake_to_camel)
             snake_to_camel = Field()
 
         self.assertEqual(B.snake_to_camel.name, 'snakeToCamel')
@@ -488,8 +488,8 @@ class CatalystTest(TestCase):
 
         # change field name and key naming style
         class C(Catalyst):
-            __format_name__ = snake_to_camel
-            __format_key__ = snake_to_camel
+            _format_field_name = staticmethod(snake_to_camel)
+            _format_field_key = staticmethod(snake_to_camel)
             snake_to_camel = Field()
             still_snake = Field(name='still_snake', key='still_snake')
 
@@ -499,8 +499,8 @@ class CatalystTest(TestCase):
         self.assertEqual(C.still_snake.key, 'still_snake')
 
         c = C()
-        self.assertIs(c.__format_key__, snake_to_camel)
-        self.assertIs(c.__format_name__, snake_to_camel)
+        self.assertIs(c._format_field_key, snake_to_camel)
+        self.assertIs(c._format_field_name, snake_to_camel)
         result = c.dump({'snakeToCamel': None, 'still_snake': None})
         self.assertIn('snakeToCamel', result.valid_data)
         self.assertIn('still_snake', result.valid_data)
