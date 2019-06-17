@@ -1,4 +1,3 @@
-import json
 import inspect
 
 from typing import Dict, Iterable, Callable, Mapping, Sequence, Any
@@ -135,9 +134,6 @@ class BaseCatalyst:
             raise ValidationError(results)
         return results
 
-    def dump_to_json(self, obj) -> str:
-        return json.dumps(self.dump(obj, True).valid_data)
-
     def dump_args(self,
                   func: Callable,
                   collect_errors: bool = None
@@ -247,15 +243,6 @@ class BaseCatalyst:
         if raise_error:
             raise ValidationError(results)
         return results
-
-    def load_from_json(self,
-                       s: str,
-                       raise_error: bool = None,
-                       collect_errors: bool = None
-                       ) -> LoadResult:
-        return self.load(
-            json.loads(s), raise_error=raise_error,
-            collect_errors=collect_errors)
 
     def load_args(self,
                   func: Callable = None,

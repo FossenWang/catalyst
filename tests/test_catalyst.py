@@ -1,4 +1,3 @@
-import json
 from unittest import TestCase
 
 from catalyst import Catalyst
@@ -172,10 +171,6 @@ class CatalystTest(TestCase):
             'bool': True, 'float': 1.1, 'func': 6,
             'integer': 1, 'list_': ['a', 'b'], 'string': 'xxx'})
 
-        # dump to json
-        text = test_data_catalyst.dump_to_json(test_data)
-        self.assertDictEqual(json.loads(text), result)
-
         # dump from dict
         test_data_dict = {
             'float_': 1.1, 'integer': 1, 'string': 'xxx',
@@ -254,12 +249,6 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.errors, {})
         self.assertDictEqual(result.valid_data, load_result)
 
-        # load from json
-        s = json.dumps(valid_data)
-        result = test_data_catalyst.load_from_json(s)
-        self.assertTrue(result.is_valid)
-        self.assertDictEqual(result.valid_data, load_result)
-
         # test invalid_data
         with self.assertRaises(TypeError):
             test_data_catalyst.load(1)
@@ -272,12 +261,6 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {
             'string', 'integer', 'float'})
         self.assertDictEqual(result.valid_data, {})
-
-        # load from json
-        s = json.dumps(invalid_data)
-        result = test_data_catalyst.load_from_json(s)
-        self.assertFalse(result.is_valid)
-        self.assertDictEqual(result.invalid_data, invalid_data)
 
         # test invalid_data: parse errors
         invalid_data = {'string': 'x', 'integer': 'str', 'float': []}
@@ -302,11 +285,6 @@ class CatalystTest(TestCase):
         with self.assertRaises(ValidationError):
             test_data_catalyst.load(invalid_data, raise_error=True)
 
-        # set "raise_error" when call load_from_json
-        s = json.dumps(invalid_data)
-        with self.assertRaises(ValidationError):
-            result = test_data_catalyst.load_from_json(s, raise_error=True)
-
         # don't collect errors
         # set "collect_errors" when init
         no_collect_err_catalyst = TestDataCatalyst(collect_errors=False)
@@ -320,11 +298,6 @@ class CatalystTest(TestCase):
         # set "collect_errors" when call load
         with self.assertRaises(Exception):
             test_data_catalyst.load(invalid_data, collect_errors=False)
-
-        # set "collect_errors" when call load_from_json
-        s = json.dumps(invalid_data)
-        with self.assertRaises(Exception):
-            result = test_data_catalyst.load_from_json(s, collect_errors=False)
 
     def test_field_args_which_affect_loading(self):
 
