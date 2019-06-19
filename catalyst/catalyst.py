@@ -26,10 +26,12 @@ class BaseCatalyst:
                  dump_from: Callable[[Any, str], Any] = None,
                  dump_raise_error: bool = False,
                  dump_collect_errors: bool = True,
+                 dump_skip_validation: bool = False,
                  load_fields: Iterable[str] = None,
                  load_from: Callable[[Any, str], Any] = None,
                  load_raise_error: bool = False,
                  load_collect_errors: bool = True,
+                 load_skip_validation: bool = False,
                  ):
         if not fields:
             fields = set(self._field_dict.keys())
@@ -48,8 +50,10 @@ class BaseCatalyst:
 
         self.dump_raise_error = dump_raise_error
         self.dump_collect_errors = dump_collect_errors
+        self.dump_skip_validation = dump_skip_validation
         self.load_raise_error = load_raise_error
         self.load_collect_errors = load_collect_errors
+        self.load_skip_validation = load_skip_validation
 
         if not dump_from:
             dump_from = self.default_dump_from
@@ -86,13 +90,16 @@ class BaseCatalyst:
     def dump(self,
              data,
              raise_error: bool = None,
-             collect_errors: bool = None
+             collect_errors: bool = None,
+             skip_validation: bool = None,
              ) -> DumpResult:
 
         if raise_error is None:
             raise_error = self.dump_raise_error
         if collect_errors is None:
             collect_errors = self.dump_collect_errors
+        if skip_validation is None:
+            skip_validation = self.dump_skip_validation
 
         data, errors = self._side_effect(
             data, {}, 'pre_dump', not collect_errors)
@@ -100,6 +107,7 @@ class BaseCatalyst:
         valid_data, invalid_data = {}, {}
 
         if not errors:
+            dump_method = 'format' if skip_validation else 'dump'
             for field in self._dump_field_dict.values():
                 raw_value = missing
                 raw_value = self.dump_from(data, field.name, field.dump_default)
@@ -111,7 +119,7 @@ class BaseCatalyst:
                             field.error('required')
                         continue
 
-                    value = field.dump(raw_value)
+                    value = getattr(field, dump_method)(raw_value)
                 except Exception as e:
                     if not collect_errors:
                         raise e
@@ -193,13 +201,16 @@ class BaseCatalyst:
     def load(self,
              data: dict,
              raise_error: bool = None,
-             collect_errors: bool = None
+             collect_errors: bool = None,
+             skip_validation: bool = None,
              ) -> LoadResult:
 
         if raise_error is None:
             raise_error = self.load_raise_error
         if collect_errors is None:
             collect_errors = self.load_collect_errors
+        if skip_validation is None:
+            skip_validation = self.dump_skip_validation
 
         data, errors = self._side_effect(
             data, {}, 'pre_load', not collect_errors)
@@ -207,6 +218,7 @@ class BaseCatalyst:
         valid_data, invalid_data = {}, {}
 
         if not errors:
+            method = 'parse' if skip_validation else 'load'
             for field in self._load_field_dict.values():
                 raw_value = missing
                 raw_value = self.load_from(data, field.key, field.load_default)
@@ -218,7 +230,7 @@ class BaseCatalyst:
                             field.error('required')
                         continue
 
-                    value = field.load(raw_value)
+                    value = getattr(field, method)(raw_value)
                 except Exception as e:
                     if not collect_errors:
                         raise e
