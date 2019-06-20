@@ -190,7 +190,7 @@ class CatalystTest(TestCase):
         catalyst = TestDataCatalyst(dump_from=get_item)
         catalyst.dump(test_data_dict)
         with self.assertRaises(TypeError):
-            catalyst.dump(test_data, collect_errors=False)
+            catalyst.dump(test_data, all_errors=False)
 
         # wrong args
         with self.assertRaises(TypeError):
@@ -286,19 +286,21 @@ class CatalystTest(TestCase):
             test_data_catalyst.load(invalid_data, raise_error=True)
 
         # don't collect errors
-        # set "collect_errors" when init
-        no_collect_err_catalyst = TestDataCatalyst(load_collect_errors=False)
+        # set "all_errors" when init
+        no_collect_err_catalyst = TestDataCatalyst(
+            load_all_errors=False, load_raise_error=True)
         with self.assertRaises(Exception):
             no_collect_err_catalyst.load(invalid_data)
 
-        # set "collect_errors" when call load
+        # set "all_errors" when call load
         result = no_collect_err_catalyst.load(
-            invalid_data, collect_errors=True, raise_error=False)
+            invalid_data, all_errors=True, raise_error=False)
         self.assertFalse(result.is_valid)
 
-        # set "collect_errors" when call load
+        # set "all_errors" when call load
         with self.assertRaises(Exception):
-            test_data_catalyst.load(invalid_data, collect_errors=False)
+            test_data_catalyst.load(
+                invalid_data, True, False)
 
     def test_field_args_which_affect_loading(self):
 
@@ -446,7 +448,7 @@ class CatalystTest(TestCase):
         with self.assertRaises(ValidationError):
             c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, raise_error=True)
         with self.assertRaises(ValidationError):
-            c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, collect_errors=False)
+            c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, all_errors=False)
 
         # post_load invalid
         result = c.load({'max_value': 1, 'min_value': 2})
@@ -547,13 +549,13 @@ class CatalystTest(TestCase):
         with self.assertRaises(TypeError):
             func_1('1', b='2', c='3')
 
-        @a.load_kwargs(collect_errors=False)
+        @a.load_kwargs(all_errors=False)
         def func_2(a, b=1, **kwargs):
             return a + b + kwargs['c']
 
         self.assertEqual(func_2(a='1', b='2', c='3'), 6)
         # don't collect error
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             func_2(a='a')
 
         @a.dump_kwargs
@@ -587,13 +589,13 @@ class CatalystTest(TestCase):
         with self.assertRaises(ValidationError):
             func_1('a', '2', b='3', c='4')
 
-        @a.load_args(collect_errors=False)
+        @a.load_args(all_errors=False)
         def func_2(a, *args, b=1, **kwargs):
             return a + sum(args) + b + kwargs['c']
 
         self.assertEqual(func_2(1, 2, b=3, c=4), 10)
         # don't collect error
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             func_2('a', '2', b='3', c='4')
 
         @a.dump_args
@@ -634,5 +636,7 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
 
         with self.assertRaises(ValidationError) as ct:
-            c.load_many(data, collect_errors=False)
-        self.assertIsInstance(ct.exception.msg, str)
+            c.load_many(data, True, all_errors=False)
+        result = ct.exception.msg
+        self.assertEqual(set(result.errors), {2})
+        self.assertDictEqual(result.invalid_data, {2: {'s': ''}})

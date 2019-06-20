@@ -25,12 +25,12 @@ class BaseCatalyst:
                  dump_fields: Iterable[str] = None,
                  dump_from: Callable[[Any, str], Any] = None,
                  dump_raise_error: bool = False,
-                 dump_collect_errors: bool = True,
+                 dump_all_errors: bool = True,
                  dump_skip_validation: bool = False,
                  load_fields: Iterable[str] = None,
                  load_from: Callable[[Any, str], Any] = None,
                  load_raise_error: bool = False,
-                 load_collect_errors: bool = True,
+                 load_all_errors: bool = True,
                  load_skip_validation: bool = False,
                  ):
         if not fields:
@@ -49,10 +49,10 @@ class BaseCatalyst:
             lambda k: not self._field_dict[k].no_load)
 
         self.dump_raise_error = dump_raise_error
-        self.dump_collect_errors = dump_collect_errors
+        self.dump_all_errors = dump_all_errors
         self.dump_skip_validation = dump_skip_validation
         self.load_raise_error = load_raise_error
-        self.load_collect_errors = load_collect_errors
+        self.load_all_errors = load_all_errors
         self.load_skip_validation = load_skip_validation
 
         if not dump_from:
@@ -83,31 +83,31 @@ class BaseCatalyst:
                 new_fields[key] = fields[key]
         return new_fields
 
-    def pack(self, data):
+    def pack(self, data) -> CatalystPacker:
         packer = CatalystPacker()
         return packer.pack(self, data)
 
     def dump(self,
              data,
              raise_error: bool = None,
-             collect_errors: bool = None,
+             all_errors: bool = None,
              skip_validation: bool = None,
              ) -> DumpResult:
 
         if raise_error is None:
             raise_error = self.dump_raise_error
-        if collect_errors is None:
-            collect_errors = self.dump_collect_errors
+        if all_errors is None:
+            all_errors = self.dump_all_errors
         if skip_validation is None:
             skip_validation = self.dump_skip_validation
 
         data, errors = self._side_effect(
-            data, {}, 'pre_dump', not collect_errors)
+            data, {}, 'pre_dump', not all_errors)
 
         valid_data, invalid_data = {}, {}
 
         if not errors:
-            dump_method = 'format' if skip_validation else 'dump'
+            method = 'format' if skip_validation else 'dump'
             for field in self._dump_field_dict.values():
                 raw_value = missing
                 raw_value = self.dump_from(data, field.name, field.dump_default)
@@ -119,20 +119,18 @@ class BaseCatalyst:
                             field.error('required')
                         continue
 
-                    value = getattr(field, dump_method)(raw_value)
+                    valid_data[field.key] = getattr(field, method)(raw_value)
                 except Exception as e:
-                    if not collect_errors:
-                        raise e
                     # collect errors and invalid data
                     errors[field.name] = e
                     if raw_value is not missing:
                         invalid_data[field.name] = raw_value
-                else:
-                    valid_data[field.key] = value
+                    if not all_errors:
+                        break
 
         if not errors:
             data, errors = self._side_effect(
-                data, errors, 'post_dump', not collect_errors)
+                data, errors, 'post_dump', not all_errors)
 
         dump_result = DumpResult(valid_data, errors, invalid_data)
         if errors and raise_error:
@@ -142,16 +140,16 @@ class BaseCatalyst:
     def dump_many(self,
                   data: Sequence,
                   raise_error: bool = None,
-                  collect_errors: bool = None
+                  all_errors: bool = None
                   ) -> DumpResult:
         if raise_error is None:
             raise_error = self.dump_raise_error
-        if collect_errors is None:
-            collect_errors = self.dump_collect_errors
+        if all_errors is None:
+            all_errors = self.dump_all_errors
 
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):
-            result = self.dump(item, False, collect_errors)
+            result = self.dump(item, False, all_errors)
             valid_data.append(result.valid_data)
             if not result.is_valid:
                 errors[i] = result.errors
@@ -164,7 +162,7 @@ class BaseCatalyst:
 
     def dump_args(self,
                   func: Callable,
-                  collect_errors: bool = None
+                  all_errors: bool = None
                   ) -> Callable:
         """Decorator for dumping args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
@@ -176,14 +174,14 @@ class BaseCatalyst:
         @wraps(func)
         def wrapper(*args, **kwargs):
             ba = sig.bind(*args, **kwargs)
-            result = self.dump(ba.arguments, True, collect_errors)
+            result = self.dump(ba.arguments, True, all_errors)
             ba.arguments.update(result.valid_data)
             return func(*ba.args, **ba.kwargs)
         return wrapper
 
     def dump_kwargs(self,
                     func: Callable = None,
-                    collect_errors: bool = None
+                    all_errors: bool = None
                     ) -> Callable:
         """Decorator for dumping kwargs by catalyst before function is called.
         The wrapper function only takes kwargs, and unpacks dumping result to
@@ -192,28 +190,28 @@ class BaseCatalyst:
         if func:
             @wraps(func)
             def wrapper(**kwargs):
-                result = self.dump(kwargs, True, collect_errors)
+                result = self.dump(kwargs, True, all_errors)
                 return func(**result.valid_data)
             return wrapper
 
-        return partial(self.dump_kwargs, collect_errors=collect_errors)
+        return partial(self.dump_kwargs, all_errors=all_errors)
 
     def load(self,
              data: dict,
              raise_error: bool = None,
-             collect_errors: bool = None,
+             all_errors: bool = None,
              skip_validation: bool = None,
              ) -> LoadResult:
 
         if raise_error is None:
             raise_error = self.load_raise_error
-        if collect_errors is None:
-            collect_errors = self.load_collect_errors
+        if all_errors is None:
+            all_errors = self.load_all_errors
         if skip_validation is None:
             skip_validation = self.dump_skip_validation
 
         data, errors = self._side_effect(
-            data, {}, 'pre_load', not collect_errors)
+            data, {}, 'pre_load', not all_errors)
 
         valid_data, invalid_data = {}, {}
 
@@ -230,20 +228,18 @@ class BaseCatalyst:
                             field.error('required')
                         continue
 
-                    value = getattr(field, method)(raw_value)
+                    valid_data[field.name] = getattr(field, method)(raw_value)
                 except Exception as e:
-                    if not collect_errors:
-                        raise e
                     # collect errors and invalid data
                     errors[field.key] = e
                     if raw_value is not missing:
                         invalid_data[field.key] = raw_value
-                else:
-                    valid_data[field.name] = value
+                    if not all_errors:
+                        break
 
         if not errors:
             data, errors = self._side_effect(
-                data, errors, 'post_load', not collect_errors)
+                data, errors, 'post_load', not all_errors)
 
         load_result = LoadResult(valid_data, errors, invalid_data)
         if errors and raise_error:
@@ -253,29 +249,31 @@ class BaseCatalyst:
     def load_many(self,
                   data: Sequence,
                   raise_error: bool = None,
-                  collect_errors: bool = None
+                  all_errors: bool = None
                   ) -> LoadResult:
         if raise_error is None:
             raise_error = self.dump_raise_error
-        if collect_errors is None:
-            collect_errors = self.dump_collect_errors
+        if all_errors is None:
+            all_errors = self.dump_all_errors
 
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):
-            result = self.load(item, False, collect_errors)
+            result = self.load(item, False, all_errors)
             valid_data.append(result.valid_data)
             if not result.is_valid:
                 errors[i] = result.errors
                 invalid_data[i] = result.invalid_data
+                if not all_errors:
+                    break
 
         results = LoadResult(valid_data, errors, invalid_data)
-        if raise_error:
+        if errors and raise_error:
             raise ValidationError(results)
         return results
 
     def load_args(self,
                   func: Callable = None,
-                  collect_errors: bool = None
+                  all_errors: bool = None
                   ) -> Callable:
         """Decorator for loading args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
@@ -288,16 +286,16 @@ class BaseCatalyst:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 ba = sig.bind(*args, **kwargs)
-                result = self.load(ba.arguments, True, collect_errors)
+                result = self.load(ba.arguments, True, all_errors)
                 ba.arguments.update(result.valid_data)
                 return func(*ba.args, **ba.kwargs)
             return wrapper
 
-        return partial(self.load_args, collect_errors=collect_errors)
+        return partial(self.load_args, all_errors=all_errors)
 
     def load_kwargs(self,
                     func: Callable = None,
-                    collect_errors: bool = None
+                    all_errors: bool = None
                     ) -> Callable:
         """Decorator for loading kwargs by catalyst before function is called.
         The wrapper function only takes kwargs, and unpacks loading result to
@@ -306,11 +304,11 @@ class BaseCatalyst:
         if func:
             @wraps(func)
             def wrapper(**kwargs):
-                result = self.load(kwargs, True, collect_errors)
+                result = self.load(kwargs, True, all_errors)
                 return func(**result.valid_data)
             return wrapper
 
-        return partial(self.load_kwargs, collect_errors=collect_errors)
+        return partial(self.load_kwargs, all_errors=all_errors)
 
     def _side_effect(self, data, errors, name, raise_error):
         handle = getattr(self, name)

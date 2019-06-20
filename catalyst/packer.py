@@ -11,11 +11,11 @@ class CatalystPacker:
 
     def dump(self,
              raise_error: bool = None,
-             collect_errors: bool = None
+             all_errors: bool = None
              ) -> DumpResult:
         valid_data, errors, invalid_data = {}, {}, {}
         for catalyst, data in self.packages:
-            temp = catalyst.dump(data, raise_error, collect_errors)
+            temp = catalyst.dump(data, raise_error, all_errors)
             valid_data.update(temp.valid_data)
             errors.update(temp.errors)
             invalid_data.update(temp.invalid_data)
@@ -24,11 +24,11 @@ class CatalystPacker:
 
     def load(self,
              raise_error: bool = None,
-             collect_errors: bool = None
+             all_errors: bool = None
              ) -> LoadResult:
         valid_data, errors, invalid_data = {}, {}, {}
         for catalyst, data in self.packages:
-            temp = catalyst.load(data, raise_error, collect_errors)
+            temp = catalyst.load(data, raise_error, all_errors)
             valid_data.update(temp.valid_data)
             errors.update(temp.errors)
             invalid_data.update(temp.invalid_data)

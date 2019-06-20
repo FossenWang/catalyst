@@ -45,5 +45,5 @@ class PackerTest(TestCase):
         with self.assertRaises(ValidationError):
             packer.load(raise_error=True)
 
-        with self.assertRaises(ValueError):
-            packer.load(collect_errors=False)
+        with self.assertRaises(ValidationError):
+            packer.load(raise_error=True, all_errors=False)
