@@ -26,12 +26,12 @@ class BaseCatalyst:
                  dump_from: Callable[[Any, str], Any] = None,
                  dump_raise_error: bool = False,
                  dump_all_errors: bool = True,
-                 dump_skip_validation: bool = False,
+                 dump_no_validate: bool = True,
                  load_fields: Iterable[str] = None,
                  load_from: Callable[[Any, str], Any] = None,
                  load_raise_error: bool = False,
                  load_all_errors: bool = True,
-                 load_skip_validation: bool = False,
+                 load_no_validate: bool = False,
                  ):
         if not fields:
             fields = set(self._field_dict.keys())
@@ -50,10 +50,10 @@ class BaseCatalyst:
 
         self.dump_raise_error = dump_raise_error
         self.dump_all_errors = dump_all_errors
-        self.dump_skip_validation = dump_skip_validation
+        self.dump_no_validate = dump_no_validate
         self.load_raise_error = load_raise_error
         self.load_all_errors = load_all_errors
-        self.load_skip_validation = load_skip_validation
+        self.load_no_validate = load_no_validate
 
         if not dump_from:
             dump_from = self.default_dump_from
@@ -91,15 +91,15 @@ class BaseCatalyst:
              data,
              raise_error: bool = None,
              all_errors: bool = None,
-             skip_validation: bool = None,
+             no_validate: bool = None,
              ) -> DumpResult:
 
         if raise_error is None:
             raise_error = self.dump_raise_error
         if all_errors is None:
             all_errors = self.dump_all_errors
-        if skip_validation is None:
-            skip_validation = self.dump_skip_validation
+        if no_validate is None:
+            no_validate = self.dump_no_validate
 
         data, errors = self._side_effect(
             data, {}, 'pre_dump', not all_errors)
@@ -107,7 +107,7 @@ class BaseCatalyst:
         valid_data, invalid_data = {}, {}
 
         if not errors:
-            method = 'format' if skip_validation else 'dump'
+            method = 'format' if no_validate else 'dump'
             for field in self._dump_field_dict.values():
                 raw_value = missing
                 raw_value = self.dump_from(data, field.name, field.dump_default)
@@ -197,18 +197,18 @@ class BaseCatalyst:
         return partial(self.dump_kwargs, all_errors=all_errors)
 
     def load(self,
-             data: dict,
+             data,
              raise_error: bool = None,
              all_errors: bool = None,
-             skip_validation: bool = None,
+             no_validate: bool = None,
              ) -> LoadResult:
 
         if raise_error is None:
             raise_error = self.load_raise_error
         if all_errors is None:
             all_errors = self.load_all_errors
-        if skip_validation is None:
-            skip_validation = self.dump_skip_validation
+        if no_validate is None:
+            no_validate = self.load_no_validate
 
         data, errors = self._side_effect(
             data, {}, 'pre_load', not all_errors)
@@ -216,7 +216,7 @@ class BaseCatalyst:
         valid_data, invalid_data = {}, {}
 
         if not errors:
-            method = 'parse' if skip_validation else 'load'
+            method = 'parse' if no_validate else 'load'
             for field in self._load_field_dict.values():
                 raw_value = missing
                 raw_value = self.load_from(data, field.key, field.load_default)

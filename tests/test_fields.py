@@ -249,10 +249,9 @@ class FieldTest(TestCase):
         field = NestedField(a_cata, name='a', key='a')
 
         self.assertEqual(field.dump({'name': '1'}), {'name': '1'})
+        self.assertEqual(field.dump({'name': '1234'}), {'name': '1234'})
         with self.assertRaises(ValidationError):
             field.dump({'n': 'm'})
-        with self.assertRaises(ValidationError):
-            field.dump({'name': '1234'})
         with self.assertRaises(TypeError):
             field.dump(1)
 

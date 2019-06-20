@@ -563,9 +563,7 @@ class CatalystTest(TestCase):
             return a + b + kwargs['c']
 
         self.assertEqual(func_3(a=1, b=2, c=3), 6)
-        # raise error if kwargs are invalid
-        with self.assertRaises(ValidationError):
-            func_3(a='1', b=2, c=3)
+        self.assertEqual(func_3(a='1', b=2, c=3), 6)
         # takes kwargs only
         with self.assertRaises(TypeError):
             func_3(1, b=2, c=3)
@@ -603,9 +601,7 @@ class CatalystTest(TestCase):
             return a + sum(args) + b + kwargs['c']
 
         self.assertEqual(func_3(1, 2, b=3, c=4), 10)
-        # raise error if kwargs are invalid
-        with self.assertRaises(ValidationError):
-            func_3('1', 2, b=3, c=4)
+        self.assertEqual(func_3('1', 2, b=3, c=4), 10)
 
     def test_load_and_dump_many(self):
         c = self.create_catalyst(min_length=1, max_length=2)
