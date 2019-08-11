@@ -15,23 +15,47 @@ from .utils import missing, \
 FieldDict = Dict[str, Field]
 
 
+class OptionBox:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            if value is not None:
+                setattr(self, key, value)
+
+    def get(self, **kwargs):
+        if len(kwargs) != 1:
+            raise ValueError('只能填一个参数')
+        for key, value in kwargs.items():
+            if value is None:
+                return getattr(self, key)
+            return value
+
+
 class BaseCatalyst:
     _field_dict = {}  # type: FieldDict
-    default_dump_from = staticmethod(get_attr_or_item)
-    default_load_from = staticmethod(get_item)
+
+    class Options(OptionBox):
+        dump_from = staticmethod(get_attr_or_item)
+        dump_raise_error = False
+        dump_all_errors = True
+        dump_no_validate = True
+
+        load_from = staticmethod(get_item)
+        load_raise_error = False
+        load_all_errors = True
+        load_no_validate = False
 
     def __init__(self,
                  fields: Iterable[str] = None,
                  dump_fields: Iterable[str] = None,
                  dump_from: Callable[[Any, str], Any] = None,
-                 dump_raise_error: bool = False,
-                 dump_all_errors: bool = True,
-                 dump_no_validate: bool = True,
+                 dump_raise_error: bool = None,
+                 dump_all_errors: bool = None,
+                 dump_no_validate: bool = None,
                  load_fields: Iterable[str] = None,
                  load_from: Callable[[Any, str], Any] = None,
-                 load_raise_error: bool = False,
-                 load_all_errors: bool = True,
-                 load_no_validate: bool = False,
+                 load_raise_error: bool = None,
+                 load_all_errors: bool = None,
+                 load_no_validate: bool = None,
                  ):
         if not fields:
             fields = set(self._field_dict.keys())
@@ -48,23 +72,22 @@ class BaseCatalyst:
             self._field_dict, load_fields,
             lambda k: not self._field_dict[k].no_load)
 
-        self.dump_raise_error = dump_raise_error
-        self.dump_all_errors = dump_all_errors
-        self.dump_no_validate = dump_no_validate
-        self.load_raise_error = load_raise_error
-        self.load_all_errors = load_all_errors
-        self.load_no_validate = load_no_validate
+        self.opts = self.Options(
+            dump_from=dump_from,
+            dump_raise_error=dump_raise_error,
+            dump_all_errors=dump_all_errors,
+            dump_no_validate=dump_no_validate,
+            load_from=load_from,
+            load_raise_error=load_raise_error,
+            load_all_errors=load_all_errors,
+            load_no_validate=load_no_validate,
+        )
 
-        if not dump_from:
-            dump_from = self.default_dump_from
-        if not callable(dump_from):
+        if not callable(self.opts.dump_from):
             raise TypeError('"dump_from" must be Callable.')
-        if not load_from:
-            load_from = self.default_load_from
-        if not callable(load_from):
+
+        if not callable(self.opts.load_from):
             raise TypeError('"load_from" must be Callable.')
-        self.dump_from = dump_from
-        self.load_from = load_from
 
     @staticmethod
     def _format_field_key(key):
@@ -93,13 +116,9 @@ class BaseCatalyst:
              all_errors: bool = None,
              no_validate: bool = None,
              ) -> DumpResult:
-
-        if raise_error is None:
-            raise_error = self.dump_raise_error
-        if all_errors is None:
-            all_errors = self.dump_all_errors
-        if no_validate is None:
-            no_validate = self.dump_no_validate
+        raise_error = self.opts.get(dump_raise_error=raise_error)
+        all_errors = self.opts.get(dump_all_errors=all_errors)
+        no_validate = self.opts.get(dump_no_validate=no_validate)
 
         data, errors = self._side_effect(
             data, {}, 'pre_dump', not all_errors)
@@ -110,7 +129,7 @@ class BaseCatalyst:
             method = 'format' if no_validate else 'dump'
             for field in self._dump_field_dict.values():
                 raw_value = missing
-                raw_value = self.dump_from(data, field.name, field.dump_default)
+                raw_value = self.opts.dump_from(data, field.name, field.dump_default)
                 try:
                     # if the field's value is missing
                     # raise error if required otherwise skip
@@ -142,10 +161,8 @@ class BaseCatalyst:
                   raise_error: bool = None,
                   all_errors: bool = None
                   ) -> DumpResult:
-        if raise_error is None:
-            raise_error = self.dump_raise_error
-        if all_errors is None:
-            all_errors = self.dump_all_errors
+        raise_error = self.opts.get(dump_raise_error=raise_error)
+        all_errors = self.opts.get(dump_all_errors=all_errors)
 
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):
@@ -202,13 +219,9 @@ class BaseCatalyst:
              all_errors: bool = None,
              no_validate: bool = None,
              ) -> LoadResult:
-
-        if raise_error is None:
-            raise_error = self.load_raise_error
-        if all_errors is None:
-            all_errors = self.load_all_errors
-        if no_validate is None:
-            no_validate = self.load_no_validate
+        raise_error = self.opts.get(load_raise_error=raise_error)
+        all_errors = self.opts.get(load_all_errors=all_errors)
+        no_validate = self.opts.get(load_no_validate=no_validate)
 
         data, errors = self._side_effect(
             data, {}, 'pre_load', not all_errors)
@@ -219,7 +232,7 @@ class BaseCatalyst:
             method = 'parse' if no_validate else 'load'
             for field in self._load_field_dict.values():
                 raw_value = missing
-                raw_value = self.load_from(data, field.key, field.load_default)
+                raw_value = self.opts.load_from(data, field.key, field.load_default)
                 try:
                     # if the field's value is missing
                     # raise error if required otherwise skip
@@ -251,10 +264,8 @@ class BaseCatalyst:
                   raise_error: bool = None,
                   all_errors: bool = None
                   ) -> LoadResult:
-        if raise_error is None:
-            raise_error = self.dump_raise_error
-        if all_errors is None:
-            all_errors = self.dump_all_errors
+        raise_error = self.opts.get(load_raise_error=raise_error)
+        all_errors = self.opts.get(load_all_errors=all_errors)
 
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):
