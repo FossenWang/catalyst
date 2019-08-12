@@ -9,7 +9,7 @@ from .fields import Field, NestedField
 from .exceptions import ValidationError
 from .utils import missing, \
     get_attr_or_item, get_item, \
-    LoadResult, DumpResult
+    LoadResult, DumpResult, Result
 
 
 FieldDict = Dict[str, Field]
@@ -23,7 +23,7 @@ class OptionBox:
 
     def get(self, **kwargs):
         if len(kwargs) != 1:
-            raise ValueError('只能填一个参数')
+            raise ValueError('Only accept one pairs of kwargs.')
         for key, value in kwargs.items():
             if value is None:
                 return getattr(self, key)
@@ -38,11 +38,13 @@ class BaseCatalyst:
         dump_raise_error = False
         dump_all_errors = True
         dump_no_validate = True
+        dump_method = 'dump'
 
         load_from = staticmethod(get_item)
         load_raise_error = False
         load_all_errors = True
         load_no_validate = False
+        load_method = 'load'
 
     def __init__(self,
                  fields: Iterable[str] = None,
@@ -106,9 +108,88 @@ class BaseCatalyst:
                 new_fields[key] = fields[key]
         return new_fields
 
-    def pack(self, data) -> CatalystPacker:
-        packer = CatalystPacker()
-        return packer.pack(self, data)
+    def _side_effect(self, data, errors, name, raise_error):
+        handle = getattr(self, name)
+        try:
+            data = handle(data)
+        except Exception as e:
+            if raise_error:
+                raise e
+            error_key = getattr(handle, 'error_key', name)
+            errors[error_key] = e
+        return data, errors
+
+    def _base_handle(self,
+                     data,
+                     name: str,
+                     raise_error: bool = None,
+                     all_errors: bool = None,
+                     method: str = None,
+                     ) -> Result:
+        if name == 'dump':
+            source_attr = 'name'
+            target_attr = 'key'
+            ResultClass = DumpResult
+            field_dict = self._dump_field_dict
+            get_value = self.opts.dump_from
+            raise_error = self.opts.get(dump_raise_error=raise_error)
+            all_errors = self.opts.get(dump_all_errors=all_errors)
+            method = self.opts.get(dump_method=method)
+            if method not in {'dump', 'format', 'validate'}:
+                raise ValueError("Argment 'method' must be in ('dump', 'format', 'validate').")
+        elif name == 'load':
+            source_attr = 'key'
+            target_attr = 'name'
+            ResultClass = LoadResult
+            field_dict = self._load_field_dict
+            get_value = self.opts.load_from
+            raise_error = self.opts.get(load_raise_error=raise_error)
+            all_errors = self.opts.get(load_all_errors=all_errors)
+            method = self.opts.get(load_method=method)
+            if method not in {'load', 'parse', 'validate'}:
+                raise ValueError("Argment 'method' must be in ('load', 'parse', 'validate').")
+        else:
+            raise ValueError("Argment 'name' must be 'dump' or 'load'.")
+
+        data, errors = self._side_effect(
+            data, {}, f'pre_{name}', not all_errors)
+
+        valid_data, invalid_data = {}, {}
+
+        if not errors:
+            for field in field_dict.values():
+                default = getattr(field, f'{name}_default')
+                required = getattr(field, f'{name}_required')
+                source = getattr(field, source_attr)
+                target = getattr(field, target_attr)
+                raw_value = missing
+
+                raw_value = get_value(data, source, default)
+                try:
+                    # if the field's value is missing
+                    # raise error if required otherwise skip
+                    if raw_value is missing:
+                        if required:
+                            field.error('required')
+                        continue
+
+                    valid_data[target] = getattr(field, method)(raw_value)
+                except Exception as e:
+                    # collect errors and invalid data
+                    errors[source] = e
+                    if raw_value is not missing:
+                        invalid_data[source] = raw_value
+                    if not all_errors:
+                        break
+
+        if not errors:
+            data, errors = self._side_effect(
+                data, errors, f'post_{name}', not all_errors)
+
+        result = ResultClass(valid_data, errors, invalid_data)
+        if errors and raise_error:
+            raise ValidationError(result)
+        return result
 
     def dump(self,
              data,
@@ -116,45 +197,9 @@ class BaseCatalyst:
              all_errors: bool = None,
              no_validate: bool = None,
              ) -> DumpResult:
-        raise_error = self.opts.get(dump_raise_error=raise_error)
-        all_errors = self.opts.get(dump_all_errors=all_errors)
         no_validate = self.opts.get(dump_no_validate=no_validate)
-
-        data, errors = self._side_effect(
-            data, {}, 'pre_dump', not all_errors)
-
-        valid_data, invalid_data = {}, {}
-
-        if not errors:
-            method = 'format' if no_validate else 'dump'
-            for field in self._dump_field_dict.values():
-                raw_value = missing
-                raw_value = self.opts.dump_from(data, field.name, field.dump_default)
-                try:
-                    # if the field's value is missing
-                    # raise error if required otherwise skip
-                    if raw_value is missing:
-                        if field.dump_required:
-                            field.error('required')
-                        continue
-
-                    valid_data[field.key] = getattr(field, method)(raw_value)
-                except Exception as e:
-                    # collect errors and invalid data
-                    errors[field.name] = e
-                    if raw_value is not missing:
-                        invalid_data[field.name] = raw_value
-                    if not all_errors:
-                        break
-
-        if not errors:
-            data, errors = self._side_effect(
-                data, errors, 'post_dump', not all_errors)
-
-        dump_result = DumpResult(valid_data, errors, invalid_data)
-        if errors and raise_error:
-            raise ValidationError(dump_result)
-        return dump_result
+        method = 'format' if no_validate else 'dump'
+        return self._base_handle(data, 'dump', raise_error, all_errors, method)
 
     def dump_many(self,
                   data: Sequence,
@@ -219,45 +264,9 @@ class BaseCatalyst:
              all_errors: bool = None,
              no_validate: bool = None,
              ) -> LoadResult:
-        raise_error = self.opts.get(load_raise_error=raise_error)
-        all_errors = self.opts.get(load_all_errors=all_errors)
         no_validate = self.opts.get(load_no_validate=no_validate)
-
-        data, errors = self._side_effect(
-            data, {}, 'pre_load', not all_errors)
-
-        valid_data, invalid_data = {}, {}
-
-        if not errors:
-            method = 'parse' if no_validate else 'load'
-            for field in self._load_field_dict.values():
-                raw_value = missing
-                raw_value = self.opts.load_from(data, field.key, field.load_default)
-                try:
-                    # if the field's value is missing
-                    # raise error if required otherwise skip
-                    if raw_value is missing:
-                        if field.load_required:
-                            field.error('required')
-                        continue
-
-                    valid_data[field.name] = getattr(field, method)(raw_value)
-                except Exception as e:
-                    # collect errors and invalid data
-                    errors[field.key] = e
-                    if raw_value is not missing:
-                        invalid_data[field.key] = raw_value
-                    if not all_errors:
-                        break
-
-        if not errors:
-            data, errors = self._side_effect(
-                data, errors, 'post_load', not all_errors)
-
-        load_result = LoadResult(valid_data, errors, invalid_data)
-        if errors and raise_error:
-            raise ValidationError(load_result)
-        return load_result
+        method = 'parse' if no_validate else 'load'
+        return self._base_handle(data, 'load', raise_error, all_errors, method)
 
     def load_many(self,
                   data: Sequence,
@@ -321,17 +330,6 @@ class BaseCatalyst:
 
         return partial(self.load_kwargs, all_errors=all_errors)
 
-    def _side_effect(self, data, errors, name, raise_error):
-        handle = getattr(self, name)
-        try:
-            data = handle(data)
-        except Exception as e:
-            if raise_error:
-                raise e
-            error_key = getattr(handle, 'error_key', name)
-            errors[error_key] = e
-        return data, errors
-
     def pre_dump(self, data):
         return data
     pre_dump.error_key = 'pre_dump'
@@ -347,6 +345,10 @@ class BaseCatalyst:
     def post_load(self, data):
         return data
     post_load.error_key = 'post_load'
+
+    def pack(self, data) -> CatalystPacker:
+        packer = CatalystPacker()
+        return packer.pack(self, data)
 
 
 class CatalystMeta(type):
