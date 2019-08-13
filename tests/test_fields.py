@@ -39,7 +39,7 @@ class FieldTest(TestCase):
 
         # test dump
         field_1 = Field(formatter=A.fixed_value_formatter)
-        self.assertEqual(field_1.formatter, A.fixed_value_formatter)
+        self.assertEqual(field_1.opts.formatter, A.fixed_value_formatter)
         a = A()
         self.assertEqual(a.fixed_value.format(1000), 1)
         with self.assertRaises(AssertionError):
@@ -59,7 +59,7 @@ class FieldTest(TestCase):
             a.fixed_value.load(100)
 
         # test validators
-        self.assertEqual(len(a.fixed_value.validators), 2)
+        self.assertEqual(len(a.fixed_value.opts.validators), 2)
         with self.assertRaises(TypeError):
             a.fixed_value.set_validators(1)
         with self.assertRaises(TypeError):
@@ -90,7 +90,7 @@ class FieldTest(TestCase):
         with self.assertRaises(ValidationError):
             field.load('')
 
-        field.allow_none = False
+        field.opts.allow_none = False
         with self.assertRaises(ValidationError):
             field.load(None)
 
@@ -182,7 +182,7 @@ class FieldTest(TestCase):
         with self.assertRaises(TypeError):
             field.load(1)
         self.assertIsNone(field.load(None))
-        field.allow_none = False
+        field.opts.allow_none = False
         with self.assertRaises(ValidationError) as c:
             field.load(None)
         self.assertEqual(c.exception.msg, field.error_messages['none'])
@@ -223,7 +223,7 @@ class FieldTest(TestCase):
         # dump
         field = FieldClass()
         dt_str = field.dump(dt)
-        self.assertEqual(dt_str, dt.strftime(field._default_fmt))
+        self.assertEqual(dt_str, dt.strftime(field.opts.fmt))
 
         field = FieldClass(fmt=fmt)
         dt_str = field.dump(dt)

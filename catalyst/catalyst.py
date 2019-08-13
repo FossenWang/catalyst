@@ -7,27 +7,13 @@ from collections import OrderedDict
 from .packer import CatalystPacker
 from .fields import Field, NestedField
 from .exceptions import ValidationError
-from .utils import missing, \
-    get_attr_or_item, get_item, \
-    LoadResult, DumpResult, Result
+from .utils import (
+    missing, get_attr_or_item, get_item,
+    LoadResult, DumpResult, Result, OptionBox
+)
 
 
 FieldDict = Dict[str, Field]
-
-
-class OptionBox:
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            if value is not None:
-                setattr(self, key, value)
-
-    def get(self, **kwargs):
-        if len(kwargs) != 1:
-            raise ValueError('Only accept one pairs of kwargs.')
-        for key, value in kwargs.items():
-            if value is None:
-                return getattr(self, key)
-            return value
 
 
 class BaseCatalyst:
@@ -68,11 +54,11 @@ class BaseCatalyst:
 
         self._dump_field_dict = self._copy_fields(
             self._field_dict, dump_fields,
-            lambda k: not self._field_dict[k].no_dump)
+            lambda k: not self._field_dict[k].opts.no_dump)
 
         self._load_field_dict = self._copy_fields(
             self._field_dict, load_fields,
-            lambda k: not self._field_dict[k].no_load)
+            lambda k: not self._field_dict[k].opts.no_load)
 
         self.opts = self.Options(
             dump_from=dump_from,
@@ -159,7 +145,7 @@ class BaseCatalyst:
         if not errors:
             for field in field_dict.values():
                 default = getattr(field, f'{name}_default')
-                required = getattr(field, f'{name}_required')
+                required = getattr(field.opts, f'{name}_required')
                 source = getattr(field, source_attr)
                 target = getattr(field, target_attr)
                 raw_value = missing

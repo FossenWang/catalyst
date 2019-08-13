@@ -4,7 +4,7 @@ from typing import Callable, Any, Iterable, Union, Mapping, Sequence
 from datetime import datetime, time, date
 from warnings import warn
 
-from .utils import ErrorMessageMixin, missing, no_processing
+from .utils import ErrorMessageMixin, missing, no_processing, OptionBox
 from .validators import (
     LengthValidator,
     ComparisonValidator,
@@ -24,25 +24,38 @@ class Field(ErrorMessageMixin):
         'required': 'Missing data for required field.',
         'none': 'Field may not be None.'
     }
-    default_formatter = staticmethod(no_processing)
-    default_parser = staticmethod(no_processing)
-    default_validators = None
+
+    class Options(OptionBox):
+        formatter = staticmethod(no_processing)
+        format_none = False
+        dump_required = None  # type: bool
+        dump_default = missing
+        no_dump = False
+
+        parser = staticmethod(no_processing)
+        parse_none = False
+        load_required = False
+        load_default = missing
+        no_load = False
+
+        validators = None  # type: list
+        allow_none = True
 
     def __init__(self,
                  name: str = None,
                  key: str = None,
                  formatter: FormatterType = None,
-                 format_none: bool = False,
+                 format_none: bool = None,
                  dump_required: bool = None,
                  dump_default: Any = missing,
-                 no_dump: bool = False,
+                 no_dump: bool = None,
                  parser: ParserType = None,
-                 parse_none: bool = False,
+                 parse_none: bool = None,
                  load_required: bool = None,
                  load_default: Any = missing,
-                 no_load: bool = False,
-                 allow_none: bool = True,
+                 no_load: bool = None,
                  validators: MultiValidator = None,
+                 allow_none: bool = None,
                  error_messages: dict = None,
                  ):
         # Warn of redundant arguments
@@ -53,49 +66,44 @@ class Field(ErrorMessageMixin):
             warn('Some args of Field may redundant, '
                  'if "dump_default" is set, "dump_required=True" has no effect.')
 
-        if load_required is None:
-            # Field is not required by default
-            load_required = False
-        elif load_required and load_default is not missing:
+        if load_required and load_default is not missing:
             warn('Some args of Field may redundant, '
                  'if "load_default" is set, "load_required=True" has no effect.')
 
         self.name = name
         self.key = key
-
-        # Arguments used for dumping
-        self.set_formatter(formatter if formatter else self.default_formatter)
-        self.format_none = format_none
-        self.dump_required = dump_required
-        self._dump_default = dump_default
-        self.no_dump = no_dump
-
-        # Arguments used for loading
-        self.set_parser(parser if parser else self.default_parser)
-        self.parse_none = parse_none
-        self.load_required = load_required
-        self._load_default = load_default
-        self.no_load = no_load
-
-        # Arguments used for validation
-        self.allow_none = allow_none
-        self.set_validators(validators if validators else self.default_validators)
+        self.opts = self.Options(
+            format_none=format_none,
+            dump_required=dump_required,
+            no_dump=no_dump,
+            parse_none=parse_none,
+            load_required=load_required,
+            no_load=no_load,
+            allow_none=allow_none,
+        )
+        if dump_default is not missing:
+            self.opts.dump_default = dump_default
+        if load_default is not missing:
+            self.opts.load_default = load_default
+        self.set_formatter(self.opts.get(formatter=formatter))
+        self.set_parser(self.opts.get(parser=parser))
+        self.set_validators(self.opts.get(validators=validators))
         self.collect_error_messages(error_messages)
 
     def set_formatter(self, formatter: FormatterType):
         if not callable(formatter):
             raise TypeError('Argument "formatter" must be Callable.')
-        self.formatter = formatter
+        self.opts.formatter = formatter
         return formatter
 
     def set_parser(self, parser: ParserType):
         if not callable(parser):
             raise TypeError('Argument "parser" must be Callable.')
-        self.parser = parser
+        self.opts.parser = parser
         return parser
 
     @staticmethod
-    def ensure_validators(validators: MultiValidator):
+    def ensure_validators(validators: MultiValidator) -> list:
         if validators is None:
             return []
 
@@ -107,27 +115,42 @@ class Field(ErrorMessageMixin):
                 raise TypeError(
                     'Argument "validators" must be ether Callable '
                     'or Iterable which contained Callable.')
-        return validators
+        return list(validators)
 
     def set_validators(self, validators: MultiValidator):
-        self.validators = list(self.ensure_validators(validators))
+        self.opts.validators = self.ensure_validators(validators)
         return validators
 
     def add_validator(self, validator: ValidatorType):
         if not callable(validator):
             raise TypeError('Argument "validator" must be Callable.')
-        self.validators.append(validator)
+        self.opts.validators.append(validator)
         return validator
+
+    def validate(self, value):
+        if value is None:
+            if self.opts.allow_none:
+                return None
+            self.error('none')
+        for validator in self.opts.validators:
+            validator(value)
+        return value
+
+    def format(self, value):
+        if value is None and not self.opts.format_none:
+            return None
+        value = self.opts.formatter(value)
+        return value
 
     def dump(self, value):
         self.validate(value)
         value = self.format(value)
         return value
 
-    def format(self, value):
-        if value is None and not self.format_none:
+    def parse(self, value):
+        if value is None and not self.opts.parse_none:
             return None
-        value = self.formatter(value)
+        value = self.opts.parser(value)
         return value
 
     def load(self, value):
@@ -135,40 +158,26 @@ class Field(ErrorMessageMixin):
         self.validate(value)
         return value
 
-    def parse(self, value):
-        if value is None and not self.parse_none:
-            return None
-        value = self.parser(value)
-        return value
-
-    def validate(self, value):
-        if value is None:
-            if self.allow_none:
-                return None
-            self.error('none')
-        for validator in self.validators:
-            validator(value)
-        return value
-
     @property
     def dump_default(self):
-        default = self._dump_default
+        default = self.opts.dump_default
         if callable(default):
             default = default()
         return default
 
     @property
     def load_default(self):
-        default = self._load_default
+        default = self.opts.load_default
         if callable(default):
             default = default()
         return default
 
 
 class StringField(Field):
-    default_formatter = str
-    default_parser = str
-    default_validators = [TypeValidator(str)]
+    class Options(Field.Options):
+        formatter = str
+        parser = str
+        validators = [TypeValidator(str)]
 
     def __init__(self, min_length: int = None, max_length: int = None, **kwargs):
         super().__init__(**kwargs)
@@ -177,9 +186,10 @@ class StringField(Field):
 
 
 class NumberField(Field):
-    default_formatter = float
-    default_parser = float
-    default_validators = [TypeValidator(float)]
+    class Options(Field.Options):
+        formatter = float
+        parser = float
+        validators = [TypeValidator(float)]
 
     def __init__(self, min_value=None, max_value=None, **kwargs):
         super().__init__(**kwargs)
@@ -192,99 +202,111 @@ class FloatField(NumberField):
 
 
 class IntegerField(NumberField):
-    default_formatter = int
-    default_parser = int
-    default_validators = [TypeValidator(int)]
+    class Options(Field.Options):
+        formatter = int
+        parser = int
+        validators = [TypeValidator(int)]
 
 
 class BoolField(Field):
-    default_formatter = bool
-    default_parser = bool
-    default_validators = [TypeValidator(bool)]
+    class Options(Field.Options):
+        formatter = bool
+        parser = bool
+        validators = [TypeValidator(bool)]
 
 
 class ListField(Field):
-    default_validators = [TypeValidator(Sequence)]
-
     def __init__(self, item_field: Field, **kwargs):
-        self.item_field = item_field
         super().__init__(**kwargs)
+        self.opts.item_field = item_field
 
-    def default_formatter(self, value: Iterable):
-        return [self.item_field.dump(item) for item in value]
+    class Options(Field.Options):
+        validators = [TypeValidator(Sequence)]
 
-    def default_parser(self, value):
-        return [self.item_field.load(item) for item in value]
+        def formatter(self, value: Iterable):
+            return [self.item_field.dump(item) for item in value]
+
+        def parser(self, value):
+            return [self.item_field.load(item) for item in value]
 
 
 class CallableField(Field):
-    default_validators = [TypeValidator(Callable)]
 
     def __init__(self,
                  func_args: Iterable = None,
                  func_kwargs: Mapping = None,
                  **kwargs):
+        kwargs.pop('no_load', None)
+        super().__init__(no_load=True, **kwargs)
         if func_args is None:
             func_args = tuple()
         if func_kwargs is None:
             func_kwargs = {}
         self.set_args(*func_args, **func_kwargs)
-        kwargs.pop('no_load', None)
-        super().__init__(no_load=True, **kwargs)
-
-    def default_formatter(self, func: Callable):
-        return func(*self.func_args, **self.func_kwargs)
 
     def set_args(self, *args, **kwargs):
-        self.func_args = args
-        self.func_kwargs = kwargs
+        self.opts.func_args = args
+        self.opts.func_kwargs = kwargs
+
+    class Options(Field.Options):
+        validators = [TypeValidator(Callable)]
+
+        def formatter(self, func: Callable):
+            return func(*self.func_args, **self.func_kwargs)
 
 
 class DatetimeField(Field):
-    _type = datetime
-    _default_fmt = r'%Y-%m-%d %H:%M:%S.%f'
-    default_validators = [TypeValidator(datetime)]
 
     def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
-        self.fmt = fmt if fmt else self._default_fmt
         super().__init__(**kwargs)
+        if fmt:
+            self.opts.fmt = fmt
+
         if min_time is not None or max_time is not None:
             self.add_validator(ComparisonValidator(min_time, max_time))
 
-    def default_formatter(self, dt):
-        return self._type.strftime(dt, self.fmt)
+    class Options(Field.Options):
+        _type = datetime
+        fmt = r'%Y-%m-%d %H:%M:%S.%f'
+        validators = [TypeValidator(datetime)]
 
-    def default_parser(self, date_string: str):
-        return datetime.strptime(date_string, self.fmt)
+        def formatter(self, dt):
+            return self._type.strftime(dt, self.fmt)
+
+        def parser(self, date_string: str):
+            return datetime.strptime(date_string, self.fmt)
 
 
 class TimeField(DatetimeField):
-    _type = time
-    _default_fmt = r'%H:%M:%S.%f'
-    default_validators = [TypeValidator(time)]
+    class Options(DatetimeField.Options):
+        _type = time
+        fmt = r'%H:%M:%S.%f'
+        validators = [TypeValidator(time)]
 
-    def default_parser(self, date_string: str):
-        return datetime.strptime(date_string, self.fmt).time()
+        def parser(self, date_string: str):
+            return datetime.strptime(date_string, self.fmt).time()
 
 
 class DateField(DatetimeField):
-    _type = date
-    _default_fmt = r'%Y-%m-%d'
-    default_validators = [TypeValidator(date)]
+    class Options(DatetimeField.Options):
+        _type = date
+        fmt = r'%Y-%m-%d'
+        validators = [TypeValidator(date)]
 
-    def default_parser(self, date_string: str):
-        return datetime.strptime(date_string, self.fmt).date()
+        def parser(self, date_string: str):
+            return datetime.strptime(date_string, self.fmt).date()
 
 
 class NestedField(Field):
-    default_validators = [TypeValidator(Mapping)]
-
     def __init__(self, catalyst, **kwargs):
-        self.catalyst = catalyst
         super().__init__(**kwargs)
+        self.opts.catalyst = catalyst
 
-    def default_formatter(self, value):
-        return self.catalyst.dump(value, True).valid_data
+    class Options(Field.Options):
+        validators = [TypeValidator(Mapping)]
 
-    def default_parser(self, value):
-        return self.catalyst.load(value, True).valid_data
+        def formatter(self, value):
+            return self.catalyst.dump(value, True).valid_data
+
+        def parser(self, value):
+            return self.catalyst.load(value, True).valid_data

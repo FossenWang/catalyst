@@ -69,6 +69,21 @@ class ErrorMessageMixin:
             self.error_messages.get(error_key, self.unknown_error))
 
 
+class OptionBox:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            if value is not None:
+                setattr(self, key, value)
+
+    def get(self, **kwargs):
+        if len(kwargs) != 1:
+            raise ValueError('Only accept one pairs of kwargs.')
+        for key, value in kwargs.items():
+            if value is None:
+                return getattr(self, key)
+            return value
+
+
 class _Missing:
     def __repr__(self):
         return '<catalyst.missing>'
