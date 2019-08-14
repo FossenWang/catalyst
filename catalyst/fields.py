@@ -231,7 +231,6 @@ class ListField(Field):
 
 
 class CallableField(Field):
-
     def __init__(self,
                  func_args: Iterable = None,
                  func_kwargs: Mapping = None,
@@ -256,7 +255,6 @@ class CallableField(Field):
 
 
 class DatetimeField(Field):
-
     def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
         super().__init__(**kwargs)
         if fmt:

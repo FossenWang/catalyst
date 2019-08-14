@@ -23,13 +23,11 @@ class BaseCatalyst:
         dump_from = staticmethod(get_attr_or_item)
         dump_raise_error = False
         dump_all_errors = True
-        dump_no_validate = True
-        dump_method = 'dump'
+        dump_method = 'format'
 
         load_from = staticmethod(get_item)
         load_raise_error = False
         load_all_errors = True
-        load_no_validate = False
         load_method = 'load'
 
     def __init__(self,
@@ -38,12 +36,12 @@ class BaseCatalyst:
                  dump_from: Callable[[Any, str], Any] = None,
                  dump_raise_error: bool = None,
                  dump_all_errors: bool = None,
-                 dump_no_validate: bool = None,
+                 dump_method: str = None,
                  load_fields: Iterable[str] = None,
                  load_from: Callable[[Any, str], Any] = None,
                  load_raise_error: bool = None,
                  load_all_errors: bool = None,
-                 load_no_validate: bool = None,
+                 load_method: str = None,
                  ):
         if not fields:
             fields = set(self._field_dict.keys())
@@ -64,11 +62,11 @@ class BaseCatalyst:
             dump_from=dump_from,
             dump_raise_error=dump_raise_error,
             dump_all_errors=dump_all_errors,
-            dump_no_validate=dump_no_validate,
+            dump_method=dump_method,
             load_from=load_from,
             load_raise_error=load_raise_error,
             load_all_errors=load_all_errors,
-            load_no_validate=load_no_validate,
+            load_method=load_method,
         )
 
         if not callable(self.opts.dump_from):
@@ -181,10 +179,8 @@ class BaseCatalyst:
              data,
              raise_error: bool = None,
              all_errors: bool = None,
-             no_validate: bool = None,
+             method: str = None,
              ) -> DumpResult:
-        no_validate = self.opts.get(dump_no_validate=no_validate)
-        method = 'format' if no_validate else 'dump'
         return self._base_handle(data, 'dump', raise_error, all_errors, method)
 
     def dump_many(self,
@@ -248,10 +244,8 @@ class BaseCatalyst:
              data,
              raise_error: bool = None,
              all_errors: bool = None,
-             no_validate: bool = None,
+             method: str = None,
              ) -> LoadResult:
-        no_validate = self.opts.get(load_no_validate=no_validate)
-        method = 'parse' if no_validate else 'load'
         return self._base_handle(data, 'load', raise_error, all_errors, method)
 
     def load_many(self,
