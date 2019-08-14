@@ -175,6 +175,62 @@ class BaseCatalyst:
             raise ValidationError(result)
         return result
 
+    def _handle_many(self,
+                     data: Sequence,
+                     name: str,
+                     raise_error: bool = None,
+                     all_errors: bool = None,
+                     method: str = None,
+                     ) -> Result:
+        if name == 'dump':
+            ResultClass = DumpResult
+            raise_error = self.opts.get(dump_raise_error=raise_error)
+            all_errors = self.opts.get(dump_all_errors=all_errors)
+        elif name == 'load':
+            ResultClass = LoadResult
+            raise_error = self.opts.get(load_raise_error=raise_error)
+            all_errors = self.opts.get(load_all_errors=all_errors)
+        else:
+            raise ValueError("Argment 'name' must be 'dump' or 'load'.")
+
+        valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
+        for i, item in enumerate(data):
+            result = self._base_handle(item, name, False, all_errors, method)
+            valid_data.append(result.valid_data)
+            if not result.is_valid:
+                errors[i] = result.errors
+                invalid_data[i] = result.invalid_data
+                if not all_errors:
+                    break
+
+        results = ResultClass(valid_data, errors, invalid_data)
+        if raise_error:
+            raise ValidationError(results)
+        return results
+
+    def _handle_args(self,
+                     func: Callable = None,
+                     name: str = None,
+                     all_errors: bool = None,
+                     method: str = None,
+                     ) -> Callable:
+        """Decorator for handling args by catalyst before function is called.
+        The wrapper function takes args as same as args of the raw function.
+        If args are invalid, error will be raised.
+        In general, `*args` should be handled by ListField,
+        and `**kwargs` should be handled by NestedField.
+        """
+        if func:
+            sig = inspect.signature(func)
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                ba = sig.bind(*args, **kwargs)
+                result = self._base_handle(ba.arguments, name, True, all_errors, method)
+                ba.arguments.update(result.valid_data)
+                return func(*ba.args, **ba.kwargs)
+            return wrapper
+        return partial(self._handle_args, name=name, all_errors=all_errors, method=method)
+
     def dump(self,
              data,
              raise_error: bool = None,
@@ -186,42 +242,17 @@ class BaseCatalyst:
     def dump_many(self,
                   data: Sequence,
                   raise_error: bool = None,
-                  all_errors: bool = None
+                  all_errors: bool = None,
+                  method: str = None,
                   ) -> DumpResult:
-        raise_error = self.opts.get(dump_raise_error=raise_error)
-        all_errors = self.opts.get(dump_all_errors=all_errors)
-
-        valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
-        for i, item in enumerate(data):
-            result = self.dump(item, False, all_errors)
-            valid_data.append(result.valid_data)
-            if not result.is_valid:
-                errors[i] = result.errors
-                invalid_data[i] = result.invalid_data
-
-        results = DumpResult(valid_data, errors, invalid_data)
-        if raise_error:
-            raise ValidationError(results)
-        return results
+        return self._handle_many(data, 'dump', raise_error, all_errors, method)
 
     def dump_args(self,
-                  func: Callable,
-                  all_errors: bool = None
+                  func: Callable = None,
+                  all_errors: bool = None,
+                  method: str = None,
                   ) -> Callable:
-        """Decorator for dumping args by catalyst before function is called.
-        The wrapper function takes args as same as args of the raw function.
-        If args are invalid, error will be raised.
-        In general, `*args` should be handled by ListField,
-        and `**kwargs` should be handled by NestedField.
-        """
-        sig = inspect.signature(func)
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            ba = sig.bind(*args, **kwargs)
-            result = self.dump(ba.arguments, True, all_errors)
-            ba.arguments.update(result.valid_data)
-            return func(*ba.args, **ba.kwargs)
-        return wrapper
+        return self._handle_args(func, 'load', all_errors, method)
 
     def load(self,
              data,
@@ -234,47 +265,17 @@ class BaseCatalyst:
     def load_many(self,
                   data: Sequence,
                   raise_error: bool = None,
-                  all_errors: bool = None
+                  all_errors: bool = None,
+                  method: str = None,
                   ) -> LoadResult:
-        raise_error = self.opts.get(load_raise_error=raise_error)
-        all_errors = self.opts.get(load_all_errors=all_errors)
-
-        valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
-        for i, item in enumerate(data):
-            result = self.load(item, False, all_errors)
-            valid_data.append(result.valid_data)
-            if not result.is_valid:
-                errors[i] = result.errors
-                invalid_data[i] = result.invalid_data
-                if not all_errors:
-                    break
-
-        results = LoadResult(valid_data, errors, invalid_data)
-        if errors and raise_error:
-            raise ValidationError(results)
-        return results
+        return self._handle_many(data, 'load', raise_error, all_errors, method)
 
     def load_args(self,
                   func: Callable = None,
-                  all_errors: bool = None
+                  all_errors: bool = None,
+                  method: str = None,
                   ) -> Callable:
-        """Decorator for loading args by catalyst before function is called.
-        The wrapper function takes args as same as args of the raw function.
-        If args are invalid, error will be raised.
-        In general, `*args` should be handled by ListField,
-        and `**kwargs` should be handled by NestedField.
-        """
-        if func:
-            sig = inspect.signature(func)
-            @wraps(func)
-            def wrapper(*args, **kwargs):
-                ba = sig.bind(*args, **kwargs)
-                result = self.load(ba.arguments, True, all_errors)
-                ba.arguments.update(result.valid_data)
-                return func(*ba.args, **ba.kwargs)
-            return wrapper
-
-        return partial(self.load_args, all_errors=all_errors)
+        return self._handle_args(func, 'load', all_errors, method)
 
     def pre_dump(self, data):
         return data
