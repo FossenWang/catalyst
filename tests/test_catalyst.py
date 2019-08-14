@@ -529,45 +529,6 @@ class CatalystTest(TestCase):
         data = {'a': 'a', 'b': 'b'}
         self.assertDictEqual(b.dump(data).valid_data, data)
 
-    def test_load_and_dump_kwargs(self):
-        class A(Catalyst):
-            a = IntegerField()
-            b = IntegerField()
-            c = IntegerField()
-
-        a = A()
-
-        @a.load_kwargs
-        def func_1(a, b=1, **kwargs):
-            return a + b + kwargs['c']
-
-        self.assertEqual(func_1(a='1', b='2', c='3'), 6)
-        # raise error if kwargs are invalid
-        with self.assertRaises(ValidationError):
-            func_1(a='a', b='2', c='3')
-        # takes kwargs only
-        with self.assertRaises(TypeError):
-            func_1('1', b='2', c='3')
-
-        @a.load_kwargs(all_errors=False)
-        def func_2(a, b=1, **kwargs):
-            return a + b + kwargs['c']
-
-        self.assertEqual(func_2(a='1', b='2', c='3'), 6)
-        # don't collect error
-        with self.assertRaises(ValidationError):
-            func_2(a='a')
-
-        @a.dump_kwargs
-        def func_3(a, b=1, **kwargs):
-            return a + b + kwargs['c']
-
-        self.assertEqual(func_3(a=1, b=2, c=3), 6)
-        self.assertEqual(func_3(a='1', b=2, c=3), 6)
-        # takes kwargs only
-        with self.assertRaises(TypeError):
-            func_3(1, b=2, c=3)
-
     def test_load_and_dump_args(self):
         class A(Catalyst):
             a = IntegerField()

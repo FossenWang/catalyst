@@ -76,14 +76,6 @@ class BaseCatalyst:
             raise TypeError('"load_from" must be Callable.')
 
     @staticmethod
-    def _format_field_key(key):
-        return key
-
-    @staticmethod
-    def _format_field_name(name):
-        return name
-
-    @staticmethod
     def _copy_fields(fields: FieldDict, keys: Iterable[str],
                      is_copying: Callable[[str], bool]) -> FieldDict:
         new_fields = {}  # type: FieldDict
@@ -91,6 +83,14 @@ class BaseCatalyst:
             if is_copying(key):
                 new_fields[key] = fields[key]
         return new_fields
+
+    @staticmethod
+    def _format_field_key(key):
+        return key
+
+    @staticmethod
+    def _format_field_name(name):
+        return name
 
     def _side_effect(self, data, errors, name, raise_error):
         handle = getattr(self, name)
@@ -223,23 +223,6 @@ class BaseCatalyst:
             return func(*ba.args, **ba.kwargs)
         return wrapper
 
-    def dump_kwargs(self,
-                    func: Callable = None,
-                    all_errors: bool = None
-                    ) -> Callable:
-        """Decorator for dumping kwargs by catalyst before function is called.
-        The wrapper function only takes kwargs, and unpacks dumping result to
-        the raw function. If kwargs are invalid, error will be raised.
-        """
-        if func:
-            @wraps(func)
-            def wrapper(**kwargs):
-                result = self.dump(kwargs, True, all_errors)
-                return func(**result.valid_data)
-            return wrapper
-
-        return partial(self.dump_kwargs, all_errors=all_errors)
-
     def load(self,
              data,
              raise_error: bool = None,
@@ -292,23 +275,6 @@ class BaseCatalyst:
             return wrapper
 
         return partial(self.load_args, all_errors=all_errors)
-
-    def load_kwargs(self,
-                    func: Callable = None,
-                    all_errors: bool = None
-                    ) -> Callable:
-        """Decorator for loading kwargs by catalyst before function is called.
-        The wrapper function only takes kwargs, and unpacks loading result to
-        the raw function. If kwargs are invalid, error will be raised.
-        """
-        if func:
-            @wraps(func)
-            def wrapper(**kwargs):
-                result = self.load(kwargs, True, all_errors)
-                return func(**result.valid_data)
-            return wrapper
-
-        return partial(self.load_kwargs, all_errors=all_errors)
 
     def pre_dump(self, data):
         return data
