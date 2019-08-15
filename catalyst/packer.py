@@ -1,4 +1,4 @@
-from .utils import LoadResult, DumpResult, Result
+from .utils import LoadResult, DumpResult, CatalystResult
 
 
 class CatalystPacker:
@@ -14,7 +14,7 @@ class CatalystPacker:
                      raise_error: bool = None,
                      all_errors: bool = None,
                      method: str = None,
-                     ) -> Result:
+                     ) -> CatalystResult:
         if name == 'dump':
             ResultClass = DumpResult
         elif name == 'load':

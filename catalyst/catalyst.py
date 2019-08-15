@@ -9,7 +9,7 @@ from .fields import Field, NestedField
 from .exceptions import ValidationError
 from .utils import (
     missing, get_attr_or_item, get_item,
-    LoadResult, DumpResult, Result, OptionBox
+    LoadResult, DumpResult, CatalystResult, OptionBox
 )
 
 
@@ -29,6 +29,23 @@ class BaseCatalyst:
         load_raise_error = False
         load_all_errors = True
         load_method = 'load'
+
+    @staticmethod
+    def _format_field_key(key):
+        return key
+
+    @staticmethod
+    def _format_field_name(name):
+        return name
+
+    @staticmethod
+    def _copy_fields(fields: FieldDict, keys: Iterable[str],
+                     is_copying: Callable[[str], bool]) -> FieldDict:
+        new_fields = {}  # type: FieldDict
+        for key in keys:
+            if is_copying(key):
+                new_fields[key] = fields[key]
+        return new_fields
 
     def __init__(self,
                  fields: Iterable[str] = None,
@@ -75,23 +92,6 @@ class BaseCatalyst:
         if not callable(self.opts.load_from):
             raise TypeError('"load_from" must be Callable.')
 
-    @staticmethod
-    def _copy_fields(fields: FieldDict, keys: Iterable[str],
-                     is_copying: Callable[[str], bool]) -> FieldDict:
-        new_fields = {}  # type: FieldDict
-        for key in keys:
-            if is_copying(key):
-                new_fields[key] = fields[key]
-        return new_fields
-
-    @staticmethod
-    def _format_field_key(key):
-        return key
-
-    @staticmethod
-    def _format_field_name(name):
-        return name
-
     def _side_effect(self, data, errors, name, raise_error):
         handle = getattr(self, name)
         try:
@@ -109,7 +109,7 @@ class BaseCatalyst:
                      raise_error: bool = None,
                      all_errors: bool = None,
                      method: str = None,
-                     ) -> Result:
+                     ) -> CatalystResult:
         if name == 'dump':
             source_attr = 'name'
             target_attr = 'key'
@@ -181,7 +181,7 @@ class BaseCatalyst:
                      raise_error: bool = None,
                      all_errors: bool = None,
                      method: str = None,
-                     ) -> Result:
+                     ) -> CatalystResult:
         if name == 'dump':
             ResultClass = DumpResult
             raise_error = self.opts.get(dump_raise_error=raise_error)
