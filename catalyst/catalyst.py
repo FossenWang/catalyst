@@ -75,6 +75,7 @@ class BaseCatalyst:
             self._field_dict, load_fields,
             lambda k: not self._field_dict[k].opts.no_load)
 
+        # TODO test args override
         self.opts = self.Options(
             dump_from=dump_from,
             dump_raise_error=dump_raise_error,
@@ -142,8 +143,10 @@ class BaseCatalyst:
 
         if not errors:
             for field in field_dict.values():
-                default = getattr(field, f'{name}_default')
+                field = field  # type: Field
+
                 required = getattr(field.opts, f'{name}_required')
+                default = getattr(field, f'{name}_default')
                 source = getattr(field, source_attr)
                 target = getattr(field, target_attr)
                 raw_value = missing

@@ -2,7 +2,6 @@
 
 from typing import Callable, Any, Iterable, Union, Mapping, Sequence
 from datetime import datetime, time, date
-from warnings import warn
 
 from .utils import ErrorMessageMixin, missing, no_processing, OptionBox
 from .validators import (
@@ -28,7 +27,7 @@ class Field(ErrorMessageMixin):
     class Options(OptionBox):
         formatter = staticmethod(no_processing)
         format_none = False
-        dump_required = None  # type: bool
+        dump_required = True
         dump_default = missing
         no_dump = False
 
@@ -58,18 +57,7 @@ class Field(ErrorMessageMixin):
                  allow_none: bool = None,
                  error_messages: dict = None,
                  ):
-        # Warn of redundant arguments
-        if dump_required is None:
-            # Field is required when default is not set, otherwise not required.
-            dump_required = dump_default is missing
-        elif dump_required and dump_default is not missing:
-            warn('Some args of Field may redundant, '
-                 'if "dump_default" is set, "dump_required=True" has no effect.')
-
-        if load_required and load_default is not missing:
-            warn('Some args of Field may redundant, '
-                 'if "load_default" is set, "load_required=True" has no effect.')
-
+        """if "default" is set, "required" has no effect."""
         self.name = name
         self.key = key
         self.opts = self.Options(

@@ -194,7 +194,22 @@ class CatalystTest(TestCase):
 
         # wrong args
         with self.assertRaises(TypeError):
-            catalyst = TestDataCatalyst(dump_from='wrong')
+            TestDataCatalyst(dump_from='wrong')
+
+        with self.assertRaises(ValueError):
+            catalyst.dump(test_data, method=1)
+
+        with self.assertRaises(ValueError):
+            catalyst._base_handle(test_data, 1)
+
+        with self.assertRaises(ValueError):
+            catalyst._handle_many([test_data], 1)
+
+        with self.assertRaises(TypeError):
+            TestDataCatalyst(load_from='wrong')
+
+        with self.assertRaises(ValueError):
+            catalyst.load(test_data, method=1)
 
     def test_field_args_which_affect_dumping(self):
         # default behavior
@@ -222,9 +237,8 @@ class CatalystTest(TestCase):
             {}, {'s': '1'}, dump_default=lambda: '1')
 
         # dump_required has no effect if dump_default is set
-        with self.assertWarns(Warning):
-            self.assert_field_dump_args(
-                {}, {'s': None}, dump_required=True, dump_default=None)
+        self.assert_field_dump_args(
+            {}, {'s': None}, dump_required=True, dump_default=None)
 
         # pass None to formatter
         self.assert_field_dump_args(
@@ -273,34 +287,26 @@ class CatalystTest(TestCase):
         self.assertIsInstance(result.errors['integer'], ValueError)
         self.assertIsInstance(result.errors['float'], TypeError)
 
-        # raise error while validating
-        # set "raise_error" when init
-        raise_err_catalyst = TestDataCatalyst(load_raise_error=True)
-        result = raise_err_catalyst.load(valid_data)
-        self.assertTrue(result.is_valid)
-        with self.assertRaises(ValidationError):
-            raise_err_catalyst.load(invalid_data)
-
-        # set "raise_error" when call load
-        with self.assertRaises(ValidationError):
-            test_data_catalyst.load(invalid_data, raise_error=True)
-
-        # don't collect errors
-        # set "all_errors" when init
-        no_collect_err_catalyst = TestDataCatalyst(
-            load_all_errors=False, load_raise_error=True)
-        with self.assertRaises(Exception):
-            no_collect_err_catalyst.load(invalid_data)
-
-        # set "all_errors" when call load
-        result = no_collect_err_catalyst.load(
-            invalid_data, all_errors=True, raise_error=False)
+        # raise_error & all_errors
+        result = test_data_catalyst.load(
+            invalid_data, raise_error=False, all_errors=True)
         self.assertFalse(result.is_valid)
+        self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
 
-        # set "all_errors" when call load
-        with self.assertRaises(Exception):
+        result = test_data_catalyst.load(
+            invalid_data, raise_error=False, all_errors=False)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(len(result.errors), 1)
+
+        with self.assertRaises(ValidationError) as ctx:
             test_data_catalyst.load(
-                invalid_data, True, False)
+                invalid_data, raise_error=True, all_errors=True)
+        self.assertEqual(set(ctx.exception.msg.errors), {'string', 'integer', 'float'})
+
+        with self.assertRaises(ValidationError) as ctx:
+            test_data_catalyst.load(
+                invalid_data, raise_error=True, all_errors=False)
+        self.assertEqual(len(ctx.exception.msg.errors), 1)
 
     def test_field_args_which_affect_loading(self):
 
@@ -341,8 +347,7 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {'s'})
 
         # load_required has no effect if load_default is set
-        with self.assertWarns(Warning):
-            catalyst = self.create_catalyst(load_required=True, load_default=None)
+        catalyst = self.create_catalyst(load_required=True, load_default=None)
         result = catalyst.load({})
         self.assertTrue(result.is_valid)
         self.assertEqual(result.valid_data['s'], None)

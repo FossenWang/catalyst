@@ -60,16 +60,23 @@ class FieldTest(TestCase):
 
         # test validators
         self.assertEqual(len(a.fixed_value.opts.validators), 2)
+
+        # test wrong args
         with self.assertRaises(TypeError):
             a.fixed_value.set_validators(1)
         with self.assertRaises(TypeError):
             a.fixed_value.add_validator(1)
+        with self.assertRaises(TypeError):
+            a.fixed_value.set_formatter(1)
+        with self.assertRaises(TypeError):
+            a.fixed_value.set_parser(1)
 
         # test error msg
         field_3 = Field(key='a', allow_none=False, error_messages={'none': '666'})
-        with self.assertRaises(ValidationError) as c:
+        with self.assertRaises(ValidationError) as ctx:
             field_3.load(None)
-        self.assertEqual(c.exception.msg, '666')
+        self.assertEqual(ctx.exception.msg, '666')
+
 
     def test_string_field(self):
         field = StringField(name='string', key='string', min_length=2, max_length=12)
@@ -232,15 +239,14 @@ class FieldTest(TestCase):
         with self.assertRaises(TypeError):
             field.dump(1)
 
-        # load
+        # load & dump
         field = FieldClass(max_time=dt)
         dt_str = field.dump(dt)
         self.assertEqual(field.load(dt_str), dt)
         with self.assertRaises(ValueError):
             field.load('2018Y')
         with self.assertRaises(ValidationError):
-            dt_str = field.dump(invalid_dt)
-            field.load(dt_str)
+            field.dump(invalid_dt)
 
     def test_nest_field(self):
         class ACatalyst(Catalyst):

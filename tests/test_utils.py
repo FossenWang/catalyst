@@ -1,8 +1,10 @@
 from unittest import TestCase
 
-from catalyst.utils import snake_to_camel, ErrorMessageMixin, \
-    ensure_staticmethod, LoadResult
 from catalyst.exceptions import ValidationError
+from catalyst.utils import (
+    snake_to_camel, ErrorMessageMixin, LoadResult,
+    missing, OptionBox
+)
 
 
 class UtilsTest(TestCase):
@@ -38,15 +40,6 @@ class UtilsTest(TestCase):
             b.error('b')
         self.assertEqual(str(context.exception), 'bb')
 
-    def test_ensure_staticmethod(self):
-        def func():
-            pass
-
-        static_func = ensure_staticmethod(func)
-        self.assertIs(static_func.__func__, func)
-        self.assertIs(static_func, ensure_staticmethod(static_func))
-        self.assertIs(ensure_staticmethod(static_func).__func__, func)
-
     def test_load_result(self):
         result = LoadResult({}, {}, {})
         self.assertTrue(result.is_valid)
@@ -62,3 +55,12 @@ class UtilsTest(TestCase):
         self.assertEqual(repr(result), s)
         self.assertDictEqual(result.format_errors(), {'error': 'error'})
         self.assertEqual(str(result), "{'error': 'error'}")
+
+    def test_others(self):
+        self.assertEqual(str(missing), '<catalyst.missing>')
+
+        opts = OptionBox()
+        with self.assertRaises(ValueError):
+            opts.get()
+        with self.assertRaises(ValueError):
+            opts.get(a=1, b=2)
