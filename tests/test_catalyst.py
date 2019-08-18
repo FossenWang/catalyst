@@ -38,15 +38,6 @@ test_catalyst = TestDataCatalyst()
 
 class CatalystTest(TestCase):
 
-    def create_catalyst(self, **kwargs):
-        class C(Catalyst):
-            s = StringField(**kwargs)
-        return C()
-
-    def assert_field_dump_args(self, data, result=None, **kwargs):
-        catalyst = self.create_catalyst(**kwargs)
-        self.assertEqual(catalyst.dump(data, True).valid_data, result)
-
     def test_metaclass(self):
         "Test metaclass of Catalyst."
 
@@ -93,6 +84,75 @@ class CatalystTest(TestCase):
         self.assertEqual(data, r.valid_data)
         r = catalyst.load(data)
         self.assertEqual(data, r.valid_data)
+
+    def test_inherit(self):
+        class A(Catalyst):
+            a = Field()
+
+        class B(A):
+            b = Field()
+
+        a = A()
+        b = B()
+
+        self.assertTrue(hasattr(a, 'a'))
+        self.assertTrue(hasattr(b, 'a'))
+        self.assertTrue(hasattr(b, 'b'))
+        self.assertEqual(b.a, a.a)
+
+        data = {'a': 'a', 'b': 'b'}
+        self.assertDictEqual(b.dump(data).valid_data, data)
+
+    def test_change_field_name_and_key_naming_style(self):
+        # change field key naming style
+        class A(Catalyst):
+            _format_field_key = staticmethod(snake_to_camel)
+            snake_to_camel = Field()
+
+        self.assertEqual(A.snake_to_camel.name, 'snake_to_camel')
+        self.assertEqual(A.snake_to_camel.key, 'snakeToCamel')
+
+        a = A()
+        result = a.dump({'snake_to_camel': 'snake'})
+        self.assertIn('snakeToCamel', result.valid_data)
+        result = a.load({'snakeToCamel': 'snake'})
+        self.assertIn('snake_to_camel', result.valid_data)
+
+        # change field name naming style
+        class B(Catalyst):
+            _format_field_name = staticmethod(snake_to_camel)
+            snake_to_camel = Field()
+
+        self.assertEqual(B.snake_to_camel.name, 'snakeToCamel')
+        self.assertEqual(B.snake_to_camel.key, 'snake_to_camel')
+
+        b = B()
+        result = b.dump({'snakeToCamel': 'snake'})
+        self.assertIn('snake_to_camel', result.valid_data)
+        result = b.load({'snake_to_camel': 'snake'})
+        self.assertIn('snakeToCamel', result.valid_data)
+
+        # change field name and key naming style
+        class C(Catalyst):
+            _format_field_name = staticmethod(snake_to_camel)
+            _format_field_key = staticmethod(snake_to_camel)
+            snake_to_camel = Field()
+            still_snake = Field(name='still_snake', key='still_snake')
+
+        self.assertEqual(C.snake_to_camel.name, 'snakeToCamel')
+        self.assertEqual(C.snake_to_camel.key, 'snakeToCamel')
+        self.assertEqual(C.still_snake.name, 'still_snake')
+        self.assertEqual(C.still_snake.key, 'still_snake')
+
+        c = C()
+        self.assertIs(c._format_field_key, snake_to_camel)
+        self.assertIs(c._format_field_name, snake_to_camel)
+        result = c.dump({'snakeToCamel': None, 'still_snake': None})
+        self.assertIn('snakeToCamel', result.valid_data)
+        self.assertIn('still_snake', result.valid_data)
+        result = c.load({'snakeToCamel': None, 'still_snake': None})
+        self.assertIn('snakeToCamel', result.valid_data)
+        self.assertIn('still_snake', result.valid_data)
 
     def test_init(self):
         "Test initializing Catalyst."
@@ -292,122 +352,82 @@ class CatalystTest(TestCase):
         with self.assertRaises(ValueError):
             test_catalyst._base_handle({}, 1)
 
-    def test_field_args_which_affect_dumping(self):
-        # default behavior
+    def test_field_args_for_dump_and_load(self):
+        def create_catalyst(**kwargs):
+            class C(Catalyst):
+                s = StringField(**kwargs)
+            return C()
+
+        def assert_field_dump_args(data, expect=None, **kwargs):
+            catalyst = create_catalyst(**kwargs)
+            self.assertEqual(catalyst.dump(data, True).valid_data, expect)
+
+        # default dump behavior
         # missing field will raise error
+        catalyst = create_catalyst()
         with self.assertRaises(ValidationError):
-            self.assert_field_dump_args(None)
+            catalyst.dump(None, True)
         with self.assertRaises(ValidationError):
-            self.assert_field_dump_args({})
+            catalyst.dump({}, True)
+        # allow None
+        assert_field_dump_args({'s': None}, {'s': None})
 
         # ignore missing field
-        self.assert_field_dump_args({}, {}, dump_required=False)
+        assert_field_dump_args({}, {}, dump_required=False)
+        assert_field_dump_args(None, {}, dump_required=False)
 
         # default value for missing field
-        self.assert_field_dump_args(
-            {}, {'s': 'default'}, dump_default='default')
-
-        self.assert_field_dump_args(
-            {'s': '1'}, {'s': '1'}, dump_default='default')
-
-        self.assert_field_dump_args(
-            {}, {'s': None}, dump_default=None)
-
+        assert_field_dump_args({}, {'s': 'default'}, dump_default='default')
+        assert_field_dump_args({'s': '1'}, {'s': '1'}, dump_default='default')
+        assert_field_dump_args({}, {'s': None}, dump_default=None)
         # callable default
-        self.assert_field_dump_args(
-            {}, {'s': '1'}, dump_default=lambda: '1')
+        assert_field_dump_args({}, {'s': '1'}, dump_default=lambda: '1')
 
         # dump_required has no effect if dump_default is set
-        self.assert_field_dump_args(
-            {}, {'s': None}, dump_required=True, dump_default=None)
+        assert_field_dump_args({}, {'s': None}, dump_required=True, dump_default=None)
 
         # pass None to formatter
-        self.assert_field_dump_args(
-            {'s': None}, {'s': 'None'}, format_none=True)
-
-        self.assert_field_dump_args(
-            {}, {'s': 'None'}, format_none=True, dump_default=None)
+        assert_field_dump_args({'s': None}, {'s': 'None'}, format_none=True)
+        assert_field_dump_args({}, {'s': 'None'}, format_none=True, dump_default=None)
+        assert_field_dump_args({'s': None}, {'s': 'None'}, format_none=True, allow_none=False)
 
         # no_dump means ignore this field
-        self.assert_field_dump_args({1: 1}, {}, no_dump=True)
+        assert_field_dump_args({'s': 1}, {}, no_dump=True)
 
-    def test_field_args_which_affect_loading(self):
+        def assert_field_load_args(data, expect=None, **kwargs):
+            catalyst = create_catalyst(**kwargs)
+            self.assertEqual(catalyst.load(data, True).valid_data, expect)
 
-        # default behavior
+        # default load behavior
         # missing field will be excluded
-        catalyst = self.create_catalyst()
-        result = catalyst.load({})
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data, {})
+        assert_field_load_args({}, {})
+        # allow None
+        assert_field_load_args({'s': None}, {'s': None})
 
         # default value for missing field
-        catalyst = self.create_catalyst(load_default=None)
-        result = catalyst.load({})
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data['s'], None)
-
-        result = catalyst.load({'s': 1})
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data['s'], '1')
-
-        catalyst = self.create_catalyst(load_default=1)
-        result = catalyst.load({})
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data['s'], '1')
-
+        assert_field_load_args({}, {'s': None}, load_default=None)
+        assert_field_load_args({}, {'s': '1'}, load_default=1)
         # callable default
-        catalyst = self.create_catalyst(load_default=lambda: 1)
-        result = catalyst.load({})
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data['s'], '1')
+        assert_field_load_args({}, {'s': '1'}, load_default=lambda: 1)
 
         # invalid when required field is missing
-        catalyst = self.create_catalyst(load_required=True)
-        result = catalyst.load({})
-        self.assertFalse(result.is_valid)
-        self.assertDictEqual(result.valid_data, {})
-        self.assertDictEqual(result.invalid_data, {})
-        self.assertEqual(set(result.errors), {'s'})
+        with self.assertRaises(ValidationError):
+            assert_field_load_args({}, load_required=True)
 
         # load_required has no effect if load_default is set
-        catalyst = self.create_catalyst(load_required=True, load_default=None)
-        result = catalyst.load({})
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data['s'], None)
+        assert_field_load_args({}, {'s': None}, load_required=True, load_default=None)
 
         # pass None to parser and validators
-        catalyst = self.create_catalyst(parse_none=True)
-        result = catalyst.load({'s': None})
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data['s'], 'None')
-
-        catalyst = self.create_catalyst(parse_none=True, load_default=None)
-        result = catalyst.load({})
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data['s'], 'None')
-
-        catalyst = self.create_catalyst(parse_none=True, allow_none=False)
-        result = catalyst.load({'s': None})
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data['s'], 'None')
+        assert_field_load_args({'s': None}, {'s': 'None'}, parse_none=True)
+        assert_field_load_args({}, {'s': 'None'}, parse_none=True, load_default=None)
+        assert_field_load_args({'s': None}, {'s': 'None'}, parse_none=True, allow_none=False)
 
         # always invalid if load_default is None and allow_none is False
-        catalyst = self.create_catalyst(allow_none=False, load_default=None)
-        result = catalyst.load({})
-        self.assertFalse(result.is_valid)
-        self.assertDictEqual(result.valid_data, {})
-        self.assertDictEqual(result.invalid_data, {'s': None})
-        self.assertEqual(set(result.errors), {'s'})
+        with self.assertRaises(ValidationError):
+            assert_field_load_args({}, allow_none=False, load_default=None)
 
         # no_load means ignore this field
-        class CC(Catalyst):
-            s = StringField(no_load=True)
-
-        catalyst = CC()
-
-        result = catalyst.load({})
-        self.assertTrue(result.is_valid)
-        self.assertDictEqual(result.valid_data, {})
+        assert_field_load_args({'s': 1}, {}, no_load=True)
 
     def test_pre_and_post_process(self):
         class C(Catalyst):
@@ -488,75 +508,6 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertTrue('wrong_value' in result.errors)
 
-    def test_change_field_name_and_key_naming_style(self):
-        # change field key naming style
-        class A(Catalyst):
-            _format_field_key = staticmethod(snake_to_camel)
-            snake_to_camel = Field()
-
-        self.assertEqual(A.snake_to_camel.name, 'snake_to_camel')
-        self.assertEqual(A.snake_to_camel.key, 'snakeToCamel')
-
-        a = A()
-        result = a.dump({'snake_to_camel': 'snake'})
-        self.assertIn('snakeToCamel', result.valid_data)
-        result = a.load({'snakeToCamel': 'snake'})
-        self.assertIn('snake_to_camel', result.valid_data)
-
-        # change field name naming style
-        class B(Catalyst):
-            _format_field_name = staticmethod(snake_to_camel)
-            snake_to_camel = Field()
-
-        self.assertEqual(B.snake_to_camel.name, 'snakeToCamel')
-        self.assertEqual(B.snake_to_camel.key, 'snake_to_camel')
-
-        b = B()
-        result = b.dump({'snakeToCamel': 'snake'})
-        self.assertIn('snake_to_camel', result.valid_data)
-        result = b.load({'snake_to_camel': 'snake'})
-        self.assertIn('snakeToCamel', result.valid_data)
-
-        # change field name and key naming style
-        class C(Catalyst):
-            _format_field_name = staticmethod(snake_to_camel)
-            _format_field_key = staticmethod(snake_to_camel)
-            snake_to_camel = Field()
-            still_snake = Field(name='still_snake', key='still_snake')
-
-        self.assertEqual(C.snake_to_camel.name, 'snakeToCamel')
-        self.assertEqual(C.snake_to_camel.key, 'snakeToCamel')
-        self.assertEqual(C.still_snake.name, 'still_snake')
-        self.assertEqual(C.still_snake.key, 'still_snake')
-
-        c = C()
-        self.assertIs(c._format_field_key, snake_to_camel)
-        self.assertIs(c._format_field_name, snake_to_camel)
-        result = c.dump({'snakeToCamel': None, 'still_snake': None})
-        self.assertIn('snakeToCamel', result.valid_data)
-        self.assertIn('still_snake', result.valid_data)
-        result = c.load({'snakeToCamel': None, 'still_snake': None})
-        self.assertIn('snakeToCamel', result.valid_data)
-        self.assertIn('still_snake', result.valid_data)
-
-    def test_inherit(self):
-        class A(Catalyst):
-            a = Field()
-
-        class B(A):
-            b = Field()
-
-        a = A()
-        b = B()
-
-        self.assertTrue(hasattr(a, 'a'))
-        self.assertTrue(hasattr(b, 'a'))
-        self.assertTrue(hasattr(b, 'b'))
-        self.assertEqual(b.a, a.a)
-
-        data = {'a': 'a', 'b': 'b'}
-        self.assertDictEqual(b.dump(data).valid_data, data)
-
     def test_load_and_dump_args(self):
         class A(Catalyst):
             a = IntegerField()
@@ -593,7 +544,10 @@ class CatalystTest(TestCase):
         self.assertEqual(func_3('1', 2, b=3, c=4), 10)
 
     def test_load_and_dump_many(self):
-        c = self.create_catalyst(min_length=1, max_length=2)
+        class C(Catalyst):
+            s = StringField(min_length=1, max_length=2)
+
+        c = C()
 
         data = [{'s': 's'} for _ in range(5)]
         result = c.dump_many(data)

@@ -143,8 +143,6 @@ class BaseCatalyst:
 
         if not errors:
             for field in field_dict.values():
-                field = field  # type: Field
-
                 required = getattr(field.opts, f'{name}_required')
                 default = getattr(field, f'{name}_default')
                 source = getattr(field, source_attr)
