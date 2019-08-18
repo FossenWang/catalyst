@@ -33,23 +33,10 @@ class TestDataCatalyst(Catalyst):
     list_ = ListField(StringField())
 
 
-test_data_catalyst = TestDataCatalyst()
+test_catalyst = TestDataCatalyst()
 
 
 class CatalystTest(TestCase):
-
-    def setUp(self):
-        self.test_data = TestData(
-            string='xxx', integer=1, float_=1.1,
-            bool_=True, list_=['a', 'b'])
-
-        self.valid_data = {
-            'string': 'xxx', 'integer': 1, 'float': 1.1,
-            'bool': True, 'list_': ['a', 'b']}
-
-        self.load_result = {
-            'string': 'xxx', 'integer': 1, 'float_': 1.1,
-            'bool_': True, 'list_': ['a', 'b']}
 
     def create_catalyst(self, **kwargs):
         class C(Catalyst):
@@ -110,46 +97,50 @@ class CatalystTest(TestCase):
     def test_init(self):
         "Test initializing Catalyst."
 
-        test_data = self.test_data
-        valid_data = self.valid_data
+        dump_data = TestData(
+            string='xxx', integer=1, float_=1.1,
+            bool_=True, list_=['a', 'b'])
+        load_data = {
+            'string': 'xxx', 'integer': 1, 'float': 1.1,
+            'bool': True, 'list_': ['a', 'b']}
 
         # Empty "fields" has no effect
         catalyst = TestDataCatalyst(fields=[])
         self.assertDictEqual(
-            catalyst._dump_field_dict, test_data_catalyst._dump_field_dict)
+            catalyst._dump_field_dict, test_catalyst._dump_field_dict)
         self.assertDictEqual(
-            catalyst._load_field_dict, test_data_catalyst._load_field_dict)
+            catalyst._load_field_dict, test_catalyst._load_field_dict)
         # if field.no_load is True, this field will be excluded from loading
         self.assertNotIn('func', catalyst._load_field_dict.keys())
 
         # Specify "fields" for dumping and loading
         catalyst = TestDataCatalyst(fields=['string'])
         self.assertDictEqual(
-            catalyst.dump(test_data).valid_data, {'string': 'xxx'})
+            catalyst.dump(dump_data).valid_data, {'string': 'xxx'})
         self.assertDictEqual(
-            catalyst.load(valid_data).valid_data, {'string': 'xxx'})
+            catalyst.load(load_data).valid_data, {'string': 'xxx'})
 
         # "dump_fields" takes precedence over "fields"
         catalyst = TestDataCatalyst(fields=['string'], dump_fields=['bool_field'])
         self.assertDictEqual(
-            catalyst.dump(test_data).valid_data, {'bool': True})
+            catalyst.dump(dump_data).valid_data, {'bool': True})
         self.assertDictEqual(
-            catalyst.load(valid_data).valid_data, {'string': 'xxx'})
+            catalyst.load(load_data).valid_data, {'string': 'xxx'})
 
         # "load_fields" takes precedence over "fields"
         catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])
         self.assertDictEqual(
-            catalyst.dump(test_data).valid_data, {'string': 'xxx'})
+            catalyst.dump(dump_data).valid_data, {'string': 'xxx'})
         self.assertDictEqual(
-            catalyst.load(valid_data).valid_data, {'bool_': True})
+            catalyst.load(load_data).valid_data, {'bool_': True})
 
         # When "dump_fields" and "load_fields" are given, fields is not used.
         catalyst = TestDataCatalyst(
             fields=['integer'], dump_fields=['string'], load_fields=['bool_field'])
         self.assertDictEqual(
-            catalyst.dump(test_data).valid_data, {'string': 'xxx'})
+            catalyst.dump(dump_data).valid_data, {'string': 'xxx'})
         self.assertDictEqual(
-            catalyst.load(valid_data).valid_data, {'bool_': True})
+            catalyst.load(load_data).valid_data, {'bool_': True})
 
         with self.assertRaises(KeyError):
             TestDataCatalyst(fields=['wrong_name'])
@@ -160,56 +151,146 @@ class CatalystTest(TestCase):
         with self.assertRaises(KeyError):
             TestDataCatalyst(load_fields=['wrong_name'])
 
-    def test_base_dumping(self):
-        "Test dumping data."
+        dump_data_dict = {
+            'float_': 1.1, 'integer': 1, 'string': 'xxx',
+            'bool_': True, 'func': dump_data.func, 'list_': ['a', 'b']
+        }
 
-        test_data = self.test_data
+        # only get dump value from attribute
+        catalyst = TestDataCatalyst(dump_from=getattr)
+        catalyst.dump(dump_data)
+        with self.assertRaises(ValidationError):
+            catalyst.dump(dump_data_dict, True)
+
+        # only get dump value from key
+        catalyst = TestDataCatalyst(dump_from=get_item)
+        catalyst.dump(dump_data_dict)
+        with self.assertRaises(TypeError):
+            catalyst.dump(dump_data, all_errors=False)
+
+        # dump_from & load_from must be callable
+        with self.assertRaises(TypeError):
+            TestDataCatalyst(dump_from='wrong')
+
+        with self.assertRaises(TypeError):
+            TestDataCatalyst(load_from='wrong')
+
+    def test_base_dump_and_load(self):
+        "Test dumping and loading data."
+        # test dump
+        dump_data = TestData(
+            string='xxx', integer=1, float_=1.1,
+            bool_=True, list_=['a', 'b'])
 
         # dump from object
-        result = test_data_catalyst.dump(test_data).valid_data
+        result = test_catalyst.dump(dump_data).valid_data
         self.assertDictEqual(result, {
             'bool': True, 'float': 1.1, 'func': 6,
             'integer': 1, 'list_': ['a', 'b'], 'string': 'xxx'})
 
         # dump from dict
-        test_data_dict = {
+        dump_data_dict = {
             'float_': 1.1, 'integer': 1, 'string': 'xxx',
-            'bool_': True, 'func': test_data.func, 'list_': ['a', 'b']
+            'bool_': True, 'func': dump_data.func, 'list_': ['a', 'b']
         }
         self.assertEqual(
-            test_data_catalyst.dump(test_data_dict).valid_data,
+            test_catalyst.dump(dump_data_dict).valid_data,
             result)
 
-        # only get dump value from attribute
-        catalyst = TestDataCatalyst(dump_from=getattr)
-        catalyst.dump(test_data)
-        with self.assertRaises(ValidationError):
-            catalyst.dump(test_data_dict, True)
+        # test load
+        load_data = {
+            'string': 'xxx', 'integer': 1, 'float': 1.1,
+            'bool': True, 'list_': ['a', 'b']}
+        load_result = {
+            'string': 'xxx', 'integer': 1, 'float_': 1.1,
+            'bool_': True, 'list_': ['a', 'b']}
 
-        # only get dump value from key
-        catalyst = TestDataCatalyst(dump_from=get_item)
-        catalyst.dump(test_data_dict)
+        # test valid data
+        result = test_catalyst.load(load_data)
+        self.assertTrue(result.is_valid)
+        self.assertDictEqual(result.invalid_data, {})
+        self.assertDictEqual(result.errors, {})
+        self.assertDictEqual(result.valid_data, load_result)
+
+        # test invalid data
         with self.assertRaises(TypeError):
-            catalyst.dump(test_data, all_errors=False)
+            test_catalyst.load(1)
 
-        # wrong args
-        with self.assertRaises(TypeError):
-            TestDataCatalyst(dump_from='wrong')
+        # test invalid data: validate errors
+        invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
+        result = test_catalyst.load(invalid_data)
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.invalid_data, invalid_data)
+        self.assertEqual(set(result.errors), {
+            'string', 'integer', 'float'})
+        self.assertDictEqual(result.valid_data, {})
+
+        # test invalid_data: parse errors
+        invalid_data = {'string': 'x', 'integer': 'str', 'float': []}
+        result = test_catalyst.load(invalid_data)
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.invalid_data, invalid_data)
+        self.assertEqual(set(result.errors), {
+            'string', 'integer', 'float'})
+        self.assertIsInstance(result.errors['string'], ValidationError)
+        self.assertIsInstance(result.errors['integer'], ValueError)
+        self.assertIsInstance(result.errors['float'], TypeError)
+
+        # raise_error & all_errors
+        result = test_catalyst.load(
+            invalid_data, raise_error=False, all_errors=True)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
+
+        result = test_catalyst.load(
+            invalid_data, raise_error=False, all_errors=False)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(len(result.errors), 1)
+
+        with self.assertRaises(ValidationError) as ctx:
+            test_catalyst.load(
+                invalid_data, raise_error=True, all_errors=True)
+        self.assertEqual(set(ctx.exception.msg.errors), {'string', 'integer', 'float'})
+
+        with self.assertRaises(ValidationError) as ctx:
+            test_catalyst.load(
+                invalid_data, raise_error=True, all_errors=False)
+        self.assertEqual(len(ctx.exception.msg.errors), 1)
+
+        # test field method
+        invalid_dump_data = {
+            'float_': 1.1, 'integer': '1', 'string': 'xxx',
+            'bool_': True, 'func': dump_data.func, 'list_': ['a', 'b']
+        }
+        # both parse and validate
+        result = test_catalyst.dump(invalid_dump_data, method='dump')
+        self.assertFalse(result.is_valid)
+        self.assertEqual(set(result.invalid_data), {'integer'})
+        # only validate, no format
+        result = test_catalyst.dump(invalid_dump_data, method='validate')
+        self.assertFalse(result.is_valid)
+        self.assertEqual(set(result.invalid_data), {'integer'})
+
+        invalid_load_data = {
+            'string': 'xxx', 'integer': '1', 'float': 1.1,
+            'bool': True, 'list_': ['a', 'b']}
+        # only validate, no parse
+        result = test_catalyst.load(invalid_load_data, method='validate')
+        self.assertFalse(result.is_valid)
+        self.assertEqual(set(result.invalid_data), {'integer'})
+        # only parse, no validate, can force to change type
+        result = test_catalyst.load(invalid_load_data, method='parse')
+        self.assertTrue(result.is_valid)
 
         with self.assertRaises(ValueError):
-            catalyst.dump(test_data, method=1)
+            test_catalyst.dump({}, method=1)
 
         with self.assertRaises(ValueError):
-            catalyst._base_handle(test_data, 1)
+            test_catalyst.load({}, method=1)
 
+        # wrong handle name
         with self.assertRaises(ValueError):
-            catalyst._handle_many([test_data], 1)
-
-        with self.assertRaises(TypeError):
-            TestDataCatalyst(load_from='wrong')
-
-        with self.assertRaises(ValueError):
-            catalyst.load(test_data, method=1)
+            test_catalyst._base_handle({}, 1)
 
     def test_field_args_which_affect_dumping(self):
         # default behavior
@@ -249,64 +330,6 @@ class CatalystTest(TestCase):
 
         # no_dump means ignore this field
         self.assert_field_dump_args({1: 1}, {}, no_dump=True)
-
-    def test_base_loading(self):
-        "Test loading data."
-
-        valid_data = self.valid_data
-        load_result = self.load_result
-
-        # test valid_data
-        result = test_data_catalyst.load(valid_data)
-        self.assertTrue(result.is_valid)
-        self.assertDictEqual(result.invalid_data, {})
-        self.assertDictEqual(result.errors, {})
-        self.assertDictEqual(result.valid_data, load_result)
-
-        # test invalid_data
-        with self.assertRaises(TypeError):
-            test_data_catalyst.load(1)
-
-        # test invalid_data: validate errors
-        invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
-        result = test_data_catalyst.load(invalid_data)
-        self.assertFalse(result.is_valid)
-        self.assertDictEqual(result.invalid_data, invalid_data)
-        self.assertEqual(set(result.errors), {
-            'string', 'integer', 'float'})
-        self.assertDictEqual(result.valid_data, {})
-
-        # test invalid_data: parse errors
-        invalid_data = {'string': 'x', 'integer': 'str', 'float': []}
-        result = test_data_catalyst.load(invalid_data)
-        self.assertFalse(result.is_valid)
-        self.assertDictEqual(result.invalid_data, invalid_data)
-        self.assertEqual(set(result.errors), {
-            'string', 'integer', 'float'})
-        self.assertIsInstance(result.errors['string'], ValidationError)
-        self.assertIsInstance(result.errors['integer'], ValueError)
-        self.assertIsInstance(result.errors['float'], TypeError)
-
-        # raise_error & all_errors
-        result = test_data_catalyst.load(
-            invalid_data, raise_error=False, all_errors=True)
-        self.assertFalse(result.is_valid)
-        self.assertEqual(set(result.errors), {'string', 'integer', 'float'})
-
-        result = test_data_catalyst.load(
-            invalid_data, raise_error=False, all_errors=False)
-        self.assertFalse(result.is_valid)
-        self.assertEqual(len(result.errors), 1)
-
-        with self.assertRaises(ValidationError) as ctx:
-            test_data_catalyst.load(
-                invalid_data, raise_error=True, all_errors=True)
-        self.assertEqual(set(ctx.exception.msg.errors), {'string', 'integer', 'float'})
-
-        with self.assertRaises(ValidationError) as ctx:
-            test_data_catalyst.load(
-                invalid_data, raise_error=True, all_errors=False)
-        self.assertEqual(len(ctx.exception.msg.errors), 1)
 
     def test_field_args_which_affect_loading(self):
 
@@ -602,3 +625,7 @@ class CatalystTest(TestCase):
         result = ct.exception.msg
         self.assertEqual(set(result.errors), {2})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}})
+
+        # wrong handle name
+        with self.assertRaises(ValueError):
+            test_catalyst._handle_many([], 1)
