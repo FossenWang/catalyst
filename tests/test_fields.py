@@ -153,22 +153,29 @@ class FieldTest(TestCase):
             field.load([])
 
     def test_bool_field(self):
-        field = BoolField(name='bool_', key='bool')
+        field = BoolField()
 
         # dump
         self.assertEqual(field.dump(True), True)
         self.assertEqual(field.dump(False), False)
         self.assertEqual(field.dump(None), None)
-        with self.assertRaises(TypeError):
-            field.dump(1)
 
         # load
+        self.assertEqual(field.load(None), None)
         self.assertEqual(field.load(True), True)
         self.assertEqual(field.load(False), False)
-        self.assertEqual(field.load('False'), True)
         self.assertEqual(field.load(0), False)
         self.assertEqual(field.load(1), True)
         self.assertEqual(field.load([]), False)
+        self.assertEqual(field.load({}), False)
+        self.assertEqual(field.load('True'), True)
+        self.assertEqual(field.load('False'), False)
+        self.assertEqual(field.load('y'), True)
+        self.assertEqual(field.load('n'), False)
+        self.assertEqual(field.load('1'), True)
+        self.assertEqual(field.load('0'), False)
+        self.assertEqual(field.load('xxx'), True)
+        self.assertEqual(field.load(''), False)
 
     def test_list_field(self):
         field = ListField(item_field=FloatField())

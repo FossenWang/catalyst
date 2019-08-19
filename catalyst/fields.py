@@ -1,6 +1,6 @@
 "Fields"
 
-from typing import Callable, Any, Iterable, Union, Mapping, Sequence
+from typing import Callable, Any, Iterable, Union, Mapping, Sequence, Hashable
 from datetime import datetime, time, date
 
 from .utils import ErrorMessageMixin, missing, no_processing, OptionBox
@@ -199,10 +199,53 @@ class IntegerField(NumberField):
 
 
 class BoolField(Field):
+    def __init__(self,
+                 value_map: dict = None,
+                 name: str = None,
+                 key: str = None,
+                 formatter: FormatterType = None,
+                 format_none: bool = None,
+                 dump_required: bool = None,
+                 dump_default: Any = missing,
+                 no_dump: bool = None,
+                 parser: ParserType = None,
+                 parse_none: bool = None,
+                 load_required: bool = None,
+                 load_default: Any = missing,
+                 no_load: bool = None,
+                 validators: MultiValidator = None,
+                 allow_none: bool = None,
+                 error_messages: dict = None,
+                 **kwargs,
+                 ):
+        super().__init__(
+            value_map=value_map,
+            name=name, key=key, formatter=formatter, format_none=format_none,
+            dump_required=dump_required, dump_default=dump_default, no_dump=no_dump,
+            parser=parser, parse_none=parse_none, load_required=load_required,
+            load_default=load_default, no_load=no_load, validators=validators,
+            allow_none=allow_none, error_messages=error_messages, **kwargs,
+        )
+        self.opts.reverse_value_map = {
+            raw: parsed
+            for parsed, raw_values in self.opts.value_map.items()
+            for raw in raw_values
+        }
+
     class Options(Field.Options):
-        formatter = bool
-        parser = bool
-        validators = [TypeValidator(bool)]
+        reverse_value_map = None  # type: dict
+        value_map = {
+            True: ('1', 'y', 'yes', 'true', 'True'),
+            False: ('0', 'n', 'no', 'false', 'False'),
+        }
+
+        def parser(self, value):
+            if isinstance(value, Hashable):
+                value = self.reverse_value_map.get(value, value)
+            value = bool(value)
+            return value
+
+        formatter = parser
 
 
 class ListField(Field):
