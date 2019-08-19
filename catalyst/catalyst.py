@@ -59,6 +59,7 @@ class BaseCatalyst:
                  load_raise_error: bool = None,
                  load_all_errors: bool = None,
                  load_method: str = None,
+                 **kwargs,
                  ):
         if not fields:
             fields = set(self._field_dict.keys())
@@ -85,6 +86,7 @@ class BaseCatalyst:
             load_raise_error=load_raise_error,
             load_all_errors=load_all_errors,
             load_method=load_method,
+            **kwargs,
         )
 
         if not callable(self.opts.dump_from):

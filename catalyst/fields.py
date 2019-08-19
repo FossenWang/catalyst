@@ -56,6 +56,7 @@ class Field(ErrorMessageMixin):
                  validators: MultiValidator = None,
                  allow_none: bool = None,
                  error_messages: dict = None,
+                 **kwargs,
                  ):
         """if "default" is set, "required" has no effect."""
         self.name = name
@@ -68,6 +69,7 @@ class Field(ErrorMessageMixin):
             load_required=load_required,
             no_load=no_load,
             allow_none=allow_none,
+            **kwargs,
         )
         if dump_default is not missing:
             self.opts.dump_default = dump_default
@@ -205,11 +207,11 @@ class BoolField(Field):
 
 class ListField(Field):
     def __init__(self, item_field: Field, **kwargs):
-        super().__init__(**kwargs)
-        self.opts.item_field = item_field
+        super().__init__(item_field=item_field, **kwargs)
 
     class Options(Field.Options):
         validators = [TypeValidator(Sequence)]
+        item_field = None  # type: Field
 
         def formatter(self, value: Iterable):
             return [self.item_field.dump(item) for item in value]
@@ -244,10 +246,7 @@ class CallableField(Field):
 
 class DatetimeField(Field):
     def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
-        super().__init__(**kwargs)
-        if fmt:
-            self.opts.fmt = fmt
-
+        super().__init__(fmt=fmt, **kwargs)
         if min_time is not None or max_time is not None:
             self.add_validator(ComparisonValidator(min_time, max_time))
 
@@ -285,11 +284,11 @@ class DateField(DatetimeField):
 
 class NestedField(Field):
     def __init__(self, catalyst, **kwargs):
-        super().__init__(**kwargs)
-        self.opts.catalyst = catalyst
+        super().__init__(catalyst=catalyst, **kwargs)
 
     class Options(Field.Options):
         validators = [TypeValidator(Mapping)]
+        catalyst = None
 
         def formatter(self, value):
             return self.catalyst.dump(value, True).valid_data

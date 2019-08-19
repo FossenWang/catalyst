@@ -524,8 +524,9 @@ class CatalystTest(TestCase):
 
         self.assertEqual(func_1('1', '2', b='3', c='4'), 10)
         # raise error if kwargs are invalid
-        with self.assertRaises(ValidationError):
-            func_1('a', '2', b='3', c='4')
+        with self.assertRaises(ValidationError) as ctx:
+            func_1('x', 'x', b='3', c='x')
+        self.assertEqual(set(ctx.exception.msg.errors), {'a', 'args', 'kwargs'})
 
         @a.load_args(all_errors=False)
         def func_2(a, *args, b=1, **kwargs):
@@ -533,8 +534,9 @@ class CatalystTest(TestCase):
 
         self.assertEqual(func_2(1, 2, b=3, c=4), 10)
         # don't collect error
-        with self.assertRaises(ValidationError):
-            func_2('a', '2', b='3', c='4')
+        with self.assertRaises(ValidationError) as ctx:
+            func_2('x', 'x', b='3', c='x')
+        self.assertEqual(len(ctx.exception.msg.errors), 1)
 
         @a.dump_args
         def func_3(a, *args, b=1, **kwargs):
@@ -568,15 +570,15 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {2, 3})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
 
-        with self.assertRaises(ValidationError) as ct:
+        with self.assertRaises(ValidationError) as ctx:
             c.load_many(data, raise_error=True)
-        result = ct.exception.msg
+        result = ctx.exception.msg
         self.assertEqual(set(result.errors), {2, 3})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
 
-        with self.assertRaises(ValidationError) as ct:
+        with self.assertRaises(ValidationError) as ctx:
             c.load_many(data, True, all_errors=False)
-        result = ct.exception.msg
+        result = ctx.exception.msg
         self.assertEqual(set(result.errors), {2})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}})
 

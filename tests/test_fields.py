@@ -30,7 +30,7 @@ class FieldTest(TestCase):
             @fixed_value.set_validators
             def large_than(value):
                 assert value > 0
-                return value + 1  # 返回值无用
+                return value + 1  # useless return
 
             @staticmethod
             @fixed_value.add_validator
@@ -76,7 +76,6 @@ class FieldTest(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             field_3.load(None)
         self.assertEqual(ctx.exception.msg, '666')
-
 
     def test_string_field(self):
         field = StringField(name='string', key='string', min_length=2, max_length=12)
