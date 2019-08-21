@@ -199,24 +199,15 @@ class IntegerField(NumberField):
 
 
 class BoolField(Field):
-    def __init__(self,
-                 value_map: dict = None,
-                 name: str = None,
-                 key: str = None,
-                 formatter: FormatterType = None,
-                 format_none: bool = None,
-                 dump_required: bool = None,
-                 dump_default: Any = missing,
-                 no_dump: bool = None,
-                 parser: ParserType = None,
-                 parse_none: bool = None,
-                 load_required: bool = None,
-                 load_default: Any = missing,
-                 no_load: bool = None,
-                 validators: MultiValidator = None,
-                 allow_none: bool = None,
-                 error_messages: dict = None,
-                 **kwargs,
+    def __init__(self, value_map: dict = None,
+                 name: str = None, key: str = None,
+                 formatter: FormatterType = None, format_none: bool = None,
+                 dump_required: bool = None, dump_default: Any = missing,
+                 no_dump: bool = None, parser: ParserType = None,
+                 parse_none: bool = None, load_required: bool = None,
+                 load_default: Any = missing, no_load: bool = None,
+                 validators: MultiValidator = None, allow_none: bool = None,
+                 error_messages: dict = None, **kwargs,
                  ):
         super().__init__(
             value_map=value_map,

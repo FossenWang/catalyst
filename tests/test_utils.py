@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from catalyst.exceptions import ValidationError
 from catalyst.utils import (
-    snake_to_camel, ErrorMessageMixin, LoadResult,
+    snake_to_camel, ErrorMessageMixin, CatalystResult,
     missing, OptionBox
 )
 
@@ -40,27 +40,43 @@ class UtilsTest(TestCase):
             b.error('b')
         self.assertEqual(str(context.exception), 'bb')
 
-    def test_load_result(self):
-        result = LoadResult({}, {}, {})
+    def test_catalyst_result(self):
+        result = CatalystResult({}, {}, {})
         self.assertTrue(result.is_valid)
-        s = 'LoadResult(valid_data={}, errors={}, invalid_data={})'
+        s = 'CatalystResult(valid_data={}, errors={}, invalid_data={})'
         self.assertEqual(repr(result), s)
         self.assertEqual(str(result), '{}')
 
-        result = LoadResult(
+        result = CatalystResult(
             valid_data={}, errors={'error': ValidationError('error')}, invalid_data={0: 0})
         self.assertFalse(result.is_valid)
-        s = ("LoadResult(valid_data={}, "
+        s = ("CatalystResult(valid_data={}, "
              "errors={'error': ValidationError('error')}, invalid_data={0: 0})")
         self.assertEqual(repr(result), s)
         self.assertDictEqual(result.format_errors(), {'error': 'error'})
         self.assertEqual(str(result), "{'error': 'error'}")
 
-    def test_others(self):
-        self.assertEqual(str(missing), '<catalyst.missing>')
-
+    def test_option_box(self):
         opts = OptionBox()
         with self.assertRaises(ValueError):
             opts.get()
         with self.assertRaises(ValueError):
             opts.get(a=1, b=2)
+
+        class BaseOptions(OptionBox):
+            a = 1
+            b = 2
+
+        class Options(BaseOptions):
+            a = 1
+            b = 3
+            c = 4
+
+        opts = Options(c=5, d=6)
+        self.assertEqual(opts.a, 1)
+        self.assertEqual(opts.b, 3)
+        self.assertEqual(opts.c, 5)
+        self.assertEqual(opts.d, 6)
+
+    def test_others(self):
+        self.assertEqual(str(missing), '<catalyst.missing>')

@@ -76,7 +76,6 @@ class BaseCatalyst:
             self._field_dict, load_fields,
             lambda k: not self._field_dict[k].opts.no_load)
 
-        # TODO test args override
         self.opts = self.Options(
             dump_from=dump_from,
             dump_raise_error=dump_raise_error,
@@ -149,7 +148,6 @@ class BaseCatalyst:
                 default = getattr(field, f'{name}_default')
                 source = getattr(field, source_attr)
                 target = getattr(field, target_attr)
-                raw_value = missing
 
                 raw_value = get_value(data, source, default)
                 try:
