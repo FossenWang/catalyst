@@ -105,8 +105,6 @@ class FieldTest(TestCase):
 
         # dump
         self.assertEqual(field.dump(1), 1)
-        with self.assertRaises(TypeError):
-            field.dump(1.6)
         self.assertEqual(field.format(1.6), 1)
         self.assertEqual(field.format('10'), 10)
 
@@ -130,8 +128,6 @@ class FieldTest(TestCase):
 
         # dump
         self.assertEqual(field.dump(5.5), 5.5)
-        with self.assertRaises(TypeError):
-            field.dump(1)
         self.assertEqual(field.format(1), 1.0)
         self.assertEqual(field.format(0), 0.0)
         self.assertEqual(field.format('10'), 10.0)
@@ -184,10 +180,6 @@ class FieldTest(TestCase):
         self.assertListEqual(field.dump([1.0, 2.0, 3.0]), [1.0, 2.0, 3.0])
         self.assertListEqual(field.dump([]), [])
         self.assertEqual(field.dump(None), None)
-        with self.assertRaises(TypeError):
-            field.dump([1, 2, 3])
-        with self.assertRaises(TypeError):
-            field.dump(1)
 
         # load
         self.assertListEqual(field.load([1, 2, 3]), [1.0, 2.0, 3.0])
@@ -264,7 +256,7 @@ class FieldTest(TestCase):
         self.assertEqual(field.dump({'name': '1234'}), {'name': '1234'})
         with self.assertRaises(ValidationError):
             field.dump({'n': 'm'})
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValidationError):
             field.dump(1)
 
         self.assertEqual(field.load({'name': '1'}), {'name': '1'})

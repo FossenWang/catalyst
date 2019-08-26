@@ -7,7 +7,6 @@ from .utils import ErrorMessageMixin, missing, no_processing, OptionBox
 from .validators import (
     LengthValidator,
     ComparisonValidator,
-    TypeValidator,
 )
 
 
@@ -167,7 +166,6 @@ class StringField(Field):
     class Options(Field.Options):
         formatter = str
         parser = str
-        validators = [TypeValidator(str)]
 
     def __init__(self, min_length: int = None, max_length: int = None, **kwargs):
         super().__init__(**kwargs)
@@ -179,7 +177,6 @@ class NumberField(Field):
     class Options(Field.Options):
         formatter = float
         parser = float
-        validators = [TypeValidator(float)]
 
     def __init__(self, min_value=None, max_value=None, **kwargs):
         super().__init__(**kwargs)
@@ -195,7 +192,6 @@ class IntegerField(NumberField):
     class Options(Field.Options):
         formatter = int
         parser = int
-        validators = [TypeValidator(int)]
 
 
 class BoolField(Field):
@@ -244,7 +240,6 @@ class ListField(Field):
         super().__init__(item_field=item_field, **kwargs)
 
     class Options(Field.Options):
-        validators = [TypeValidator(Sequence)]
         item_field = None  # type: Field
 
         def formatter(self, value: Iterable):
@@ -272,8 +267,6 @@ class CallableField(Field):
         self.opts.func_kwargs = kwargs
 
     class Options(Field.Options):
-        validators = [TypeValidator(Callable)]
-
         def formatter(self, func: Callable):
             return func(*self.func_args, **self.func_kwargs)
 
@@ -287,7 +280,6 @@ class DatetimeField(Field):
     class Options(Field.Options):
         _type = datetime
         fmt = r'%Y-%m-%d %H:%M:%S.%f'
-        validators = [TypeValidator(datetime)]
 
         def formatter(self, dt):
             return self._type.strftime(dt, self.fmt)
@@ -300,7 +292,6 @@ class TimeField(DatetimeField):
     class Options(DatetimeField.Options):
         _type = time
         fmt = r'%H:%M:%S.%f'
-        validators = [TypeValidator(time)]
 
         def parser(self, date_string: str):
             return datetime.strptime(date_string, self.fmt).time()
@@ -310,7 +301,6 @@ class DateField(DatetimeField):
     class Options(DatetimeField.Options):
         _type = date
         fmt = r'%Y-%m-%d'
-        validators = [TypeValidator(date)]
 
         def parser(self, date_string: str):
             return datetime.strptime(date_string, self.fmt).date()
@@ -321,7 +311,6 @@ class NestedField(Field):
         super().__init__(catalyst=catalyst, **kwargs)
 
     class Options(Field.Options):
-        validators = [TypeValidator(Mapping)]
         catalyst = None
 
         def formatter(self, value):
