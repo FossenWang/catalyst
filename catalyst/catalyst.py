@@ -155,15 +155,16 @@ class BaseCatalyst:
                     # raise error if required otherwise skip
                     if raw_value is missing:
                         if required:
-                            field.error('required')
+                            errors[source] = field.get_error('required')
+                            if not all_errors:
+                                break
                         continue
 
                     valid_data[target] = getattr(field, method)(raw_value)
                 except Exception as e:
                     # collect errors and invalid data
                     errors[source] = e
-                    if raw_value is not missing:
-                        invalid_data[source] = raw_value
+                    invalid_data[source] = raw_value
                     if not all_errors:
                         break
 

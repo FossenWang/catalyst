@@ -369,6 +369,8 @@ class CatalystTest(TestCase):
             catalyst.dump(None, True)
         with self.assertRaises(ValidationError):
             catalyst.dump({}, True)
+        with self.assertRaises(ValidationError):
+            catalyst.dump({}, True, False)
         # allow None
         assert_field_dump_args({'s': None}, {'s': None})
 

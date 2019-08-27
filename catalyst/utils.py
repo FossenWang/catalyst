@@ -23,7 +23,7 @@ class CatalystResult:
         return str(self.format_errors())
 
     @classmethod
-    def _format_errors(cls, errors: Mapping):
+    def _format_errors(cls, errors):
         if isinstance(errors, Mapping):
             return {k: cls._format_errors(errors[k]) for k in errors}
         return str(errors)
@@ -63,9 +63,12 @@ class ErrorMessageMixin:
         self.error_messages = messages
 
     def error(self, error_key: str, error_class=None):
+        raise self.get_error(error_key, error_class)
+
+    def get_error(self, error_key: str, error_class=None):
         if not error_class:
             error_class = self.default_error_class
-        raise error_class(
+        return error_class(
             self.error_messages.get(error_key, self.unknown_error))
 
 
