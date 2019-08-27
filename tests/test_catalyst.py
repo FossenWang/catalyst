@@ -38,53 +38,6 @@ test_catalyst = TestDataCatalyst()
 
 class CatalystTest(TestCase):
 
-    def test_metaclass(self):
-        "Test metaclass of Catalyst."
-
-        data = {
-            'title': 'x',
-            'content': 'x',
-            'author': {
-                'uid': 1,
-                'name': 'x'
-            }
-        }
-
-        # Automatic wrap an object of Catalyst as NestedField
-        class User(Catalyst):
-            uid = IntegerField()
-            name = StringField()
-
-        user_catalyst = User()
-
-        class Article1(Catalyst):
-            title = StringField()
-            content = StringField()
-            author = user_catalyst
-
-        catalyst = Article1()
-
-        r = catalyst.dump(data)
-        self.assertEqual(data, r.valid_data)
-        r = catalyst.load(data)
-        self.assertEqual(data, r.valid_data)
-
-        # Automatic wrap a subclass of Catalyst as NestedField
-        class Article2(Catalyst):
-            title = StringField()
-            content = StringField()
-
-            class author(Catalyst):
-                uid = IntegerField()
-                name = StringField()
-
-        catalyst = Article2()
-
-        r = catalyst.dump(data)
-        self.assertEqual(data, r.valid_data)
-        r = catalyst.load(data)
-        self.assertEqual(data, r.valid_data)
-
     def test_inherit(self):
         class A(Catalyst):
             a = Field()
@@ -587,3 +540,61 @@ class CatalystTest(TestCase):
         # wrong handle name
         with self.assertRaises(ValueError):
             test_catalyst._handle_many([], 1)
+
+    def test_nested_field(self):
+        data = {
+            'title': 'x',
+            'content': 'x',
+            'author': {
+                'uid': 1,
+                'name': 'x'
+            }
+        }
+
+        # Automatic wrap an object of Catalyst as NestedField
+        class User(Catalyst):
+            uid = IntegerField()
+            name = StringField()
+
+        user_catalyst = User()
+
+        class Article1(Catalyst):
+            title = StringField()
+            content = StringField()
+            author = user_catalyst
+
+        catalyst = Article1()
+
+        r = catalyst.dump(data)
+        self.assertEqual(data, r.valid_data)
+        r = catalyst.load(data)
+        self.assertEqual(data, r.valid_data)
+
+        # Automatic wrap a subclass of Catalyst as NestedField
+        class Article2(Catalyst):
+            title = StringField()
+            content = StringField()
+
+            class author(Catalyst):
+                uid = IntegerField()
+                name = StringField()
+
+        catalyst = Article2()
+
+        r = catalyst.dump(data)
+        self.assertEqual(data, r.valid_data)
+        r = catalyst.load(data)
+        self.assertEqual(data, r.valid_data)
+
+        invalid_data = {
+            'title': 'x',
+            'content': 'x',
+            'author': {
+                'uid': 'x',
+                'name': 'x'
+            }
+        }
+        r = catalyst.load(invalid_data)
+        self.assertDictEqual(r.valid_data, {'author': {'name': 'x'}, 'content': 'x', 'title': 'x'})
+        self.assertDictEqual(r.invalid_data, {'author': {'uid': 'x'}})
+        self.assertEqual(set(r.errors['author']), {'uid'})

@@ -163,8 +163,14 @@ class BaseCatalyst:
                     valid_data[target] = getattr(field, method)(raw_value)
                 except Exception as e:
                     # collect errors and invalid data
-                    errors[source] = e
-                    invalid_data[source] = raw_value
+                    if isinstance(e, ValidationError) and isinstance(e.msg, CatalystResult):
+                        # distribute nested errors
+                        valid_data[target] = e.msg.valid_data
+                        errors[source] = e.msg.errors
+                        invalid_data[source] = e.msg.invalid_data
+                    else:
+                        errors[source] = e
+                        invalid_data[source] = raw_value
                     if not all_errors:
                         break
 
