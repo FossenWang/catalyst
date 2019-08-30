@@ -2,8 +2,12 @@
 
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable
 from datetime import datetime, time, date
+from collections import OrderedDict
 
-from .utils import ErrorMessageMixin, missing, no_processing, OptionBox
+from .utils import (
+    ErrorMessageMixin, missing, no_processing, OptionBox,
+    LoadResult,
+)
 from .validators import (
     LengthValidator,
     ComparisonValidator,
@@ -219,42 +223,6 @@ class BoolField(Field):
         formatter = parser
 
 
-class ListField(Field):
-    def __init__(self, item_field: Field, **kwargs):
-        super().__init__(item_field=item_field, **kwargs)
-
-    class Options(Field.Options):
-        item_field = None  # type: Field
-
-        def formatter(self, value: Iterable):
-            return [self.item_field.dump(item) for item in value]
-
-        def parser(self, value):
-            return [self.item_field.load(item) for item in value]
-
-
-class CallableField(Field):
-    def __init__(self,
-                 func_args: Iterable = None,
-                 func_kwargs: Mapping = None,
-                 **kwargs):
-        kwargs.pop('no_load', None)
-        super().__init__(no_load=True, **kwargs)
-        if func_args is None:
-            func_args = tuple()
-        if func_kwargs is None:
-            func_kwargs = {}
-        self.set_args(*func_args, **func_kwargs)
-
-    def set_args(self, *args, **kwargs):
-        self.opts.func_args = args
-        self.opts.func_kwargs = kwargs
-
-    class Options(Field.Options):
-        def formatter(self, func: Callable):
-            return func(*self.func_args, **self.func_kwargs)
-
-
 class DatetimeField(Field):
     def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
         super().__init__(fmt=fmt, **kwargs)
@@ -288,6 +256,42 @@ class DateField(DatetimeField):
 
         def parser(self, date_string: str):
             return datetime.strptime(date_string, self.fmt).date()
+
+
+class CallableField(Field):
+    def __init__(self,
+                 func_args: Iterable = None,
+                 func_kwargs: Mapping = None,
+                 **kwargs):
+        kwargs.pop('no_load', None)
+        super().__init__(no_load=True, **kwargs)
+        if func_args is None:
+            func_args = tuple()
+        if func_kwargs is None:
+            func_kwargs = {}
+        self.set_args(*func_args, **func_kwargs)
+
+    def set_args(self, *args, **kwargs):
+        self.opts.func_args = args
+        self.opts.func_kwargs = kwargs
+
+    class Options(Field.Options):
+        def formatter(self, func: Callable):
+            return func(*self.func_args, **self.func_kwargs)
+
+
+class ListField(Field):
+    def __init__(self, item_field: Field, **kwargs):
+        super().__init__(item_field=item_field, **kwargs)
+
+    class Options(Field.Options):
+        item_field = None  # type: Field
+
+        def formatter(self, value: Iterable):
+            return [self.item_field.dump(item) for item in value]
+
+        def parser(self, value):
+            return [self.item_field.load(item) for item in value]
 
 
 class NestedField(Field):

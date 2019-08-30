@@ -184,13 +184,15 @@ class FieldTest(TestCase):
         # load
         self.assertListEqual(field.load([1, 2, 3]), [1.0, 2.0, 3.0])
         self.assertListEqual(field.load([]), [])
+        with self.assertRaises(ValueError):
+            field.load([1, 'a', 3])
         with self.assertRaises(TypeError):
             field.load(1)
         self.assertIsNone(field.load(None))
         field.opts.allow_none = False
-        with self.assertRaises(ValidationError) as c:
+        with self.assertRaises(ValidationError) as ctx:
             field.load(None)
-        self.assertEqual(c.exception.msg, field.error_messages['none'])
+        self.assertEqual(ctx.exception.msg, field.error_messages['none'])
 
     def test_callable_field(self):
         field = CallableField(
