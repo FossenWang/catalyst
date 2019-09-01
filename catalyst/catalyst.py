@@ -21,14 +21,13 @@ class BaseCatalyst:
 
     class Options(OptionBox):
         dump_from = staticmethod(get_attr_or_item)
-        dump_raise_error = False
-        dump_all_errors = True
         dump_method = 'format'
 
         load_from = staticmethod(get_item)
-        load_raise_error = False
-        load_all_errors = True
         load_method = 'load'
+
+        raise_error = False
+        all_errors = True
 
     @staticmethod
     def _format_field_key(key):
@@ -51,14 +50,12 @@ class BaseCatalyst:
                  fields: Iterable[str] = None,
                  dump_fields: Iterable[str] = None,
                  dump_from: Callable[[Any, str], Any] = None,
-                 dump_raise_error: bool = None,
-                 dump_all_errors: bool = None,
                  dump_method: str = None,
                  load_fields: Iterable[str] = None,
                  load_from: Callable[[Any, str], Any] = None,
-                 load_raise_error: bool = None,
-                 load_all_errors: bool = None,
                  load_method: str = None,
+                 raise_error: bool = None,
+                 all_errors: bool = None,
                  **kwargs,
                  ):
         if not fields:
@@ -78,13 +75,11 @@ class BaseCatalyst:
 
         self.opts = self.Options(
             dump_from=dump_from,
-            dump_raise_error=dump_raise_error,
-            dump_all_errors=dump_all_errors,
             dump_method=dump_method,
             load_from=load_from,
-            load_raise_error=load_raise_error,
-            load_all_errors=load_all_errors,
             load_method=load_method,
+            raise_error=raise_error,
+            all_errors=all_errors,
             **kwargs,
         )
 
@@ -118,8 +113,6 @@ class BaseCatalyst:
             ResultClass = DumpResult
             field_dict = self._dump_field_dict
             get_value = self.opts.dump_from
-            raise_error = self.opts.get(dump_raise_error=raise_error)
-            all_errors = self.opts.get(dump_all_errors=all_errors)
             method = self.opts.get(dump_method=method)
             if method not in {'dump', 'format', 'validate'}:
                 raise ValueError("Argment 'method' must be in ('dump', 'format', 'validate').")
@@ -129,13 +122,13 @@ class BaseCatalyst:
             ResultClass = LoadResult
             field_dict = self._load_field_dict
             get_value = self.opts.load_from
-            raise_error = self.opts.get(load_raise_error=raise_error)
-            all_errors = self.opts.get(load_all_errors=all_errors)
             method = self.opts.get(load_method=method)
             if method not in {'load', 'parse', 'validate'}:
                 raise ValueError("Argment 'method' must be in ('load', 'parse', 'validate').")
         else:
             raise ValueError("Argment 'name' must be 'dump' or 'load'.")
+        raise_error = self.opts.get(raise_error=raise_error)
+        all_errors = self.opts.get(all_errors=all_errors)
 
         data, errors = self._side_effect(
             data, {}, f'pre_{name}', not all_errors)
@@ -192,14 +185,12 @@ class BaseCatalyst:
                      ) -> CatalystResult:
         if name == 'dump':
             ResultClass = DumpResult
-            raise_error = self.opts.get(dump_raise_error=raise_error)
-            all_errors = self.opts.get(dump_all_errors=all_errors)
         elif name == 'load':
             ResultClass = LoadResult
-            raise_error = self.opts.get(load_raise_error=raise_error)
-            all_errors = self.opts.get(load_all_errors=all_errors)
         else:
             raise ValueError("Argment 'name' must be 'dump' or 'load'.")
+        raise_error = self.opts.get(raise_error=raise_error)
+        all_errors = self.opts.get(all_errors=all_errors)
 
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):
