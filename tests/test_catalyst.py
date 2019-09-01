@@ -276,11 +276,11 @@ class CatalystTest(TestCase):
             'bool_': True, 'func': dump_data.func, 'list_': ['a', 'b']
         }
         # both parse and validate
-        result = test_catalyst.dump(invalid_dump_data, method='dump')
+        result = TestDataCatalyst(dump_method='dump').dump(invalid_dump_data)
         self.assertFalse(result.is_valid)
         self.assertEqual(set(result.invalid_data), {'integer'})
         # only validate, no format
-        result = test_catalyst.dump(invalid_dump_data, method='validate')
+        result = TestDataCatalyst(dump_method='validate').dump(invalid_dump_data)
         self.assertFalse(result.is_valid)
         self.assertEqual(set(result.invalid_data), {'integer'})
 
@@ -288,18 +288,18 @@ class CatalystTest(TestCase):
             'string': 'xxx', 'integer': '1', 'float': 1.1,
             'bool': True, 'list_': ['a', 'b']}
         # only validate, no parse
-        result = test_catalyst.load(invalid_load_data, method='validate')
+        result = TestDataCatalyst(load_method='validate').load(invalid_load_data)
         self.assertFalse(result.is_valid)
         self.assertEqual(set(result.invalid_data), {'integer'})
         # only parse, no validate, can force to change type
-        result = test_catalyst.load(invalid_load_data, method='parse')
+        result = TestDataCatalyst(load_method='parse').load(invalid_load_data)
         self.assertTrue(result.is_valid)
 
         with self.assertRaises(ValueError):
-            test_catalyst.dump({}, method=1)
+            TestDataCatalyst(dump_method=1)
 
         with self.assertRaises(ValueError):
-            test_catalyst.load({}, method=1)
+            TestDataCatalyst(load_method=1)
 
         # wrong handle name
         with self.assertRaises(ValueError):

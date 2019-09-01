@@ -48,14 +48,14 @@ class BaseCatalyst:
 
     def __init__(self,
                  fields: Iterable[str] = None,
+                 raise_error: bool = None,
+                 all_errors: bool = None,
                  dump_fields: Iterable[str] = None,
                  dump_from: Callable[[Any, str], Any] = None,
                  dump_method: str = None,
                  load_fields: Iterable[str] = None,
                  load_from: Callable[[Any, str], Any] = None,
                  load_method: str = None,
-                 raise_error: bool = None,
-                 all_errors: bool = None,
                  **kwargs,
                  ):
         if not fields:
@@ -74,12 +74,12 @@ class BaseCatalyst:
             lambda k: not self._field_dict[k].opts.no_load)
 
         self.opts = self.Options(
+            raise_error=raise_error,
+            all_errors=all_errors,
             dump_from=dump_from,
             dump_method=dump_method,
             load_from=load_from,
             load_method=load_method,
-            raise_error=raise_error,
-            all_errors=all_errors,
             **kwargs,
         )
 
@@ -88,6 +88,12 @@ class BaseCatalyst:
 
         if not callable(self.opts.load_from):
             raise TypeError('"load_from" must be Callable.')
+
+        if self.opts.dump_method not in {'dump', 'format', 'validate'}:
+            raise ValueError("Argment 'method' must be in ('dump', 'format', 'validate').")
+
+        if self.opts.load_method not in {'load', 'parse', 'validate'}:
+            raise ValueError("Argment 'method' must be in ('load', 'parse', 'validate').")
 
     def _side_effect(self, data, errors, name, raise_error):
         handle = getattr(self, name)
@@ -105,7 +111,6 @@ class BaseCatalyst:
                      name: str,
                      raise_error: bool = None,
                      all_errors: bool = None,
-                     method: str = None,
                      ) -> CatalystResult:
         if name == 'dump':
             source_attr = 'name'
@@ -113,18 +118,14 @@ class BaseCatalyst:
             ResultClass = DumpResult
             field_dict = self._dump_field_dict
             get_value = self.opts.dump_from
-            method = self.opts.get(dump_method=method)
-            if method not in {'dump', 'format', 'validate'}:
-                raise ValueError("Argment 'method' must be in ('dump', 'format', 'validate').")
+            method = self.opts.dump_method
         elif name == 'load':
             source_attr = 'key'
             target_attr = 'name'
             ResultClass = LoadResult
             field_dict = self._load_field_dict
             get_value = self.opts.load_from
-            method = self.opts.get(load_method=method)
-            if method not in {'load', 'parse', 'validate'}:
-                raise ValueError("Argment 'method' must be in ('load', 'parse', 'validate').")
+            method = self.opts.load_method
         else:
             raise ValueError("Argment 'name' must be 'dump' or 'load'.")
         raise_error = self.opts.get(raise_error=raise_error)
@@ -181,7 +182,6 @@ class BaseCatalyst:
                      name: str,
                      raise_error: bool = None,
                      all_errors: bool = None,
-                     method: str = None,
                      ) -> CatalystResult:
         if name == 'dump':
             ResultClass = DumpResult
@@ -194,7 +194,7 @@ class BaseCatalyst:
 
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):
-            result = self._base_handle(item, name, False, all_errors, method)
+            result = self._base_handle(item, name, False, all_errors)
             valid_data.append(result.valid_data)
             if not result.is_valid:
                 errors[i] = result.errors
@@ -211,7 +211,6 @@ class BaseCatalyst:
                      func: Callable = None,
                      name: str = None,
                      all_errors: bool = None,
-                     method: str = None,
                      ) -> Callable:
         """Decorator for handling args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
@@ -224,57 +223,51 @@ class BaseCatalyst:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 ba = sig.bind(*args, **kwargs)
-                result = self._base_handle(ba.arguments, name, True, all_errors, method)
+                result = self._base_handle(ba.arguments, name, True, all_errors)
                 ba.arguments.update(result.valid_data)
                 return func(*ba.args, **ba.kwargs)
             return wrapper
-        return partial(self._handle_args, name=name, all_errors=all_errors, method=method)
+        return partial(self._handle_args, name=name, all_errors=all_errors)
 
     def dump(self,
              data,
              raise_error: bool = None,
              all_errors: bool = None,
-             method: str = None,
              ) -> DumpResult:
-        return self._base_handle(data, 'dump', raise_error, all_errors, method)
+        return self._base_handle(data, 'dump', raise_error, all_errors)
 
     def dump_many(self,
                   data: Sequence,
                   raise_error: bool = None,
                   all_errors: bool = None,
-                  method: str = None,
                   ) -> DumpResult:
-        return self._handle_many(data, 'dump', raise_error, all_errors, method)
+        return self._handle_many(data, 'dump', raise_error, all_errors)
 
     def dump_args(self,
                   func: Callable = None,
                   all_errors: bool = None,
-                  method: str = None,
                   ) -> Callable:
-        return self._handle_args(func, 'load', all_errors, method)
+        return self._handle_args(func, 'load', all_errors)
 
     def load(self,
              data,
              raise_error: bool = None,
              all_errors: bool = None,
-             method: str = None,
              ) -> LoadResult:
-        return self._base_handle(data, 'load', raise_error, all_errors, method)
+        return self._base_handle(data, 'load', raise_error, all_errors)
 
     def load_many(self,
                   data: Sequence,
                   raise_error: bool = None,
                   all_errors: bool = None,
-                  method: str = None,
                   ) -> LoadResult:
-        return self._handle_many(data, 'load', raise_error, all_errors, method)
+        return self._handle_many(data, 'load', raise_error, all_errors)
 
     def load_args(self,
                   func: Callable = None,
                   all_errors: bool = None,
-                  method: str = None,
                   ) -> Callable:
-        return self._handle_args(func, 'load', all_errors, method)
+        return self._handle_args(func, 'load', all_errors)
 
     def pre_dump(self, data):
         return data

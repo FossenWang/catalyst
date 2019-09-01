@@ -13,7 +13,6 @@ class CatalystPacker:
                      name: str,
                      raise_error: bool = None,
                      all_errors: bool = None,
-                     method: str = None,
                      ) -> CatalystResult:
         if name == 'dump':
             ResultClass = DumpResult
@@ -24,7 +23,7 @@ class CatalystPacker:
 
         valid_data, errors, invalid_data = {}, {}, {}
         for catalyst, data in self.packages:
-            temp = catalyst._base_handle(data, name, raise_error, all_errors, method)
+            temp = catalyst._base_handle(data, name, raise_error, all_errors)
             valid_data.update(temp.valid_data)
             errors.update(temp.errors)
             invalid_data.update(temp.invalid_data)
@@ -34,16 +33,14 @@ class CatalystPacker:
     def dump(self,
              raise_error: bool = None,
              all_errors: bool = None,
-             method: str = None,
              ) -> DumpResult:
-        return self._base_handle('dump', raise_error, all_errors, method)
+        return self._base_handle('dump', raise_error, all_errors)
 
     def load(self,
              raise_error: bool = None,
              all_errors: bool = None,
-             method: str = None,
              ) -> LoadResult:
-        return self._base_handle('load', raise_error, all_errors, method)
+        return self._base_handle('load', raise_error, all_errors)
 
     def clear(self):
         self.packages.clear()
