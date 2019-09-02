@@ -303,7 +303,7 @@ class CatalystTest(TestCase):
 
         # wrong handle name
         with self.assertRaises(ValueError):
-            test_catalyst._base_handle({}, 1)
+            test_catalyst._base_handle(1, {})
 
     def test_field_args_for_dump_and_load(self):
         def create_catalyst(**kwargs):
@@ -448,10 +448,9 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
         # pre_load raise error
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(ValidationError) as ctx:
             c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, raise_error=True)
-        with self.assertRaises(ValidationError):
-            c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, all_errors=False)
+        self.assertTrue('not_allowed_keys' in ctx.exception.msg.errors)
 
         # post_load invalid
         result = c.load({'max_value': 1, 'min_value': 2})
@@ -539,7 +538,7 @@ class CatalystTest(TestCase):
 
         # wrong handle name
         with self.assertRaises(ValueError):
-            test_catalyst._handle_many([], 1)
+            test_catalyst._handle_many(1, [])
 
     def test_nested_field(self):
         data = {

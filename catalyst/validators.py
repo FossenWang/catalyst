@@ -28,7 +28,7 @@ class LengthValidator(Validator):
                  error_messages: dict = None):
         if min_length is not None and max_length is not None \
             and min_length > max_length:
-            raise ValueError('"min_length" can\'t be greater than "max_length".')
+            raise ValueError('`min_length` can\'t be greater than `max_length`.')
 
         self.min_length = min_length
         self.max_length = max_length
@@ -60,7 +60,7 @@ class ComparisonValidator(Validator):
                  error_messages: dict = None):
         if min_value is not None and max_value is not None \
             and min_value > max_value:
-            raise ValueError('"min_value" can\'t be greater than "max_value".')
+            raise ValueError('`min_value` can\'t be greater than `max_value`.')
 
         self.min_value = min_value
         self.max_value = max_value

@@ -23,7 +23,7 @@ class CatalystPacker:
 
         valid_data, errors, invalid_data = {}, {}, {}
         for catalyst, data in self.packages:
-            temp = catalyst._base_handle(data, name, raise_error, all_errors)
+            temp = catalyst._base_handle(name, data, raise_error, all_errors)
             valid_data.update(temp.valid_data)
             errors.update(temp.errors)
             invalid_data.update(temp.invalid_data)
