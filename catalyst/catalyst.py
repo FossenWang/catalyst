@@ -198,10 +198,10 @@ class BaseCatalyst:
                 if not all_errors:
                     break
 
-        results = ResultClass(valid_data, errors, invalid_data)
-        if raise_error:
-            raise ValidationError(results)
-        return results
+        result = ResultClass(valid_data, errors, invalid_data)
+        if errors and raise_error:
+            raise ValidationError(result)
+        return result
 
     def _handle_args(self,
                      func: Callable = None,

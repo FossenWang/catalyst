@@ -184,8 +184,14 @@ class FieldTest(TestCase):
         # load
         self.assertListEqual(field.load([1, 2, 3]), [1.0, 2.0, 3.0])
         self.assertListEqual(field.load([]), [])
-        with self.assertRaises(ValueError):
+
+        with self.assertRaises(ValidationError) as ctx:
             field.load([1, 'a', 3])
+        result = ctx.exception.msg
+        self.assertIsInstance(result.errors[1], ValueError)
+        self.assertEqual(result.invalid_data[1], 'a')
+        self.assertEqual(result.valid_data, [1.0, 3.0])
+
         with self.assertRaises(TypeError):
             field.load(1)
         self.assertIsNone(field.load(None))

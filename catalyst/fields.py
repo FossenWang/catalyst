@@ -2,14 +2,17 @@
 
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable
 from datetime import datetime, time, date
+from collections import OrderedDict
 
 from .utils import (
-    ErrorMessageMixin, missing, no_processing, OptionBox
+    ErrorMessageMixin, missing, no_processing, OptionBox,
+    DumpResult, LoadResult
 )
 from .validators import (
     LengthValidator,
     ComparisonValidator,
 )
+from .exceptions import ValidationError
 
 
 FormatterType = ParserType = Callable[[Any], Any]
@@ -279,17 +282,57 @@ class CallableField(Field):
 
 
 class ListField(Field):
-    def __init__(self, item_field: Field, **kwargs):
-        super().__init__(item_field=item_field, **kwargs)
+    def __init__(self,
+                 item_field: Field,
+                 dump_method: str = None,
+                 load_method: str = None,
+                 all_errors: bool = None,
+                 **kwargs):
+        super().__init__(
+            item_field=item_field,
+            dump_method=dump_method,
+            load_method=load_method,
+            **kwargs)
 
     class Options(Field.Options):
         item_field = None  # type: Field
+        dump_method = 'format'
+        load_method = 'load'
+        all_errors = True
 
         def formatter(self, value: Iterable):
-            return [self.item_field.dump(item) for item in value]
+            return self._base_handle('dump', value)
 
-        def parser(self, value):
-            return [self.item_field.load(item) for item in value]
+        def parser(self, value: Iterable):
+            return self._base_handle('load', value)
+
+        def _base_handle(self, name: str, data: Iterable):
+            if name == 'dump':
+                ResultClass = DumpResult
+                method_name = self.dump_method
+            elif name == 'load':
+                ResultClass = LoadResult
+                method_name = self.load_method
+            else:
+                raise ValueError("Argument `name` must be 'dump' or 'load'.")
+
+            handle = getattr(self.item_field, method_name)
+            all_errors = self.all_errors
+
+            valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
+            for i, item in enumerate(data):
+                try:
+                    result = handle(item)
+                    valid_data.append(result)
+                except Exception as error:
+                    errors[i] = error
+                    invalid_data[i] = item
+                    if not all_errors:
+                        break
+
+            if errors:
+                raise ValidationError(ResultClass(valid_data, errors, invalid_data))
+            return valid_data
 
 
 class NestedField(Field):

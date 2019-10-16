@@ -508,12 +508,17 @@ class CatalystTest(TestCase):
         data = [{'s': 's'} for _ in range(5)]
         result = c.dump_many(data)
         self.assertListEqual(result.valid_data, data)
+        result = c.dump_many(data, raise_error=True)
+        self.assertTrue(result.is_valid)
 
         result = c.load_many(data)
         self.assertTrue(result.is_valid)
         self.assertEqual(result.valid_data, data)
         self.assertEqual(result.errors, {})
         self.assertEqual(result.invalid_data, {})
+
+        result = c.load_many(data, raise_error=True)
+        self.assertTrue(result.is_valid)
 
         data[2]['s'] = ''
         data[3]['s'] = 'sss'
@@ -539,6 +544,34 @@ class CatalystTest(TestCase):
         # wrong handle name
         with self.assertRaises(ValueError):
             test_catalyst._handle_many(1, [])
+
+    def test_list_field(self):
+        class C(Catalyst):
+            nums = ListField(IntegerField())
+
+        c = C()
+
+        data = {'nums': [1, '2', 3.0]}
+
+        result = c.dump(data)
+        self.assertEqual(result.valid_data['nums'], [1, 2, 3])
+
+        result = c.load(data)
+        self.assertEqual(result.valid_data['nums'], [1, 2, 3])
+
+        data['nums'] = [1, 'x', 3]
+
+        result = c.dump(data)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(result.valid_data['nums'], [1, 3])
+        self.assertEqual(result.invalid_data['nums'][1], 'x')
+        self.assertIsInstance(result.errors['nums'][1], ValueError)
+
+        result = c.load(data)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(result.valid_data['nums'], [1, 3])
+        self.assertEqual(result.invalid_data['nums'][1], 'x')
+        self.assertIsInstance(result.errors['nums'][1], ValueError)
 
     def test_nested_field(self):
         data = {
