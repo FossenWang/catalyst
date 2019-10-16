@@ -8,7 +8,7 @@ from .packer import CatalystPacker
 from .fields import Field, NestedField
 from .exceptions import ValidationError
 from .utils import (
-    missing, get_attr_or_item, get_item,
+    missing, get_attr_or_item, get_item, no_processing,
     LoadResult, DumpResult, CatalystResult, OptionBox
 )
 
@@ -95,175 +95,191 @@ class BaseCatalyst:
         if self.opts.load_method not in {'load', 'parse', 'validate'}:
             raise ValueError("Argument `method` must be in ('load', 'parse', 'validate').")
 
-    def _side_effect(self, data, errors, name):
-        handle = getattr(self, name)
+    def _side_effect(self, name: str, data: Any):
+        """Do side effect before or after processs.
+
+        :param name: The name of side effect method, which named with
+            prefix and method name, such as `pre_dump` or `post_dump_many`.
+            There are two words `pre` and `post` can be used to
+            prefix four methods `dump`, `load`, `dump_many`, `load_many`.
+        """
+        handle = getattr(self, name, no_processing)
         try:
-            data = handle(data)
+            valid_data = handle(data)
+            invalid_data = None
+            errors = None
         except Exception as e:
             error_key = getattr(handle, 'error_key', name)
-            errors[error_key] = e
-        return data, errors
+            errors = {error_key: e}
+            invalid_data = data
+            valid_data = None
+        return valid_data, errors, invalid_data
 
-    def _base_handle(self,
-                     name: str,
-                     data: Any,
-                     raise_error: bool = None,
-                     all_errors: bool = None,
-                     ) -> CatalystResult:
+    def _process_flow(
+                self,
+                name: str,
+                many: bool,
+                data: Any,
+                raise_error: bool = None,
+                all_errors: bool = None,
+                ) -> CatalystResult:
+        """Core basic process flow.
+        """
+        if name == 'dump':
+            ResultClass = DumpResult
+        elif name == 'load':
+            ResultClass = LoadResult
+        else:
+            raise ValueError("Argument `name` must be `dump` or `load`.")
+
+        # select data handle
+        if many:
+            method_name = f'{name}_many'
+            handle = self._process_many
+        else:
+            method_name = name
+            handle = self._process_one
+
+        all_errors = self.opts.get(all_errors=all_errors)
+        raise_error = self.opts.get(raise_error=raise_error)
+
+        valid_data, errors, invalid_data = self._side_effect(f'pre_{method_name}', data)
+
+        if not errors:
+            valid_data, errors, invalid_data = handle(name, valid_data, all_errors)
+
+        if not errors:
+            valid_data, errors, invalid_data = self._side_effect(f'post_{method_name}', valid_data)
+
+        result = ResultClass(valid_data, errors, invalid_data)
+        if errors and raise_error:
+            raise ValidationError(result)
+        return result
+
+    def _process_one(self, name: str, data: Any, all_errors: bool):
         if name == 'dump':
             source_attr = 'name'
             target_attr = 'key'
-            ResultClass = DumpResult
             field_dict = self._dump_field_dict
             get_value = self.opts.dump_from
             method = self.opts.dump_method
         elif name == 'load':
             source_attr = 'key'
             target_attr = 'name'
-            ResultClass = LoadResult
             field_dict = self._load_field_dict
             get_value = self.opts.load_from
             method = self.opts.load_method
         else:
             raise ValueError("Argument `name` must be 'dump' or 'load'.")
-        raise_error = self.opts.get(raise_error=raise_error)
-        all_errors = self.opts.get(all_errors=all_errors)
 
-        data, errors = self._side_effect(data, {}, f'pre_{name}')
+        valid_data, errors, invalid_data = {}, {}, {}
 
-        valid_data, invalid_data = {}, {}
+        for field in field_dict.values():
+            required = getattr(field.opts, f'{name}_required')
+            default = getattr(field, f'{name}_default')
+            source = getattr(field, source_attr)
+            target = getattr(field, target_attr)
 
-        if not errors:
-            for field in field_dict.values():
-                required = getattr(field.opts, f'{name}_required')
-                default = getattr(field, f'{name}_default')
-                source = getattr(field, source_attr)
-                target = getattr(field, target_attr)
+            raw_value = get_value(data, source, default)
+            try:
+                # if the field's value is missing
+                # raise error if required otherwise skip
+                if raw_value is missing:
+                    if required:
+                        errors[source] = field.get_error('required')
+                        if not all_errors:
+                            break
+                    continue
 
-                raw_value = get_value(data, source, default)
-                try:
-                    # if the field's value is missing
-                    # raise error if required otherwise skip
-                    if raw_value is missing:
-                        if required:
-                            errors[source] = field.get_error('required')
-                            if not all_errors:
-                                break
-                        continue
+                valid_data[target] = getattr(field, method)(raw_value)
+            except Exception as e:
+                # collect errors and invalid data
+                if isinstance(e, ValidationError) and isinstance(e.msg, CatalystResult):
+                    # distribute nested data in CatalystResult
+                    valid_data[target] = e.msg.valid_data
+                    errors[source] = e.msg.errors
+                    invalid_data[source] = e.msg.invalid_data
+                else:
+                    errors[source] = e
+                    invalid_data[source] = raw_value
+                if not all_errors:
+                    break
 
-                    valid_data[target] = getattr(field, method)(raw_value)
-                except Exception as e:
-                    # collect errors and invalid data
-                    if isinstance(e, ValidationError) and isinstance(e.msg, CatalystResult):
-                        # distribute nested errors
-                        valid_data[target] = e.msg.valid_data
-                        errors[source] = e.msg.errors
-                        invalid_data[source] = e.msg.invalid_data
-                    else:
-                        errors[source] = e
-                        invalid_data[source] = raw_value
-                    if not all_errors:
-                        break
+        return valid_data, errors, invalid_data
 
-        if not errors:
-            data, errors = self._side_effect(data, errors, f'post_{name}')
-
-        result = ResultClass(valid_data, errors, invalid_data)
-        if errors and raise_error:
-            raise ValidationError(result)
-        return result
-
-    def _handle_many(self,
-                     name: str,
-                     data: Sequence,
-                     raise_error: bool = None,
-                     all_errors: bool = None,
-                     ) -> CatalystResult:
-        if name == 'dump':
-            ResultClass = DumpResult
-        elif name == 'load':
-            ResultClass = LoadResult
-        else:
-            raise ValueError("Argument `name` must be 'dump' or 'load'.")
-        raise_error = self.opts.get(raise_error=raise_error)
-        all_errors = self.opts.get(all_errors=all_errors)
-
+    def _process_many(self, name: str, data: Sequence, all_errors: bool):
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):
-            result = self._base_handle(name, item, False, all_errors)
-            valid_data.append(result.valid_data)
-            if not result.is_valid:
+            result = self._process_flow(name, False, item, False, all_errors)
+            if result.is_valid:
+                valid_data.append(result.valid_data)
+            else:
                 errors[i] = result.errors
                 invalid_data[i] = result.invalid_data
                 if not all_errors:
                     break
+        return valid_data, errors, invalid_data
 
-        result = ResultClass(valid_data, errors, invalid_data)
-        if errors and raise_error:
-            raise ValidationError(result)
-        return result
-
-    def _handle_args(self,
-                     func: Callable = None,
-                     name: str = None,
-                     all_errors: bool = None,
-                     ) -> Callable:
+    def _process_args(self,
+                      func: Callable = None,
+                      name: str = None,
+                      all_errors: bool = None,
+                      ) -> Callable:
         """Decorator for handling args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
-        If args are invalid, error will be raised.
-        In general, `*args` should be handled by ListField,
-        and `**kwargs` should be handled by NestedField.
+        If args are invalid, error will be raised. In general, `*args` should
+        be handled by ListField, and `**kwargs` should be handled by NestedField.
         """
         if func:
             sig = inspect.signature(func)
             @wraps(func)
             def wrapper(*args, **kwargs):
                 ba = sig.bind(*args, **kwargs)
-                result = self._base_handle(name, ba.arguments, True, all_errors)
+                result = self._process_flow(name, False, ba.arguments, True, all_errors)
                 ba.arguments.update(result.valid_data)
                 return func(*ba.args, **ba.kwargs)
             return wrapper
-        return partial(self._handle_args, name=name, all_errors=all_errors)
+        return partial(self._process_args, name=name, all_errors=all_errors)
 
     def dump(self,
              data,
              raise_error: bool = None,
              all_errors: bool = None,
              ) -> DumpResult:
-        return self._base_handle('dump', data, raise_error, all_errors)
+        return self._process_flow('dump', False, data, raise_error, all_errors)
 
     def dump_many(self,
                   data: Sequence,
                   raise_error: bool = None,
                   all_errors: bool = None,
                   ) -> DumpResult:
-        return self._handle_many('dump', data, raise_error, all_errors)
+        return self._process_flow('dump', True, data, raise_error, all_errors)
 
     def dump_args(self,
                   func: Callable = None,
                   all_errors: bool = None,
                   ) -> Callable:
-        return self._handle_args(func, 'load', all_errors)
+        return self._process_args(func, 'dump', all_errors)
 
     def load(self,
              data,
              raise_error: bool = None,
              all_errors: bool = None,
              ) -> LoadResult:
-        return self._base_handle('load', data, raise_error, all_errors)
+        return self._process_flow('load', False, data, raise_error, all_errors)
 
     def load_many(self,
                   data: Sequence,
                   raise_error: bool = None,
                   all_errors: bool = None,
                   ) -> LoadResult:
-        return self._handle_many('load', data, raise_error, all_errors)
+        return self._process_flow('load', True, data, raise_error, all_errors)
 
     def load_args(self,
                   func: Callable = None,
                   all_errors: bool = None,
                   ) -> Callable:
-        return self._handle_args(func, 'load', all_errors)
+        return self._process_args(func, 'load', all_errors)
 
     def pre_dump(self, data):
         return data
@@ -280,6 +296,22 @@ class BaseCatalyst:
     def post_load(self, data):
         return data
     post_load.error_key = 'post_load'
+
+    def pre_dump_many(self, data):
+        return data
+    pre_dump_many.error_key = 'pre_dump_many'
+
+    def post_dump_many(self, data):
+        return data
+    post_dump_many.error_key = 'post_dump_many'
+
+    def pre_load_many(self, data):
+        return data
+    pre_load_many.error_key = 'pre_load_many'
+
+    def post_load_many(self, data):
+        return data
+    post_load_many.error_key = 'post_load_many'
 
     def pack(self, data) -> CatalystPacker:
         packer = CatalystPacker()

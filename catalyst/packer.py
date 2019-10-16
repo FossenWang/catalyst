@@ -23,10 +23,12 @@ class CatalystPacker:
 
         valid_data, errors, invalid_data = {}, {}, {}
         for catalyst, data in self.packages:
-            temp = catalyst._base_handle(name, data, raise_error, all_errors)
+            temp = catalyst._process_flow(name, False, data, raise_error, all_errors)
             valid_data.update(temp.valid_data)
-            errors.update(temp.errors)
-            invalid_data.update(temp.invalid_data)
+            if isinstance(temp.errors, dict):
+                errors.update(temp.errors)
+            if isinstance(temp.invalid_data, dict):
+                invalid_data.update(temp.invalid_data)
         result = ResultClass(valid_data, errors, invalid_data)
         return result
 

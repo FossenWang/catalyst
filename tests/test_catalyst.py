@@ -221,8 +221,8 @@ class CatalystTest(TestCase):
         # test valid data
         result = test_catalyst.load(load_data)
         self.assertTrue(result.is_valid)
-        self.assertDictEqual(result.invalid_data, {})
-        self.assertDictEqual(result.errors, {})
+        self.assertFalse(result.errors)
+        self.assertFalse(result.invalid_data)
         self.assertDictEqual(result.valid_data, load_result)
 
         # test invalid data
@@ -303,7 +303,9 @@ class CatalystTest(TestCase):
 
         # wrong handle name
         with self.assertRaises(ValueError):
-            test_catalyst._base_handle(1, {})
+            test_catalyst._process_flow(1, False, {})
+        with self.assertRaises(ValueError):
+            test_catalyst._process_one(1, {}, True)
 
     def test_field_args_for_dump_and_load(self):
         def create_catalyst(**kwargs):
@@ -407,60 +409,80 @@ class CatalystTest(TestCase):
                     raise ValidationError('"max_value" must be larger than "min_value".')
                 return data
 
+            def pre_load_many(self, data):
+                assert len(data) < 3
+                return data
+
         c = C()
 
+        valid_data = {'max_value': 2, 'min_value': 1}
         # dump valid
-        c.dump({'max_value': 2, 'min_value': 1})
+        c.dump(valid_data)
 
         # pre_dump invalid
-        result = c.dump({'max_value': 2, 'min_value': 1, 'xxx': 1})
+        redundant_data = {'max_value': 2, 'min_value': 1, 'xxx': 1}
+        result = c.dump(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('pre_dump' in result.errors)
         with self.assertRaises(ValidationError):
-            c.dump({'max_value': 2, 'min_value': 1, 'xxx': 1}, raise_error=True)
+            c.dump(redundant_data, raise_error=True)
         C.pre_dump.error_key = 'not_allowed_keys'
-        result = c.dump({'max_value': 2, 'min_value': 1, 'xxx': 1})
+        result = c.dump(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
 
         # post_dump invalid
-        result = c.dump({'max_value': 1, 'min_value': 2})
+        invalid_data = {'max_value': 1, 'min_value': 2}
+        result = c.dump(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('post_dump' in result.errors)
         with self.assertRaises(ValidationError):
-            c.dump({'max_value': 1, 'min_value': 2}, raise_error=True)
+            c.dump(invalid_data, raise_error=True)
         C.post_dump.error_key = 'wrong_value'
-        result = c.dump({'max_value': 1, 'min_value': 2})
+        result = c.dump(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('wrong_value' in result.errors)
 
         # load valid
-        result = c.load({'max_value': 2, 'min_value': 1})
+        result = c.load(valid_data)
         self.assertTrue(result.is_valid)
 
         # pre_load invalid
-        result = c.load({'max_value': 2, 'min_value': 1, 'xxx': 1})
+        result = c.load(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('pre_load' in result.errors)
         # pre_load error_key
         C.pre_load.error_key = 'not_allowed_keys'
-        result = c.load({'max_value': 2, 'min_value': 1, 'xxx': 1})
+        result = c.load(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
         # pre_load raise error
         with self.assertRaises(ValidationError) as ctx:
-            c.load({'max_value': 2, 'min_value': 1, 'xxx': 1}, raise_error=True)
+            c.load(redundant_data, raise_error=True)
         self.assertTrue('not_allowed_keys' in ctx.exception.msg.errors)
 
         # post_load invalid
-        result = c.load({'max_value': 1, 'min_value': 2})
+        result = c.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('post_load' in result.errors)
         # post_load error_key
         C.post_load.error_key = 'wrong_value'
-        result = c.load({'max_value': 1, 'min_value': 2})
+        result = c.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('wrong_value' in result.errors)
+
+        # post_load invalid
+        result = c.load_many([valid_data, invalid_data])
+        self.assertFalse(result.is_valid)
+        self.assertTrue('wrong_value' in result.errors[1])
+        self.assertDictEqual(result.invalid_data[1], invalid_data)
+
+        # pre_load_many invalid
+        result = c.load_many([{}, {}, {}])
+        self.assertFalse(result.is_valid)
+        self.assertFalse(result.valid_data)
+        self.assertTrue('pre_load_many' in result.errors)
+        self.assertListEqual(result.invalid_data, [{}, {}, {}])
 
     def test_load_and_dump_args(self):
         class A(Catalyst):
@@ -514,8 +536,8 @@ class CatalystTest(TestCase):
         result = c.load_many(data)
         self.assertTrue(result.is_valid)
         self.assertEqual(result.valid_data, data)
-        self.assertEqual(result.errors, {})
-        self.assertEqual(result.invalid_data, {})
+        self.assertFalse(result.errors)
+        self.assertFalse(result.invalid_data)
 
         result = c.load_many(data, raise_error=True)
         self.assertTrue(result.is_valid)
@@ -540,10 +562,6 @@ class CatalystTest(TestCase):
         result = ctx.exception.msg
         self.assertEqual(set(result.errors), {2})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}})
-
-        # wrong handle name
-        with self.assertRaises(ValueError):
-            test_catalyst._handle_many(1, [])
 
     def test_list_field(self):
         class C(Catalyst):
