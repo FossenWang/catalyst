@@ -200,6 +200,17 @@ class FieldTest(TestCase):
             field.load(None)
         self.assertEqual(ctx.exception.msg, field.error_messages['none'])
 
+        field = ListField(item_field=FloatField(), all_errors=False)
+        with self.assertRaises(ValidationError) as ctx:
+            field.load([1, 'a', 'b'])
+        result = ctx.exception.msg
+        self.assertEqual(set(result.errors), {1})
+        self.assertEqual(result.invalid_data[1], 'a')
+        self.assertEqual(result.valid_data, [1.0])
+
+        with self.assertRaises(ValueError):
+            field.opts._process_many('xxx', None)
+
     def test_callable_field(self):
         field = CallableField(
             name='test_func', func_args=[1, 2], func_kwargs={'c': 3})

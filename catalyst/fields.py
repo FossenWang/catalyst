@@ -292,6 +292,7 @@ class ListField(Field):
             item_field=item_field,
             dump_method=dump_method,
             load_method=load_method,
+            all_errors=all_errors,
             **kwargs)
 
     class Options(Field.Options):
@@ -301,12 +302,12 @@ class ListField(Field):
         all_errors = True
 
         def formatter(self, value: Iterable):
-            return self._base_handle('dump', value)
+            return self._process_many('dump', value)
 
         def parser(self, value: Iterable):
-            return self._base_handle('load', value)
+            return self._process_many('load', value)
 
-        def _base_handle(self, name: str, data: Iterable):
+        def _process_many(self, name: str, data: Iterable):
             if name == 'dump':
                 ResultClass = DumpResult
                 method_name = self.dump_method

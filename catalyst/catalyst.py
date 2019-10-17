@@ -4,7 +4,6 @@ from typing import Dict, Iterable, Callable, Sequence, Any
 from functools import wraps, partial
 from collections import OrderedDict
 
-from .packer import CatalystPacker
 from .fields import Field, NestedField
 from .exceptions import ValidationError
 from .utils import (
@@ -242,7 +241,7 @@ class BaseCatalyst:
         return partial(self._process_args, name=name, all_errors=all_errors)
 
     def dump(self,
-             data,
+             data: Any,
              raise_error: bool = None,
              all_errors: bool = None,
              ) -> DumpResult:
@@ -262,7 +261,7 @@ class BaseCatalyst:
         return self._process_args(func, 'dump', all_errors)
 
     def load(self,
-             data,
+             data: Any,
              raise_error: bool = None,
              all_errors: bool = None,
              ) -> LoadResult:
@@ -312,10 +311,6 @@ class BaseCatalyst:
     def post_load_many(self, data):
         return data
     post_load_many.error_key = 'post_load_many'
-
-    def pack(self, data) -> CatalystPacker:
-        packer = CatalystPacker()
-        return packer.pack(self, data)
 
 
 class CatalystMeta(type):
