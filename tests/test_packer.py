@@ -24,19 +24,18 @@ class PackerTest(TestCase):
             c = FloatField()
 
         a, b, c = A(), B(), C()
-        a_data, b_data, c_data = {'a': 0.0}, {'b': 1.0}, {'c': 2.0}
-        all_data = {'a': 0.0, 'b': 1.0, 'c': 2.0}
-
         packer = CatalystPacker((a, b, c))
-        data = (a_data, b_data, c_data)
 
-        result = packer.dump(data)
-        self.assertTrue(result.is_valid)
-        self.assertDictEqual(result.valid_data, all_data)
+        valid_data = ({'a': 0.0}, {'b': 1.0}, {'c': 2.0})
+        valid_result = {'a': 0.0, 'b': 1.0, 'c': 2.0}
 
-        result = packer.load(data)
+        result = packer.dump(valid_data)
         self.assertTrue(result.is_valid)
-        self.assertDictEqual(result.valid_data, all_data)
+        self.assertDictEqual(result.valid_data, valid_result)
+
+        result = packer.load(valid_data)
+        self.assertTrue(result.is_valid)
+        self.assertDictEqual(result.valid_data, valid_result)
 
         invalid_data = ({'a': 'a'}, {'b': 'b'}, {'c': 'c'})
 
@@ -58,4 +57,51 @@ class PackerTest(TestCase):
         self.assertEqual(set(result.errors), {'a', 'b', 'c'})
 
         with self.assertRaises(ValueError):
-            packer._process_flow('xxx', None)
+            packer._process_flow('xxx', None, None)
+
+        # process many
+        valid_data = [
+            [{'a': 0.0}, {'a': 1.0}, {'a': 2.0}],
+            [{'b': 0.0}, {'b': 1.0}, {'b': 2.0}],
+            [{'c': 0.0}, {'c': 1.0}, {'c': 2.0}],
+        ]
+        valid_result = [
+            {'a': 0.0, 'b': 0.0, 'c': 0.0},
+            {'a': 1.0, 'b': 1.0, 'c': 1.0},
+            {'a': 2.0, 'b': 2.0, 'c': 2.0}
+        ]
+
+        result = packer.dump_many(valid_data)
+        self.assertTrue(result.is_valid)
+        self.assertListEqual(result.valid_data, valid_result)
+
+        result = packer.load_many(valid_data)
+        self.assertTrue(result.is_valid)
+        self.assertListEqual(result.valid_data, valid_result)
+
+        invalid_data = [
+            [{'a': 0.0}, {'a': 1.0}, {'a': 2.0}],
+            [{'b': 0.0}, {'b': 'b'}, {'b': 2.0}],
+            [{'c': 'c'}, {'c': 1.0}, {'c': 2.0}],
+        ]
+
+        result = packer.load_many(invalid_data)
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.invalid_data, {0: {'c': 'c'}, 1: {'b': 'b'}})
+        self.assertListEqual(result.valid_data, [
+            {'a': 0.0, 'b': 0.0},
+            {'a': 1.0, 'c': 1.0},
+            {'a': 2.0, 'b': 2.0, 'c': 2.0}
+        ])
+
+        result = packer.load_many(invalid_data, all_errors=False)
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.invalid_data, {0: {'c': 'c'}})
+        self.assertListEqual(result.valid_data, [{'a': 0.0, 'b': 0.0}])
+
+        with self.assertRaises(ValidationError) as ctx:
+            packer.load_many(invalid_data, raise_error=True, all_errors=False)
+        result = ctx.exception.msg
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.invalid_data, {0: {'c': 'c'}})
+        self.assertListEqual(result.valid_data, [{'a': 0.0, 'b': 0.0}])

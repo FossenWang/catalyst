@@ -210,9 +210,8 @@ class BaseCatalyst:
         valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
         for i, item in enumerate(data):
             result = self._process_flow(name, False, item, False, all_errors)
-            if result.is_valid:
-                valid_data.append(result.valid_data)
-            else:
+            valid_data.append(result.valid_data)
+            if not result.is_valid:
                 errors[i] = result.errors
                 invalid_data[i] = result.invalid_data
                 if not all_errors:
