@@ -45,18 +45,18 @@ class BaseCatalyst:
                 new_fields[key] = fields[key]
         return new_fields
 
-    def __init__(self,
-                 fields: Iterable[str] = None,
-                 raise_error: bool = None,
-                 all_errors: bool = None,
-                 dump_fields: Iterable[str] = None,
-                 dump_from: Callable[[Any, str], Any] = None,
-                 dump_method: str = None,
-                 load_fields: Iterable[str] = None,
-                 load_from: Callable[[Any, str], Any] = None,
-                 load_method: str = None,
-                 **kwargs,
-                 ):
+    def __init__(
+            self,
+            fields: Iterable[str] = None,
+            raise_error: bool = None,
+            all_errors: bool = None,
+            dump_fields: Iterable[str] = None,
+            dump_from: Callable[[Any, str], Any] = None,
+            dump_method: str = None,
+            load_fields: Iterable[str] = None,
+            load_from: Callable[[Any, str], Any] = None,
+            load_method: str = None,
+            **kwargs):
         if not fields:
             fields = set(self._field_dict.keys())
         if not dump_fields:
@@ -115,13 +115,13 @@ class BaseCatalyst:
         return valid_data, errors, invalid_data
 
     def _process_flow(
-                self,
-                name: str,
-                many: bool,
-                data: Any,
-                raise_error: bool = None,
-                all_errors: bool = None,
-                ) -> CatalystResult:
+            self,
+            name: str,
+            many: bool,
+            data: Any,
+            raise_error: bool = None,
+            all_errors: bool = None,
+        ) -> CatalystResult:
         """Core basic process flow.
         """
         if name == 'dump':
@@ -218,11 +218,9 @@ class BaseCatalyst:
                     break
         return valid_data, errors, invalid_data
 
-    def _process_args(self,
-                      func: Callable = None,
-                      name: str = None,
-                      all_errors: bool = None,
-                      ) -> Callable:
+    def _process_args(
+            self, func: Callable = None, name: str = None, all_errors: bool = None,
+        ) -> Callable:
         """Decorator for handling args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
         If args are invalid, error will be raised. In general, `*args` should
@@ -239,44 +237,42 @@ class BaseCatalyst:
             return wrapper
         return partial(self._process_args, name=name, all_errors=all_errors)
 
-    def dump(self,
-             data: Any,
-             raise_error: bool = None,
-             all_errors: bool = None,
-             ) -> DumpResult:
+    def dump(
+            self,
+            data: Any,
+            raise_error: bool = None,
+            all_errors: bool = None,
+        ) -> DumpResult:
         return self._process_flow('dump', False, data, raise_error, all_errors)
 
-    def load(self,
-             data: Any,
-             raise_error: bool = None,
-             all_errors: bool = None,
-             ) -> LoadResult:
+    def load(
+            self,
+            data: Any,
+            raise_error: bool = None,
+            all_errors: bool = None,
+        ) -> LoadResult:
         return self._process_flow('load', False, data, raise_error, all_errors)
 
-    def dump_many(self,
-                  data: Sequence,
-                  raise_error: bool = None,
-                  all_errors: bool = None,
-                  ) -> DumpResult:
+    def dump_many(
+            self,
+            data: Sequence,
+            raise_error: bool = None,
+            all_errors: bool = None,
+        ) -> DumpResult:
         return self._process_flow('dump', True, data, raise_error, all_errors)
 
-    def load_many(self,
-                  data: Sequence,
-                  raise_error: bool = None,
-                  all_errors: bool = None,
-                  ) -> LoadResult:
+    def load_many(
+            self,
+            data: Sequence,
+            raise_error: bool = None,
+            all_errors: bool = None,
+        ) -> LoadResult:
         return self._process_flow('load', True, data, raise_error, all_errors)
 
-    def dump_args(self,
-                  func: Callable = None,
-                  all_errors: bool = None,
-                  ) -> Callable:
+    def dump_args(self, func: Callable = None, all_errors: bool = None) -> Callable:
         return self._process_args(func, 'dump', all_errors)
 
-    def load_args(self,
-                  func: Callable = None,
-                  all_errors: bool = None,
-                  ) -> Callable:
+    def load_args(self, func: Callable = None, all_errors: bool = None) -> Callable:
         return self._process_args(func, 'load', all_errors)
 
     def pre_dump(self, data):

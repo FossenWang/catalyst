@@ -22,10 +22,11 @@ class LengthValidator(Validator):
     includ keys ('too_small', 'too_large')
     """
 
-    def __init__(self,
-                 min_length: int = None,
-                 max_length: int = None,
-                 error_messages: dict = None):
+    def __init__(
+            self,
+            min_length: int = None,
+            max_length: int = None,
+            error_messages: dict = None):
         if min_length is not None and max_length is not None \
             and min_length > max_length:
             raise ValueError('`min_length` can\'t be greater than `max_length`.')
@@ -54,10 +55,11 @@ class ComparisonValidator(Validator):
     includ keys ('too_small', 'too_large')
     """
 
-    def __init__(self,
-                 min_value=None,
-                 max_value=None,
-                 error_messages: dict = None):
+    def __init__(
+            self,
+            min_value=None,
+            max_value=None,
+            error_messages: dict = None):
         if min_value is not None and max_value is not None \
             and min_value > max_value:
             raise ValueError('`min_value` can\'t be greater than `max_value`.')

@@ -44,24 +44,24 @@ class Field(ErrorMessageMixin):
         validators = None  # type: list
         allow_none = True
 
-    def __init__(self,
-                 name: str = None,
-                 key: str = None,
-                 formatter: FormatterType = None,
-                 format_none: bool = None,
-                 dump_required: bool = None,
-                 dump_default: Any = missing,
-                 no_dump: bool = None,
-                 parser: ParserType = None,
-                 parse_none: bool = None,
-                 load_required: bool = None,
-                 load_default: Any = missing,
-                 no_load: bool = None,
-                 validators: MultiValidator = None,
-                 allow_none: bool = None,
-                 error_messages: dict = None,
-                 **kwargs,
-                 ):
+    def __init__(
+            self,
+            name: str = None,
+            key: str = None,
+            formatter: FormatterType = None,
+            format_none: bool = None,
+            dump_required: bool = None,
+            dump_default: Any = missing,
+            no_dump: bool = None,
+            parser: ParserType = None,
+            parse_none: bool = None,
+            load_required: bool = None,
+            load_default: Any = missing,
+            no_load: bool = None,
+            validators: MultiValidator = None,
+            allow_none: bool = None,
+            error_messages: dict = None,
+            **kwargs):
         """if `default` is set, `required` has no effect."""
         self.name = name
         self.key = key
@@ -260,10 +260,7 @@ class DateField(DatetimeField):
 
 
 class CallableField(Field):
-    def __init__(self,
-                 func_args: Iterable = None,
-                 func_kwargs: Mapping = None,
-                 **kwargs):
+    def __init__(self, func_args: Iterable = None, func_kwargs: Mapping = None, **kwargs):
         kwargs.pop('no_load', None)
         super().__init__(no_load=True, **kwargs)
         if func_args is None:
@@ -282,12 +279,13 @@ class CallableField(Field):
 
 
 class ListField(Field):
-    def __init__(self,
-                 item_field: Field,
-                 dump_method: str = None,
-                 load_method: str = None,
-                 all_errors: bool = None,
-                 **kwargs):
+    def __init__(
+            self,
+            item_field: Field,
+            dump_method: str = None,
+            load_method: str = None,
+            all_errors: bool = None,
+            **kwargs):
         super().__init__(
             item_field=item_field,
             dump_method=dump_method,

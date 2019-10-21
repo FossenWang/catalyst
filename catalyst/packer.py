@@ -9,24 +9,25 @@ class CatalystPacker:
     raise_error = False
     all_errors = True
 
-    def __init__(self,
-                 catalysts: Sequence = None,
-                 raise_error: bool = None,
-                 all_errors: bool = None,
-                 ):
+    def __init__(
+            self,
+            catalysts: Sequence = None,
+            raise_error: bool = None,
+            all_errors: bool = None):
         self.catalysts = [] if catalysts is None else catalysts
         if raise_error is not None:
             self.raise_error = raise_error
         if all_errors is not None:
             self.all_errors = all_errors
 
-    def _process_flow(self,
-                      name: str,
-                      many: bool,
-                      data: Sequence,
-                      raise_error: bool = None,
-                      all_errors: bool = None,
-                      ) -> CatalystResult:
+    def _process_flow(
+            self,
+            name: str,
+            many: bool,
+            data: Sequence,
+            raise_error: bool = None,
+            all_errors: bool = None,
+        ) -> CatalystResult:
         if name == 'dump':
             ResultClass = DumpResult
         elif name == 'load':
@@ -84,18 +85,20 @@ class CatalystPacker:
                     break
         return valid_data, errors, invalid_data
 
-    def dump(self,
-             data: Sequence,
-             raise_error: bool = None,
-             all_errors: bool = None,
-             ) -> DumpResult:
+    def dump(
+            self,
+            data: Sequence,
+            raise_error: bool = None,
+            all_errors: bool = None,
+        ) -> DumpResult:
         return self._process_flow('dump', False, data, raise_error, all_errors)
 
-    def load(self,
-             data: Sequence,
-             raise_error: bool = None,
-             all_errors: bool = None,
-             ) -> LoadResult:
+    def load(
+            self,
+            data: Sequence,
+            raise_error: bool = None,
+            all_errors: bool = None,
+        ) -> LoadResult:
         return self._process_flow('load', False, data, raise_error, all_errors)
 
     def dump_many(
@@ -106,9 +109,10 @@ class CatalystPacker:
         ) -> DumpResult:
         return self._process_flow('dump', True, data, raise_error, all_errors)
 
-    def load_many(self,
-                  data: Sequence,
-                  raise_error: bool = None,
-                  all_errors: bool = None,
-                  ) -> LoadResult:
+    def load_many(
+            self,
+            data: Sequence,
+            raise_error: bool = None,
+            all_errors: bool = None,
+        ) -> LoadResult:
         return self._process_flow('load', True, data, raise_error, all_errors)
