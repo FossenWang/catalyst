@@ -246,19 +246,6 @@ class BaseCatalyst:
              ) -> DumpResult:
         return self._process_flow('dump', False, data, raise_error, all_errors)
 
-    def dump_many(self,
-                  data: Sequence,
-                  raise_error: bool = None,
-                  all_errors: bool = None,
-                  ) -> DumpResult:
-        return self._process_flow('dump', True, data, raise_error, all_errors)
-
-    def dump_args(self,
-                  func: Callable = None,
-                  all_errors: bool = None,
-                  ) -> Callable:
-        return self._process_args(func, 'dump', all_errors)
-
     def load(self,
              data: Any,
              raise_error: bool = None,
@@ -266,12 +253,25 @@ class BaseCatalyst:
              ) -> LoadResult:
         return self._process_flow('load', False, data, raise_error, all_errors)
 
+    def dump_many(self,
+                  data: Sequence,
+                  raise_error: bool = None,
+                  all_errors: bool = None,
+                  ) -> DumpResult:
+        return self._process_flow('dump', True, data, raise_error, all_errors)
+
     def load_many(self,
                   data: Sequence,
                   raise_error: bool = None,
                   all_errors: bool = None,
                   ) -> LoadResult:
         return self._process_flow('load', True, data, raise_error, all_errors)
+
+    def dump_args(self,
+                  func: Callable = None,
+                  all_errors: bool = None,
+                  ) -> Callable:
+        return self._process_args(func, 'dump', all_errors)
 
     def load_args(self,
                   func: Callable = None,
@@ -316,8 +316,9 @@ class CatalystMeta(type):
     def __new__(cls, name, bases, attrs):
         new_cls = type.__new__(cls, name, bases, attrs)
 
-        # collect fields to cls._field_dict
         fields = {}  # type: FieldDict
+        # inherit fields
+        fields.update(new_cls._field_dict)
         for attr, value in attrs.items():
             # init calalyst object
             if isinstance(value, cls):
@@ -334,8 +335,6 @@ class CatalystMeta(type):
                     value.key = new_cls._format_field_key(attr)
                 fields[attr] = value
 
-        # inherit fields
-        fields.update(new_cls._field_dict)
         new_cls._field_dict = fields
         return new_cls
 

@@ -41,19 +41,24 @@ class CatalystTest(TestCase):
     def test_inherit(self):
         class A(Catalyst):
             a = Field()
+            b = Field()
 
         class B(A):
-            b = Field()
+            b = IntegerField()
+            c = FloatField()
 
         a = A()
         b = B()
 
-        self.assertTrue(hasattr(a, 'a'))
-        self.assertTrue(hasattr(b, 'a'))
-        self.assertTrue(hasattr(b, 'b'))
-        self.assertEqual(b.a, a.a)
+        self.assertEqual(set(a._field_dict), {'a', 'b'})
+        self.assertEqual(set(b._field_dict), {'a', 'b', 'c'})
+        self.assertIsInstance(a._field_dict['b'], Field)
+        self.assertIsInstance(b._field_dict['b'], IntegerField)
 
         data = {'a': 'a', 'b': 'b'}
+        self.assertDictEqual(a.dump(data).valid_data, data)
+
+        data = {'a': 'a', 'b': 1, 'c': 1.0}
         self.assertDictEqual(b.dump(data).valid_data, data)
 
     def test_change_field_name_and_key_naming_style(self):
