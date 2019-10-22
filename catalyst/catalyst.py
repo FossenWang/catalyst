@@ -1,6 +1,6 @@
 import inspect
 
-from typing import Dict, Iterable, Callable, Sequence, Any
+from typing import Dict, Iterable, Callable, Sequence, Any, Tuple
 from functools import wraps, partial
 from collections import OrderedDict
 
@@ -45,8 +45,13 @@ class BaseCatalyst:
                 new_fields[key] = fields[key]
         return new_fields
 
+    @staticmethod
+    def _set_fields(cls_or_obj, attrs):
+        raise NotImplementedError()
+
     def __init__(
             self,
+            schema: Any = None,
             fields: Iterable[str] = None,
             raise_error: bool = None,
             all_errors: bool = None,
@@ -57,6 +62,11 @@ class BaseCatalyst:
             load_from: Callable[[Any, str], Any] = None,
             load_method: str = None,
             **kwargs):
+        # set fields from a non `Catalyst` class, which can avoid override
+        if schema:
+            attrs = ((attr, getattr(schema, attr)) for attr in dir(schema))
+            self._set_fields(self, attrs)
+
         if not fields:
             fields = set(self._field_dict.keys())
         if not dump_fields:
@@ -309,31 +319,45 @@ class BaseCatalyst:
 
 
 class CatalystMeta(type):
+    """Metaclass for `Catalyst` class. Binds fields to `_field_dict` attribute."""
+
     def __new__(cls, name, bases, attrs):
         new_cls = type.__new__(cls, name, bases, attrs)
-
-        fields = {}  # type: FieldDict
-        # inherit fields
-        fields.update(new_cls._field_dict)
-        for attr, value in attrs.items():
-            # init calalyst object
-            if isinstance(value, cls):
-                value = value()
-            # wrap catalyst object as NestedField
-            if isinstance(value, BaseCatalyst):
-                value = NestedField(value)
-                setattr(new_cls, attr, value)
-            # automatic generate field name or key
-            if isinstance(value, Field):
-                if value.name is None:
-                    value.name = new_cls._format_field_name(attr)
-                if value.key is None:
-                    value.key = new_cls._format_field_key(attr)
-                fields[attr] = value
-
-        new_cls._field_dict = fields
+        new_cls._set_fields(new_cls, attrs.items())
         return new_cls
 
 
 class Catalyst(BaseCatalyst, metaclass=CatalystMeta):
     __doc__ = BaseCatalyst.__doc__
+
+    @staticmethod
+    def _set_fields(cls_or_obj: BaseCatalyst, attrs: Iterable[Tuple[str, Any]]):
+        """Set fields for `Catalyst` class or its instance.
+        Fields are bond to `cls_or_obj._field_dict` which are set separately
+        on class or its instance, which works like class inheritance.
+
+        :param cls_or_obj: `Catalyst` class or its instance
+        :param attrs: iterable which contains name, field pairs
+            [(name, Field), ...]
+        """
+        fields = {}  # type: FieldDict
+        # inherit fields
+        fields.update(cls_or_obj._field_dict)
+
+        for attr, value in attrs:
+            # init calalyst object
+            if isinstance(value, CatalystMeta):
+                value = value()
+            # wrap catalyst object as NestedField
+            if isinstance(value, BaseCatalyst):
+                value = NestedField(value)
+            # automatic generate field name or key
+            if isinstance(value, Field):
+                if value.name is None:
+                    value.name = cls_or_obj._format_field_name(attr)
+                if value.key is None:
+                    value.key = cls_or_obj._format_field_key(attr)
+
+                fields[attr] = value
+
+        cls_or_obj._field_dict = fields

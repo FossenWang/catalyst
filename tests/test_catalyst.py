@@ -193,6 +193,31 @@ class CatalystTest(TestCase):
         with self.assertRaises(TypeError):
             TestDataCatalyst(load_from='wrong')
 
+    def test_set_fields_by_non_class_inheritance(self):
+        # set fields from a non `Catalyst` class when instantiate
+        class Schema:
+            a = StringField()
+            b = FloatField()
+        catalyst = Catalyst(Schema)
+        fields = catalyst._field_dict
+        self.assertEqual(fields['a'], Schema.a)
+        self.assertEqual(fields['b'], Schema.b)
+
+        # instance works
+        catalyst = TestDataCatalyst(Schema())
+        fields = catalyst._field_dict
+        self.assertEqual(fields['a'], Schema.a)
+        self.assertEqual(fields['b'], Schema.b)
+
+        # inheritance works
+        class Schema2:
+            a = StringField()
+            string = FloatField()
+        catalyst = TestDataCatalyst(Schema2)
+        fields = catalyst._field_dict
+        self.assertEqual(fields['string'], Schema2.string)
+        self.assertNotEqual(fields['string'], TestDataCatalyst.string)
+
     def test_base_dump_and_load(self):
         "Test dumping and loading data."
         # test dump
