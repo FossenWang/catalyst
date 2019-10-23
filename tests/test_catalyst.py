@@ -1,11 +1,10 @@
 from unittest import TestCase
 
-from catalyst import Catalyst
+from catalyst.catalyst import Catalyst, BaseCatalyst
 from catalyst.fields import Field, StringField, IntegerField, \
     FloatField, BoolField, CallableField, ListField
 from catalyst.exceptions import ValidationError
-from catalyst.utils import get_item, \
-    snake_to_camel
+from catalyst.utils import get_item, snake_to_camel
 
 
 class TestData:
@@ -194,20 +193,36 @@ class CatalystTest(TestCase):
             TestDataCatalyst(load_from='wrong')
 
     def test_set_fields_by_non_class_inheritance(self):
+        # test fields from class inheritance
+        self.assertNotIn('schema', repr(test_catalyst))
+        self.assertIsNone(test_catalyst.opts.schema)
+        self.assertIs(test_catalyst.integer, test_catalyst._field_dict['integer'])
+
         # set fields from a non `Catalyst` class when instantiate
         class Schema:
             a = StringField()
             b = FloatField()
+
+            @staticmethod
+            @b.set_formatter
+            def test(value):
+                return value
+
         catalyst = Catalyst(Schema)
         fields = catalyst._field_dict
-        self.assertEqual(fields['a'], Schema.a)
-        self.assertEqual(fields['b'], Schema.b)
+        self.assertIn('schema', repr(catalyst))
+        self.assertIs(fields['a'], Schema.a)
+        self.assertIs(fields['b'], Schema.b)
+        # setting opts of field works
+        self.assertIsNone(Schema.b.opts.formatter(None))
+        self.assertIs(Schema.b.opts.formatter, Schema.test)
 
-        # instance works
+        # instance also works
         catalyst = TestDataCatalyst(Schema())
         fields = catalyst._field_dict
-        self.assertEqual(fields['a'], Schema.a)
-        self.assertEqual(fields['b'], Schema.b)
+        self.assertIn('schema', repr(catalyst))
+        self.assertIs(fields['a'], Schema.a)
+        self.assertIs(fields['b'], Schema.b)
 
         # inheritance works
         class Schema2:
@@ -215,8 +230,11 @@ class CatalystTest(TestCase):
             string = FloatField()
         catalyst = TestDataCatalyst(Schema2)
         fields = catalyst._field_dict
-        self.assertEqual(fields['string'], Schema2.string)
-        self.assertNotEqual(fields['string'], TestDataCatalyst.string)
+        self.assertIs(fields['string'], Schema2.string)
+        self.assertIsNot(fields['string'], TestDataCatalyst.string)
+
+        with self.assertRaises(NotImplementedError):
+            BaseCatalyst._set_fields(1, 1)
 
     def test_base_dump_and_load(self):
         "Test dumping and loading data."

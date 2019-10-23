@@ -27,6 +27,7 @@ class BaseCatalyst:
 
         raise_error = False
         all_errors = True
+        schema = None
 
     @staticmethod
     def _format_field_key(key):
@@ -83,6 +84,7 @@ class BaseCatalyst:
             lambda k: not self._field_dict[k].opts.no_load)
 
         self.opts = self.Options(
+            schema=schema,
             raise_error=raise_error,
             all_errors=all_errors,
             dump_from=dump_from,
@@ -103,6 +105,20 @@ class BaseCatalyst:
 
         if self.opts.load_method not in {'load', 'parse', 'validate'}:
             raise ValueError("Argument `method` must be in ('load', 'parse', 'validate').")
+
+    def __repr__(self):
+        args = []
+        schema = self.opts.schema
+        if schema:
+            if isinstance(schema, type):
+                schema = self.opts.schema.__name__
+            else:
+                schema = self.opts.schema.__class__.__name__
+            args.append(f'schema={schema}')
+        args.append(f'raise_error={self.opts.raise_error}')
+        args.append(f'all_errors={self.opts.all_errors}')
+        args = ', '.join(args)
+        return f'<{self.__class__.__name__}({args})>'
 
     def _side_effect(self, name: str, data: Any):
         """Do side effect before or after processs.
