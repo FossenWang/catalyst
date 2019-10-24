@@ -1,5 +1,5 @@
 from unittest import TestCase
-from datetime import datetime, time, date, timedelta
+from datetime import datetime, timedelta
 
 from catalyst import Catalyst
 from catalyst.fields import (
@@ -13,6 +13,7 @@ from catalyst.exceptions import ValidationError
 
 class FieldTest(TestCase):
     def test_field(self):
+        # test set field opts in class
         class A:
             fixed_value = Field(validators=[])
 
@@ -37,10 +38,9 @@ class FieldTest(TestCase):
             def less_than(value):
                 assert value < 100
 
-        # test dump
-        field_1 = Field(formatter=A.fixed_value_formatter)
-        self.assertEqual(field_1.opts.formatter, A.fixed_value_formatter)
         a = A()
+
+        # test dump
         self.assertEqual(a.fixed_value.format(1000), 1)
         with self.assertRaises(AssertionError):
             a.fixed_value.dump(1000)
@@ -71,10 +71,17 @@ class FieldTest(TestCase):
         with self.assertRaises(TypeError):
             a.fixed_value.set_parser(1)
 
+        # test set opts when init field
+        field = Field(
+            formatter=A.fixed_value_formatter,
+            parser=a.fixed_value.opts.parser)
+        self.assertEqual(field.opts.formatter, A.fixed_value_formatter)
+        self.assertEqual(field.opts.parser, A.fixed_value_add_1)
+
         # test error msg
-        field_3 = Field(key='a', allow_none=False, error_messages={'none': '666'})
+        field = Field(key='a', allow_none=False, error_messages={'none': '666'})
         with self.assertRaises(ValidationError) as ctx:
-            field_3.load(None)
+            field.load(None)
         self.assertEqual(ctx.exception.msg, '666')
 
     def test_string_field(self):
@@ -235,15 +242,11 @@ class FieldTest(TestCase):
     def test_datetime_field(self):
         dt = datetime(2019, 1, 1)
         invalid_dt = dt + timedelta(days=1, seconds=1)
-        self.base_test_datetime_field(
-            dt, invalid_dt, datetime, DatetimeField, '%Y%m%d%H%M%S')
-        self.base_test_datetime_field(
-            dt.time(), invalid_dt.time(), time, TimeField, '%H%M%S')
-        self.base_test_datetime_field(
-            dt.date(), invalid_dt.date(), date, DateField, '%Y%m%d')
+        self.base_test_datetime_field(dt, invalid_dt, DatetimeField, '%Y%m%d%H%M%S')
+        self.base_test_datetime_field(dt.time(), invalid_dt.time(), TimeField, '%H%M%S')
+        self.base_test_datetime_field(dt.date(), invalid_dt.date(), DateField, '%Y%m%d')
 
-    def base_test_datetime_field(
-            self, dt, invalid_dt, type_, FieldClass, fmt):
+    def base_test_datetime_field(self, dt, invalid_dt, FieldClass, fmt):
         # dump
         field = FieldClass()
         dt_str = field.dump(dt)

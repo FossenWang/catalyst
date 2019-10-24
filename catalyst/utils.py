@@ -80,7 +80,7 @@ class OptionBox:
 
     def get(self, **kwargs):
         if len(kwargs) != 1:
-            raise ValueError('Only accept one pairs of kwargs.')
+            raise ValueError('Only accept a pair of kwargs.')
         for key, value in kwargs.items():
             if value is None:
                 return getattr(self, key)

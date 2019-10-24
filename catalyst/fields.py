@@ -79,8 +79,10 @@ class Field(ErrorMessageMixin):
             self.opts.dump_default = dump_default
         if load_default is not missing:
             self.opts.load_default = load_default
-        self.set_formatter(self.opts.get(formatter=formatter))
-        self.set_parser(self.opts.get(parser=parser))
+        if formatter is not None:
+            self.set_formatter(formatter)
+        if parser is not None:
+            self.set_parser(parser)
         self.set_validators(self.opts.get(validators=validators))
         self.collect_error_messages(error_messages)
 
@@ -263,10 +265,8 @@ class CallableField(Field):
     def __init__(self, func_args: Iterable = None, func_kwargs: Mapping = None, **kwargs):
         kwargs.pop('no_load', None)
         super().__init__(no_load=True, **kwargs)
-        if func_args is None:
-            func_args = tuple()
-        if func_kwargs is None:
-            func_kwargs = {}
+        func_args = self.opts.get(func_kwargs=func_args)
+        func_kwargs = self.opts.get(func_kwargs=func_kwargs)
         self.set_args(*func_args, **func_kwargs)
 
     def set_args(self, *args, **kwargs):
@@ -274,6 +274,9 @@ class CallableField(Field):
         self.opts.func_kwargs = kwargs
 
     class Options(Field.Options):
+        func_args = tuple()
+        func_kwargs = {}
+
         def formatter(self, func: Callable):
             return func(*self.func_args, **self.func_kwargs)
 
