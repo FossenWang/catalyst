@@ -5,8 +5,9 @@ from datetime import datetime, time, date
 from collections import OrderedDict
 
 from .utils import (
-    ErrorMessageMixin, missing, no_processing, OptionBox,
-    DumpResult, LoadResult
+    DumpResult, LoadResult,
+    ErrorMessageMixin, ERROR_MESSAGES,
+    missing, no_processing, OptionBox,
 )
 from .validators import (
     LengthValidator,
@@ -23,11 +24,6 @@ MultiValidator = Union[ValidatorType, Iterable[ValidatorType]]
 
 
 class Field(ErrorMessageMixin):
-    default_error_messages = {
-        'required': 'Missing data for required field.',
-        'none': 'Field may not be None.'
-    }
-
     class Options(OptionBox):
         formatter = staticmethod(no_processing)
         format_none = False
@@ -167,6 +163,11 @@ class Field(ErrorMessageMixin):
         if callable(default):
             default = default()
         return default
+
+ERROR_MESSAGES[Field] = {
+    'required': 'Missing data for required field.',
+    'none': 'Field may not be None.',
+}
 
 
 class StringField(Field):

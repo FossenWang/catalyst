@@ -1,8 +1,6 @@
 """Validators"""
 
-from typing import Sequence
-
-from .utils import ErrorMessageMixin
+from .utils import ErrorMessageMixin, ERROR_MESSAGES
 
 
 class Validator(ErrorMessageMixin):
@@ -18,9 +16,10 @@ class Validator(ErrorMessageMixin):
 class LengthValidator(Validator):
     """
     Compares length between values.
-    error_messages:
-    includ keys ('too_small', 'too_large')
+
+    :param error_messages: includ keys {'too_short', 'too_long'}
     """
+    error_messages = {}
 
     def __init__(
             self,
@@ -35,26 +34,24 @@ class LengthValidator(Validator):
         self.max_length = max_length
         super().__init__(error_messages)
 
-        if min_length is not None:
-            self.error_messages.setdefault('too_small', f'Ensure length >= {min_length}.')
-        if max_length is not None:
-            self.error_messages.setdefault('too_large', f'Ensure length <= {max_length}.')
-
     def __call__(self, value):
         if self.min_length is not None and len(value) < self.min_length:
-            self.error('too_small')
+            self.error('too_short')
 
         if self.max_length is not None and len(value) > self.max_length:
-            self.error('too_large')
+            self.error('too_long')
+
+ERROR_MESSAGES[LengthValidator] = {
+    'too_short': 'Ensure length >= {self.min_length}.',
+    'too_long': 'Ensure length <= {self.max_length}.',
+}
 
 
 class ComparisonValidator(Validator):
-    """
-    Compare between values.
-    error_messages:
-    includ keys ('too_small', 'too_large')
-    """
+    """Compare between values.
 
+    :param error_messages: includ keys {'too_small', 'too_large'}
+    """
     def __init__(
             self,
             min_value=None,
@@ -68,11 +65,6 @@ class ComparisonValidator(Validator):
         self.max_value = max_value
         super().__init__(error_messages)
 
-        if min_value is not None:
-            self.error_messages.setdefault('too_small', f'Ensure value >= {min_value}.')
-        if max_value is not None:
-            self.error_messages.setdefault('too_large', f'Ensure value <= {max_value}.')
-
     def __call__(self, value):
         if self.min_value is not None and value < self.min_value:
             self.error('too_small')
@@ -80,17 +72,26 @@ class ComparisonValidator(Validator):
         if self.max_value is not None and value > self.max_value:
             self.error('too_large')
 
+ERROR_MESSAGES[ComparisonValidator] = {
+    'too_small': 'Ensure value >= {self.min_value}.',
+    'too_large': 'Ensure value <= {self.max_value}.',
+}
+
 
 class TypeValidator(Validator):
+    """Check type of value.
+
+    :param error_messages: includ keys {'wrong_type'}
+    """
     def __init__(self, class_or_tuple, error_messages: dict = None):
         self.class_or_tuple = class_or_tuple
         super().__init__(error_messages)
-        if isinstance(class_or_tuple, Sequence):
-            msg = f'Type must be one of {class_or_tuple}.'
-        else:
-            msg = f'Type must be {class_or_tuple}.'
-        self.error_messages.setdefault('wrong_type', msg)
 
     def __call__(self, value):
         if not isinstance(value, self.class_or_tuple):
-            self.error('wrong_type', TypeError)
+            error = self.get_error('wrong_type')
+            raise TypeError(error.msg)
+
+ERROR_MESSAGES[TypeValidator] = {
+    'wrong_type': 'Type must be {self.class_or_tuple}.',
+}

@@ -3,7 +3,7 @@ from unittest import TestCase
 from catalyst.exceptions import ValidationError
 from catalyst.utils import (
     snake_to_camel, ErrorMessageMixin, CatalystResult,
-    missing, OptionBox
+    missing, OptionBox, ERROR_MESSAGES,
 )
 
 
@@ -18,10 +18,15 @@ class UtilsTest(TestCase):
 
     def test_error_msg(self):
         class A(ErrorMessageMixin):
-            default_error_messages = {'a': 'a'}
+            pass
 
         class B(A):
-            default_error_messages = {'b': 'b'}
+            pass
+
+        ERROR_MESSAGES.update({
+            A: {'a': 'a'},
+            B: {'b': 'b'},
+        })
 
         b = B()
         b.collect_error_messages({'c': 'c'})
@@ -31,14 +36,35 @@ class UtilsTest(TestCase):
             b.error('b')
         self.assertEqual(str(context.exception), 'b')
 
-        with self.assertRaises(ValidationError) as context:
+        with self.assertRaises(AssertionError) as context:
             b.error('x')
-        self.assertEqual(str(context.exception), b.unknown_error)
+        self.assertTrue(str(context.exception).startswith(
+            'Error key `x` does not exist in the `error_messages` dict'))
 
         b.collect_error_messages({'b': 'bb'})
         with self.assertRaises(ValidationError) as context:
             b.error('b')
         self.assertEqual(str(context.exception), 'bb')
+
+        # test global error messages
+        a = A()
+
+        ERROR_MESSAGES.update({
+            ErrorMessageMixin: {1: 1},
+        })
+        a.collect_error_messages()
+        self.assertDictEqual(a.error_messages, {'a': 'a', 1: 1})
+
+        ERROR_MESSAGES.update({
+            A: {2: 2, 'a': 'aaaaa'},
+        })
+        a.collect_error_messages()
+        self.assertDictEqual(a.error_messages, {'a': 'aaaaa', 1: 1, 2: 2})
+
+        del ERROR_MESSAGES[A]
+        del ERROR_MESSAGES[ErrorMessageMixin]
+        a.collect_error_messages()
+        self.assertDictEqual(a.error_messages, {})
 
     def test_catalyst_result(self):
         result = CatalystResult({}, {}, {})

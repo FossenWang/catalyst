@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 from catalyst.exceptions import ValidationError
+from catalyst.utils import ERROR_MESSAGES
 from catalyst.validators import (
     Validator, LengthValidator,
     ComparisonValidator, TypeValidator
@@ -14,9 +15,12 @@ class ValidationTest(TestCase):
             Validator()(None)
 
         class NewValidator(Validator):
-            default_error_messages = {'msg': 'default'}
             def __call__(self, value):
                 raise ValidationError(self.error_messages['msg'])
+
+        ERROR_MESSAGES.update({
+            NewValidator: {'msg': 'default'}
+        })
 
         # test alterable error messages
         default_validator = NewValidator()
@@ -30,10 +34,8 @@ class ValidationTest(TestCase):
         self.assertEqual(str(c.exception), 'custom')
         self.assertEqual(repr(c.exception), "ValidationError('custom')")
 
-        self.assertDictEqual(NewValidator.default_error_messages, {'msg': 'default'})
-
     def test_comparison_validator(self):
-        ComparisonValidator.default_error_messages = {'too_small': 'too_small'}
+        ERROR_MESSAGES[ComparisonValidator].update({'too_small': 'too_small'})
         compare_integer = ComparisonValidator(0, 100, {'too_large': 'too_large'})
         compare_integer(1)
         compare_integer(0)
@@ -69,8 +71,8 @@ class ValidationTest(TestCase):
             ComparisonValidator(1, 0)
 
     def test_length_validator(self):
-        LengthValidator.default_error_messages = {'too_small': 'too_small'}
-        validator = LengthValidator(2, 10, {'too_large': 'too_large'})
+        ERROR_MESSAGES[LengthValidator].update({'too_short': 'too_short'})
+        validator = LengthValidator(2, 10, {'too_long': 'too_long'})
 
         validator('x' * 2)
         validator('x' * 5)
@@ -78,10 +80,10 @@ class ValidationTest(TestCase):
         validator(['xzc', 1])
         with self.assertRaises(ValidationError) as c:
             validator('x')
-        self.assertEqual(str(c.exception), 'too_small')
+        self.assertEqual(str(c.exception), 'too_short')
         with self.assertRaises(ValidationError) as c:
             validator('x' * 11)
-        self.assertEqual(str(c.exception), 'too_large')
+        self.assertEqual(str(c.exception), 'too_long')
         with self.assertRaises(ValidationError):
             validator('')
         with self.assertRaises(TypeError):

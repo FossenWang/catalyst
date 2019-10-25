@@ -44,11 +44,13 @@ class LoadResult(CatalystResult):
     pass
 
 
-class ErrorMessageMixin:
-    default_error_class = ValidationError
-    default_error_messages = {}
-    unknown_error = "Unknown error."
+# global error messages, {'class': {'error_key': 'error_message'}}
+ERROR_MESSAGES = {}
+UNKNOWN_ERROR_MESSAGE = (
+    'Error key `{key}` does not exist in the `error_messages` dict of `{self}`.'
+)
 
+class ErrorMessageMixin:
     def collect_error_messages(self, error_messages: dict = None):
         """
         Collect default error message from self and parent classes.
@@ -58,18 +60,21 @@ class ErrorMessageMixin:
         """
         messages = {}
         for cls in reversed(self.__class__.__mro__):
-            messages.update(getattr(cls, 'default_error_messages', {}))
+            messages.update(ERROR_MESSAGES.get(cls, {}))
         messages.update(error_messages or {})
         self.error_messages = messages
 
-    def error(self, error_key: str, error_class=None):
-        raise self.get_error(error_key, error_class)
+    def error(self, error_key: str, **kwargs):
+        raise self.get_error(error_key, **kwargs)
 
-    def get_error(self, error_key: str, error_class=None):
-        if not error_class:
-            error_class = self.default_error_class
-        return error_class(
-            self.error_messages.get(error_key, self.unknown_error))
+    def get_error(self, error_key: str, **kwargs):
+        try:
+            msg = self.error_messages[error_key]
+        except KeyError:
+            raise AssertionError(UNKNOWN_ERROR_MESSAGE.format(self=self, key=error_key))
+
+        msg = str(msg).format(self=self, **kwargs)
+        return ValidationError(msg)
 
 
 class OptionBox:

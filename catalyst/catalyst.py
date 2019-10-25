@@ -38,8 +38,9 @@ class BaseCatalyst:
         return name
 
     @staticmethod
-    def _copy_fields(fields: FieldDict, keys: Iterable[str],
-                     is_copying: Callable[[str], bool]) -> FieldDict:
+    def _copy_fields(
+            fields: FieldDict, keys: Iterable[str],
+            is_copying: Callable[[str], bool]) -> FieldDict:
         new_fields = {}  # type: FieldDict
         for key in keys:
             if is_copying(key):
@@ -185,13 +186,13 @@ class BaseCatalyst:
         if name == 'dump':
             source_attr = 'name'
             target_attr = 'key'
-            field_dict = self._dump_field_dict
+            field_dict = self._dump_field_dict  # type: FieldDict
             get_value = self.opts.dump_from
             method = self.opts.dump_method
         elif name == 'load':
             source_attr = 'key'
             target_attr = 'name'
-            field_dict = self._load_field_dict
+            field_dict = self._load_field_dict  # type: FieldDict
             get_value = self.opts.load_from
             method = self.opts.load_method
         else:
