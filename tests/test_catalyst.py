@@ -4,7 +4,7 @@ from catalyst.catalyst import Catalyst, BaseCatalyst
 from catalyst.fields import Field, StringField, IntegerField, \
     FloatField, BoolField, CallableField, ListField
 from catalyst.exceptions import ValidationError
-from catalyst.utils import get_item, snake_to_camel
+from catalyst.utils import snake_to_camel
 
 
 class TestData:
@@ -167,30 +167,6 @@ class CatalystTest(TestCase):
 
         with self.assertRaises(KeyError):
             TestDataCatalyst(load_fields=['wrong_name'])
-
-        dump_data_dict = {
-            'float_': 1.1, 'integer': 1, 'string': 'xxx',
-            'bool_': True, 'func': dump_data.func, 'list_': ['a', 'b']
-        }
-
-        # only get dump value from attribute
-        catalyst = TestDataCatalyst(dump_from=getattr)
-        catalyst.dump(dump_data)
-        with self.assertRaises(ValidationError):
-            catalyst.dump(dump_data_dict, True)
-
-        # only get dump value from key
-        catalyst = TestDataCatalyst(dump_from=get_item)
-        catalyst.dump(dump_data_dict)
-        with self.assertRaises(TypeError):
-            catalyst.dump(dump_data, all_errors=False)
-
-        # dump_from & load_from must be callable
-        with self.assertRaises(TypeError):
-            TestDataCatalyst(dump_from='wrong')
-
-        with self.assertRaises(TypeError):
-            TestDataCatalyst(load_from='wrong')
 
     def test_set_fields_by_non_class_inheritance(self):
         # test fields from class inheritance

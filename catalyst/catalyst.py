@@ -7,7 +7,8 @@ from collections import OrderedDict
 from .fields import Field, NestedField
 from .exceptions import ValidationError
 from .utils import (
-    missing, get_attr_or_item, get_item, no_processing,
+    missing, no_processing,
+    assign_attr_or_item_getter, assign_item_getter,
     LoadResult, DumpResult, CatalystResult, OptionBox
 )
 
@@ -19,15 +20,16 @@ class BaseCatalyst:
     _field_dict = {}  # type: FieldDict
 
     class Options(OptionBox):
-        dump_from = staticmethod(get_attr_or_item)
         dump_method = 'format'
-
-        load_from = staticmethod(get_item)
         load_method = 'load'
 
         raise_error = False
         all_errors = True
         schema = None
+
+    # assign getter for dumping & loading
+    _assign_dump_getter = staticmethod(assign_attr_or_item_getter)
+    _assign_load_getter = staticmethod(assign_item_getter)
 
     @staticmethod
     def _format_field_key(key):
@@ -58,10 +60,8 @@ class BaseCatalyst:
             raise_error: bool = None,
             all_errors: bool = None,
             dump_fields: Iterable[str] = None,
-            dump_from: Callable[[Any, str], Any] = None,
             dump_method: str = None,
             load_fields: Iterable[str] = None,
-            load_from: Callable[[Any, str], Any] = None,
             load_method: str = None,
             **kwargs):
         # set fields from a non `Catalyst` class, which can avoid override
@@ -88,18 +88,10 @@ class BaseCatalyst:
             schema=schema,
             raise_error=raise_error,
             all_errors=all_errors,
-            dump_from=dump_from,
             dump_method=dump_method,
-            load_from=load_from,
             load_method=load_method,
             **kwargs,
         )
-
-        if not callable(self.opts.dump_from):
-            raise TypeError("Argument `dump_from` must be Callable.")
-
-        if not callable(self.opts.load_from):
-            raise TypeError("Argument `load_from` must be Callable.")
 
         if self.opts.dump_method not in {'dump', 'format', 'validate'}:
             raise ValueError("Argument `method` must be in ('dump', 'format', 'validate').")
@@ -187,16 +179,19 @@ class BaseCatalyst:
             source_attr = 'name'
             target_attr = 'key'
             field_dict = self._dump_field_dict  # type: FieldDict
-            get_value = self.opts.dump_from
+            assign_getter = self._assign_dump_getter
             method = self.opts.dump_method
         elif name == 'load':
             source_attr = 'key'
             target_attr = 'name'
             field_dict = self._load_field_dict  # type: FieldDict
-            get_value = self.opts.load_from
+            assign_getter = self._assign_load_getter
             method = self.opts.load_method
         else:
             raise ValueError("Argument `name` must be 'dump' or 'load'.")
+
+        # According to the type of `data`, assign a function to get field value from `data`
+        get_value = assign_getter(data)
 
         valid_data, errors, invalid_data = {}, {}, {}
 

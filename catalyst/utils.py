@@ -103,17 +103,16 @@ class _Missing:
 missing = _Missing()
 
 
-def get_attr_or_item(obj, name, default):
+def assign_attr_or_item_getter(obj):
     if isinstance(obj, Mapping):
-        return obj.get(name, default)
-    return getattr(obj, name, default)
+        return Mapping.get
+    return getattr
 
 
-def get_item(mapping, key, default):
-    # return mapping.get(key, default)
-    if isinstance(mapping, Mapping):
-        return mapping.get(key, default)
-    raise TypeError(f'{mapping} is not Mapping.')
+def assign_item_getter(obj):
+    if isinstance(obj, Mapping):
+        return Mapping.get
+    raise TypeError(f'{obj} is not Mapping.')
 
 
 def no_processing(value):
