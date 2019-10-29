@@ -286,5 +286,5 @@ class FieldTest(TestCase):
             field.load({'n': 'm'})
         with self.assertRaises(ValidationError):
             field.load({'name': '1234'})
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValidationError):
             field.load(1)

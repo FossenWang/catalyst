@@ -250,8 +250,10 @@ class CatalystTest(TestCase):
         self.assertDictEqual(result.valid_data, load_result)
 
         # test invalid data
-        with self.assertRaises(TypeError):
-            test_catalyst.load(1)
+        result = test_catalyst.load(1)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(result.invalid_data, 1)
+        self.assertEqual(set(result.errors), {'load'})
 
         # test invalid data: validate errors
         invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
@@ -586,6 +588,17 @@ class CatalystTest(TestCase):
         result = ctx.exception.msg
         self.assertEqual(set(result.errors), {2})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}})
+
+        result = test_catalyst.load_many(1)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(result.invalid_data, 1)
+        self.assertEqual(set(result.errors), {'load_many'})
+
+        result = test_catalyst.load_many([1, {}])
+        self.assertFalse(result.is_valid)
+        self.assertEqual(set(result.errors), {0, 1})
+        self.assertEqual(set(result.errors[0]), {'load'})
+        self.assertEqual(set(result.errors[1]), {'integer'})
 
     def test_list_field(self):
         class C(Catalyst):

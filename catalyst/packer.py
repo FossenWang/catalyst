@@ -1,5 +1,4 @@
 from typing import Sequence
-from collections import OrderedDict
 
 from .utils import LoadResult, DumpResult, CatalystResult
 from .exceptions import ValidationError
@@ -64,7 +63,7 @@ class CatalystPacker:
         return valid_data, errors, invalid_data
 
     def _process_many(self, name: str, data: Sequence[Sequence], all_errors: bool):
-        valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
+        valid_data, errors, invalid_data = [], {}, {}
         for i, items in enumerate(zip(*data)):
             temp_valid_data, temp_errors, temp_invalid_data = {}, {}, {}
             for catalyst, item in zip(self.catalysts, items):

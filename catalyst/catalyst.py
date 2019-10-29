@@ -2,7 +2,6 @@ import inspect
 
 from typing import Dict, Iterable, Callable, Sequence, Any, Tuple
 from functools import wraps, partial
-from collections import OrderedDict
 
 from .fields import Field, NestedField
 from .exceptions import ValidationError
@@ -161,11 +160,21 @@ class BaseCatalyst:
         all_errors = self.opts.get(all_errors=all_errors)
         raise_error = self.opts.get(raise_error=raise_error)
 
+        # pre process
         valid_data, errors, invalid_data = self._side_effect(f'pre_{method_name}', data)
 
+        # main process
         if not errors:
-            valid_data, errors, invalid_data = handle(name, valid_data, all_errors)
+            try:
+                valid_data, errors, invalid_data = handle(name, valid_data, all_errors)
+            except Exception as e:
+                method = getattr(self, method_name)
+                error_key = getattr(method, 'error_key', method_name)
+                errors = {error_key: e}
+                invalid_data = data
+                valid_data = None
 
+        # post process
         if not errors:
             valid_data, errors, invalid_data = self._side_effect(f'post_{method_name}', valid_data)
 
@@ -229,7 +238,7 @@ class BaseCatalyst:
         return valid_data, errors, invalid_data
 
     def _process_many(self, name: str, data: Sequence, all_errors: bool):
-        valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
+        valid_data, errors, invalid_data = [], {}, {}
         for i, item in enumerate(data):
             result = self._process_flow(name, False, item, False, all_errors)
             valid_data.append(result.valid_data)
@@ -266,6 +275,7 @@ class BaseCatalyst:
             all_errors: bool = None,
         ) -> DumpResult:
         return self._process_flow('dump', False, data, raise_error, all_errors)
+    dump.error_key = 'dump'
 
     def load(
             self,
@@ -274,6 +284,7 @@ class BaseCatalyst:
             all_errors: bool = None,
         ) -> LoadResult:
         return self._process_flow('load', False, data, raise_error, all_errors)
+    load.error_key = 'load'
 
     def dump_many(
             self,
@@ -282,6 +293,7 @@ class BaseCatalyst:
             all_errors: bool = None,
         ) -> DumpResult:
         return self._process_flow('dump', True, data, raise_error, all_errors)
+    dump_many.error_key = 'dump_many'
 
     def load_many(
             self,
@@ -290,6 +302,7 @@ class BaseCatalyst:
             all_errors: bool = None,
         ) -> LoadResult:
         return self._process_flow('load', True, data, raise_error, all_errors)
+    load_many.error_key = 'load_many'
 
     def dump_args(self, func: Callable = None, all_errors: bool = None) -> Callable:
         return self._process_args(func, 'dump', all_errors)

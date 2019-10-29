@@ -2,7 +2,6 @@
 
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable
 from datetime import datetime, time, date
-from collections import OrderedDict
 
 from .utils import (
     DumpResult, LoadResult,
@@ -322,7 +321,7 @@ class ListField(Field):
             handle = getattr(self.item_field, method_name)
             all_errors = self.all_errors
 
-            valid_data, errors, invalid_data = [], OrderedDict(), OrderedDict()
+            valid_data, errors, invalid_data = [], {}, {}
             for i, item in enumerate(data):
                 try:
                     result = handle(item)
