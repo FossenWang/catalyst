@@ -220,8 +220,8 @@ class CatalystTest(TestCase):
             bool_=True, list_=['a', 'b'])
 
         # dump from object
-        result = test_catalyst.dump(dump_data).valid_data
-        self.assertDictEqual(result, {
+        result = test_catalyst.dump(dump_data)
+        self.assertDictEqual(result.valid_data, {
             'bool': True, 'float': 1.1, 'func': 6,
             'integer': 1, 'list_': ['a', 'b'], 'string': 'xxx'})
 
@@ -232,7 +232,7 @@ class CatalystTest(TestCase):
         }
         self.assertEqual(
             test_catalyst.dump(dump_data_dict).valid_data,
-            result)
+            result.valid_data)
 
         # test load
         load_data = {
@@ -249,11 +249,18 @@ class CatalystTest(TestCase):
         self.assertFalse(result.invalid_data)
         self.assertDictEqual(result.valid_data, load_result)
 
-        # test invalid data
+        # test invalid data: wrong type
         result = test_catalyst.load(1)
         self.assertFalse(result.is_valid)
+        self.assertEqual(result.valid_data, {})
         self.assertEqual(result.invalid_data, 1)
         self.assertEqual(set(result.errors), {'load'})
+
+        # test error_keys
+        test_catalyst.opts.error_keys = {'load': 'xxx'}
+        result = test_catalyst.load(1)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(set(result.errors), {'xxx'})
 
         # test invalid data: validate errors
         invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
@@ -452,7 +459,7 @@ class CatalystTest(TestCase):
         self.assertTrue('pre_dump' in result.errors)
         with self.assertRaises(ValidationError):
             c.dump(redundant_data, raise_error=True)
-        C.pre_dump.error_key = 'not_allowed_keys'
+        c.opts.error_keys = {'pre_dump': 'not_allowed_keys'}
         result = c.dump(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
@@ -464,7 +471,7 @@ class CatalystTest(TestCase):
         self.assertTrue('post_dump' in result.errors)
         with self.assertRaises(ValidationError):
             c.dump(invalid_data, raise_error=True)
-        C.post_dump.error_key = 'wrong_value'
+        c.opts.error_keys = {'post_dump': 'wrong_value'}
         result = c.dump(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('wrong_value' in result.errors)
@@ -478,7 +485,7 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertTrue('pre_load' in result.errors)
         # pre_load error_key
-        C.pre_load.error_key = 'not_allowed_keys'
+        c.opts.error_keys = {'pre_load': 'not_allowed_keys'}
         result = c.load(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
@@ -492,7 +499,7 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertTrue('post_load' in result.errors)
         # post_load error_key
-        C.post_load.error_key = 'wrong_value'
+        c.opts.error_keys = {'post_load': 'wrong_value'}
         result = c.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('wrong_value' in result.errors)
@@ -589,16 +596,23 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {2})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}})
 
-        result = test_catalyst.load_many(1)
+        result = c.load_many(1)
         self.assertFalse(result.is_valid)
+        self.assertEqual(result.valid_data, [])
         self.assertEqual(result.invalid_data, 1)
         self.assertEqual(set(result.errors), {'load_many'})
 
-        result = test_catalyst.load_many([1, {}])
+        result = c.load_many([1, {}])
         self.assertFalse(result.is_valid)
-        self.assertEqual(set(result.errors), {0, 1})
+        self.assertEqual(result.valid_data, [{}, {}])
+        self.assertEqual(result.invalid_data, {0: 1})
+        self.assertEqual(set(result.errors), {0})
         self.assertEqual(set(result.errors[0]), {'load'})
-        self.assertEqual(set(result.errors[1]), {'integer'})
+
+        c.opts.error_keys = {'load_many': 'xxx'}
+        result = c.load_many(1)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(set(result.errors), {'xxx'})
 
     def test_list_field(self):
         class C(Catalyst):
