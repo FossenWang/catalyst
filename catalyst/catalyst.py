@@ -119,18 +119,6 @@ class BaseCatalyst:
         args = ', '.join(args)
         return f'<{self.__class__.__name__}({args})>'
 
-    def _side_effect(self, name: str, data: Any):
-        """Do side effect before or after processs.
-
-        :param name: The name of side effect method, which named with
-            prefix and method name, such as `pre_dump` or `post_dump_many`.
-            There are two words `pre` and `post` can be used to
-            prefix four methods `dump`, `load`, `dump_many`, `load_many`.
-        """
-        handle = getattr(self, name, None)
-        valid_data = handle(data) if handle else data
-        return valid_data
-
     def _process_flow(
             self,
             name: str,
@@ -163,7 +151,7 @@ class BaseCatalyst:
         try:
             # pre process
             process_name = f'pre_{method_name}'
-            valid_data = self._side_effect(process_name, data)
+            valid_data = getattr(self, process_name)(data)
 
             # main process
             process_name = method_name
@@ -171,7 +159,7 @@ class BaseCatalyst:
 
             # post process
             process_name = f'post_{method_name}'
-            valid_data = self._side_effect(process_name, valid_data)
+            valid_data = getattr(self, process_name)(valid_data)
         except Exception as e:
             # handle error which raised during processing
             error_key = self.opts.error_keys.get(process_name, process_name)

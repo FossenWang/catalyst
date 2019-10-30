@@ -1,4 +1,5 @@
 from unittest import TestCase
+from unittest.mock import patch
 
 from catalyst.exceptions import ValidationError
 from catalyst.utils import ERROR_MESSAGES
@@ -10,13 +11,14 @@ from catalyst.validators import (
 
 class ValidationTest(TestCase):
 
+    @patch.dict('catalyst.utils.ERROR_MESSAGES')
     def test_base_validator(self):
         with self.assertRaises(NotImplementedError):
             Validator()(None)
 
         class NewValidator(Validator):
             def __call__(self, value):
-                raise ValidationError(self.error_messages['msg'])
+                self.error('msg')
 
         ERROR_MESSAGES.update({
             NewValidator: {'msg': 'default'}
@@ -34,6 +36,7 @@ class ValidationTest(TestCase):
         self.assertEqual(str(c.exception), 'custom')
         self.assertEqual(repr(c.exception), "ValidationError('custom')")
 
+    @patch.dict('catalyst.utils.ERROR_MESSAGES')
     def test_comparison_validator(self):
         ERROR_MESSAGES[ComparisonValidator].update({'too_small': 'too_small'})
         compare_integer = ComparisonValidator(0, 100, {'too_large': 'too_large'})
@@ -70,6 +73,7 @@ class ValidationTest(TestCase):
         with self.assertRaises(ValueError):
             ComparisonValidator(1, 0)
 
+    @patch.dict('catalyst.utils.ERROR_MESSAGES')
     def test_length_validator(self):
         ERROR_MESSAGES[LengthValidator].update({'too_short': 'too_short'})
         validator = LengthValidator(2, 10, {'too_long': 'too_long'})

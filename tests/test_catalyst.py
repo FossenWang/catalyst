@@ -42,9 +42,15 @@ class CatalystTest(TestCase):
             a = Field()
             b = Field()
 
+            class Options(Catalyst.Options):
+                all_errors = False
+
         class B(A):
             b = IntegerField()
             c = FloatField()
+
+            class Options(A.Options):
+                raise_error = True
 
         a = A()
         b = B()
@@ -59,6 +65,11 @@ class CatalystTest(TestCase):
 
         data = {'a': 'a', 'b': 1, 'c': 1.0}
         self.assertDictEqual(b.dump(data).valid_data, data)
+
+        self.assertEqual(a.opts.all_errors, False)
+        self.assertEqual(a.opts.raise_error, False)
+        self.assertEqual(b.opts.all_errors, False)
+        self.assertEqual(b.opts.raise_error, True)
 
     def test_change_field_name_and_key_naming_style(self):
         # change field key naming style

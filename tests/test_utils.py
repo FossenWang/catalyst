@@ -1,4 +1,5 @@
 from unittest import TestCase
+from unittest.mock import patch
 
 from catalyst.exceptions import ValidationError
 from catalyst.utils import (
@@ -16,6 +17,7 @@ class UtilsTest(TestCase):
         self.assertEqual(snake_to_camel(''), '')
         self.assertEqual(snake_to_camel('___'), '')
 
+    @patch.dict('catalyst.utils.ERROR_MESSAGES')
     def test_error_msg(self):
         class A(ErrorMessageMixin):
             pass
