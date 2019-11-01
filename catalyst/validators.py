@@ -42,8 +42,8 @@ class LengthValidator(Validator):
             self.error('too_long')
 
 ERROR_MESSAGES[LengthValidator] = {
-    'too_short': 'Ensure length >= {self.min_length}.',
-    'too_long': 'Ensure length <= {self.max_length}.',
+    'too_short': 'Length must >= {self.min_length}.',
+    'too_long': 'Length must <= {self.max_length}.',
 }
 
 
@@ -73,8 +73,8 @@ class ComparisonValidator(Validator):
             self.error('too_large')
 
 ERROR_MESSAGES[ComparisonValidator] = {
-    'too_small': 'Ensure value >= {self.min_value}.',
-    'too_large': 'Ensure value <= {self.max_value}.',
+    'too_small': 'Value must >= {self.min_value}.',
+    'too_large': 'Value must <= {self.max_value}.',
 }
 
 

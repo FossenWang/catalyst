@@ -1,12 +1,11 @@
 # catalyst
-catalyst 是一个用于将数据在复杂对象和基础Python数据类型间相互转换的轻量级库
+*Catalyst* is an lightweight library for converting complex datatypes to and from native Python datatypes.
 
-示例：
 ```python
 from datetime import datetime
 from pprint import pprint
 
-from catalyst import Catalyst, StringField, DatetimeField, NestField
+from catalyst import Catalyst, String, Datetime, NestField
 
 
 class Writer:
@@ -23,15 +22,15 @@ class Article:
 
 
 class WriterCatalyst(Catalyst):
-    name = StringField(min_length=0, max_length=12)
+    name = String(min_length=0, max_length=12)
 
 writerCatalyst = WriterCatalyst()
 
 
 class ArticleCatalyst(Catalyst):
-    title = StringField(min_length=1, max_length=48)
-    content = StringField(min_length=1, max_length=500)
-    pub_date = DatetimeField('%Y/%m/%d %H:%M:%S')
+    title = String(min_length=1, max_length=48)
+    content = String(min_length=1, max_length=500)
+    pub_date = Datetime('%Y/%m/%d %H:%M:%S')
     author = NestField(writerCatalyst)
 
 articleCatalyst = ArticleCatalyst()
@@ -80,4 +79,4 @@ pprint(load_result.errors)
 ```
 
 ---
-该项目参考了 [marshmallow](https://github.com/marshmallow-code/marshmallow/) 的实现
+*Catalyst* is inspired by [marshmallow](https://github.com/marshmallow-code/marshmallow/).

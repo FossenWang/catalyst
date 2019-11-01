@@ -1,8 +1,8 @@
 from unittest import TestCase
 
 from catalyst.catalyst import Catalyst, BaseCatalyst
-from catalyst.fields import Field, StringField, IntegerField, \
-    FloatField, BoolField, CallableField, ListField
+from catalyst.fields import Field, String, Integer, \
+    Float, Boolean, Method, List
 from catalyst.exceptions import ValidationError
 from catalyst.utils import snake_to_camel
 
@@ -23,13 +23,13 @@ class TestData:
 
 
 class TestDataCatalyst(Catalyst):
-    string = StringField(min_length=2, max_length=12,
-                         dump_default='default', load_default='default')
-    integer = IntegerField(min_value=0, max_value=12, load_required=True)
-    float_field = FloatField(name='float_', key='float', min_value=-1.1, max_value=1.1)
-    bool_field = BoolField(name='bool_', key='bool')
-    func = CallableField(name='func', key='func', func_args=(1, 2, 3))
-    list_ = ListField(StringField())
+    string = String(min_length=2, max_length=12,
+                    dump_default='default', load_default='default')
+    integer = Integer(min_value=0, max_value=12, load_required=True)
+    float_field = Float(name='float_', key='float', min_value=-1.1, max_value=1.1)
+    bool_field = Boolean(name='bool_', key='bool')
+    func = Method(name='func', key='func', func_args=(1, 2, 3))
+    list_ = List(String())
 
 
 test_catalyst = TestDataCatalyst()
@@ -46,8 +46,8 @@ class CatalystTest(TestCase):
                 all_errors = False
 
         class B(A):
-            b = IntegerField()
-            c = FloatField()
+            b = Integer()
+            c = Float()
 
             class Options(A.Options):
                 raise_error = True
@@ -58,7 +58,7 @@ class CatalystTest(TestCase):
         self.assertEqual(set(a._field_dict), {'a', 'b'})
         self.assertEqual(set(b._field_dict), {'a', 'b', 'c'})
         self.assertIsInstance(a._field_dict['b'], Field)
-        self.assertIsInstance(b._field_dict['b'], IntegerField)
+        self.assertIsInstance(b._field_dict['b'], Integer)
 
         data = {'a': 'a', 'b': 'b'}
         self.assertDictEqual(a.dump(data).valid_data, data)
@@ -187,8 +187,8 @@ class CatalystTest(TestCase):
 
         # set fields from a non `Catalyst` class when instantiate
         class Schema:
-            a = StringField()
-            b = FloatField()
+            a = String()
+            b = Float()
 
             @staticmethod
             @b.set_formatter
@@ -213,8 +213,8 @@ class CatalystTest(TestCase):
 
         # inheritance works
         class Schema2:
-            a = StringField()
-            string = FloatField()
+            a = String()
+            string = Float()
         catalyst = TestDataCatalyst(Schema2)
         fields = catalyst._field_dict
         self.assertIs(fields['string'], Schema2.string)
@@ -354,7 +354,7 @@ class CatalystTest(TestCase):
     def test_field_args_for_dump_and_load(self):
         def create_catalyst(**kwargs):
             class C(Catalyst):
-                s = StringField(**kwargs)
+                s = String(**kwargs)
             return C()
 
         def assert_field_dump_args(data, expect=None, **kwargs):
@@ -432,8 +432,8 @@ class CatalystTest(TestCase):
 
     def test_pre_and_post_process(self):
         class C(Catalyst):
-            max_value = IntegerField()
-            min_value = IntegerField()
+            max_value = Integer()
+            min_value = Integer()
 
             def pre_dump(self, obj):
                 return self.pre_load(obj)
@@ -530,11 +530,11 @@ class CatalystTest(TestCase):
 
     def test_load_and_dump_args(self):
         class A(Catalyst):
-            a = IntegerField()
-            b = IntegerField()
-            args = ListField(IntegerField())
+            a = Integer()
+            b = Integer()
+            args = List(Integer())
             class kwargs(Catalyst):
-                c = IntegerField()
+                c = Integer()
 
         a = A()
 
@@ -567,7 +567,7 @@ class CatalystTest(TestCase):
 
     def test_load_and_dump_many(self):
         class C(Catalyst):
-            s = StringField(min_length=1, max_length=2)
+            s = String(min_length=1, max_length=2)
 
         c = C()
 
@@ -590,7 +590,7 @@ class CatalystTest(TestCase):
         data[3]['s'] = 'sss'
 
         result = c.load_many(data)
-        s = "{2: {'s': 'Ensure length >= 1.'}, 3: {'s': 'Ensure length <= 2.'}}"
+        s = "{2: {'s': 'Length must >= 1.'}, 3: {'s': 'Length must <= 2.'}}"
         self.assertEqual(str(result), s)
         self.assertEqual(set(result.errors), {2, 3})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
@@ -627,7 +627,7 @@ class CatalystTest(TestCase):
 
     def test_list_field(self):
         class C(Catalyst):
-            nums = ListField(IntegerField())
+            nums = List(Integer())
 
         c = C()
 
@@ -663,16 +663,16 @@ class CatalystTest(TestCase):
             }
         }
 
-        # Automatic wrap an object of Catalyst as NestedField
+        # Automatic wrap an object of Catalyst as Nested
         class User(Catalyst):
-            uid = IntegerField()
-            name = StringField()
+            uid = Integer()
+            name = String()
 
         user_catalyst = User()
 
         class Article1(Catalyst):
-            title = StringField()
-            content = StringField()
+            title = String()
+            content = String()
             author = user_catalyst
 
         catalyst = Article1()
@@ -682,14 +682,14 @@ class CatalystTest(TestCase):
         r = catalyst.load(data)
         self.assertEqual(data, r.valid_data)
 
-        # Automatic wrap a subclass of Catalyst as NestedField
+        # Automatic wrap a subclass of Catalyst as Nested
         class Article2(Catalyst):
-            title = StringField()
-            content = StringField()
+            title = String()
+            content = String()
 
             class author(Catalyst):
-                uid = IntegerField()
-                name = StringField()
+                uid = Integer()
+                name = String()
 
         catalyst = Article2()
 

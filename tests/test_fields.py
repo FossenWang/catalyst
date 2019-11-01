@@ -3,10 +3,10 @@ from datetime import datetime, timedelta
 
 from catalyst import Catalyst
 from catalyst.fields import (
-    Field, StringField, IntegerField, FloatField,
-    BoolField, ListField, CallableField,
-    DatetimeField, TimeField, DateField,
-    NestedField,
+    Field, String, Integer, Float,
+    Boolean, List, Method,
+    Datetime, Time, Date,
+    Nested,
 )
 from catalyst.exceptions import ValidationError
 
@@ -85,7 +85,7 @@ class FieldTest(TestCase):
         self.assertEqual(ctx.exception.msg, '666')
 
     def test_string_field(self):
-        field = StringField(name='string', key='string', min_length=2, max_length=12)
+        field = String(name='string', key='string', min_length=2, max_length=12)
 
         # dump
         self.assertEqual(field.dump('xxx'), 'xxx')
@@ -108,7 +108,7 @@ class FieldTest(TestCase):
             field.load(None)
 
     def test_int_field(self):
-        field = IntegerField(name='integer', key='integer', min_value=-10, max_value=100)
+        field = Integer(name='integer', key='integer', min_value=-10, max_value=100)
 
         # dump
         self.assertEqual(field.dump(1), 1)
@@ -131,7 +131,7 @@ class FieldTest(TestCase):
             field.load([])
 
     def test_float_field(self):
-        field = FloatField(name='float_', key='float', min_value=-11.1, max_value=111.1)
+        field = Float(name='float_', key='float', min_value=-11.1, max_value=111.1)
 
         # dump
         self.assertEqual(field.dump(5.5), 5.5)
@@ -156,7 +156,7 @@ class FieldTest(TestCase):
             field.load([])
 
     def test_bool_field(self):
-        field = BoolField()
+        field = Boolean()
 
         # dump
         self.assertEqual(field.dump(True), True)
@@ -181,7 +181,7 @@ class FieldTest(TestCase):
         self.assertEqual(field.load(''), False)
 
     def test_list_field(self):
-        field = ListField(item_field=FloatField())
+        field = List(item_field=Float())
 
         # dump
         self.assertListEqual(field.dump([1.0, 2.0, 3.0]), [1.0, 2.0, 3.0])
@@ -207,7 +207,7 @@ class FieldTest(TestCase):
             field.load(None)
         self.assertEqual(ctx.exception.msg, field.error_messages['none'])
 
-        field = ListField(item_field=FloatField(), all_errors=False)
+        field = List(item_field=Float(), all_errors=False)
         with self.assertRaises(ValidationError) as ctx:
             field.load([1, 'a', 'b'])
         result = ctx.exception.msg
@@ -219,7 +219,7 @@ class FieldTest(TestCase):
             field.opts._process_many('xxx', None)
 
     def test_callable_field(self):
-        field = CallableField(
+        field = Method(
             name='test_func', func_args=[1, 2], func_kwargs={'c': 3})
 
         def test_func(a, b, c=1):
@@ -233,18 +233,18 @@ class FieldTest(TestCase):
             field.dump(1)
 
         # init
-        CallableField()
+        Method()
         with self.assertRaises(TypeError):
-            CallableField(func_args=0)
+            Method(func_args=0)
         with self.assertRaises(TypeError):
-            CallableField(func_kwargs=0)
+            Method(func_kwargs=0)
 
     def test_datetime_field(self):
         dt = datetime(2019, 1, 1)
         invalid_dt = dt + timedelta(days=1, seconds=1)
-        self.base_test_datetime_field(dt, invalid_dt, DatetimeField, '%Y%m%d%H%M%S')
-        self.base_test_datetime_field(dt.time(), invalid_dt.time(), TimeField, '%H%M%S')
-        self.base_test_datetime_field(dt.date(), invalid_dt.date(), DateField, '%Y%m%d')
+        self.base_test_datetime_field(dt, invalid_dt, Datetime, '%Y%m%d%H%M%S')
+        self.base_test_datetime_field(dt.time(), invalid_dt.time(), Time, '%H%M%S')
+        self.base_test_datetime_field(dt.date(), invalid_dt.date(), Date, '%Y%m%d')
 
     def base_test_datetime_field(self, dt, invalid_dt, FieldClass, fmt):
         # dump
@@ -270,9 +270,9 @@ class FieldTest(TestCase):
 
     def test_nest_field(self):
         class ACatalyst(Catalyst):
-            name = StringField(max_length=3, load_required=True)
+            name = String(max_length=3, load_required=True)
         a_cata = ACatalyst()
-        field = NestedField(a_cata, name='a', key='a')
+        field = Nested(a_cata, name='a', key='a')
 
         self.assertEqual(field.dump({'name': '1'}), {'name': '1'})
         self.assertEqual(field.dump({'name': '1234'}), {'name': '1234'})

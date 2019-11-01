@@ -169,7 +169,7 @@ ERROR_MESSAGES[Field] = {
 }
 
 
-class StringField(Field):
+class String(Field):
     class Options(Field.Options):
         formatter = str
         parser = str
@@ -191,17 +191,17 @@ class NumberField(Field):
             self.add_validator(ComparisonValidator(min_value, max_value))
 
 
-class FloatField(NumberField):
+class Float(NumberField):
     pass
 
 
-class IntegerField(NumberField):
+class Integer(NumberField):
     class Options(Field.Options):
         formatter = int
         parser = int
 
 
-class BoolField(Field):
+class Boolean(Field):
     def __init__(self, value_map: dict = None, **kwargs):
         super().__init__(value_map=value_map, **kwargs)
         self.opts.reverse_value_map = {
@@ -226,7 +226,7 @@ class BoolField(Field):
         formatter = parser
 
 
-class DatetimeField(Field):
+class Datetime(Field):
     def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
         super().__init__(fmt=fmt, **kwargs)
         if min_time is not None or max_time is not None:
@@ -243,8 +243,8 @@ class DatetimeField(Field):
             return datetime.strptime(date_string, self.fmt)
 
 
-class TimeField(DatetimeField):
-    class Options(DatetimeField.Options):
+class Time(Datetime):
+    class Options(Datetime.Options):
         _type = time
         fmt = r'%H:%M:%S.%f'
 
@@ -252,8 +252,8 @@ class TimeField(DatetimeField):
             return datetime.strptime(date_string, self.fmt).time()
 
 
-class DateField(DatetimeField):
-    class Options(DatetimeField.Options):
+class Date(Datetime):
+    class Options(Datetime.Options):
         _type = date
         fmt = r'%Y-%m-%d'
 
@@ -261,7 +261,7 @@ class DateField(DatetimeField):
             return datetime.strptime(date_string, self.fmt).date()
 
 
-class CallableField(Field):
+class Method(Field):
     def __init__(self, func_args: Iterable = None, func_kwargs: Mapping = None, **kwargs):
         kwargs.pop('no_load', None)
         super().__init__(no_load=True, **kwargs)
@@ -281,7 +281,7 @@ class CallableField(Field):
             return func(*self.func_args, **self.func_kwargs)
 
 
-class ListField(Field):
+class List(Field):
     def __init__(
             self,
             item_field: Field,
@@ -337,7 +337,7 @@ class ListField(Field):
             return valid_data
 
 
-class NestedField(Field):
+class Nested(Field):
     def __init__(self, catalyst, **kwargs):
         super().__init__(catalyst=catalyst, **kwargs)
 

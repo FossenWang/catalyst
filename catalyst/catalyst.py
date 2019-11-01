@@ -3,7 +3,7 @@ import inspect
 from typing import Dict, Iterable, Callable, Sequence, Any, Tuple, Mapping
 from functools import wraps, partial
 
-from .fields import Field, NestedField
+from .fields import Field, Nested
 from .exceptions import ValidationError
 from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,
@@ -244,7 +244,7 @@ class BaseCatalyst:
         """Decorator for handling args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
         If args are invalid, error will be raised. In general, `*args` should
-        be handled by ListField, and `**kwargs` should be handled by NestedField.
+        be handled by List, and `**kwargs` should be handled by Nested.
         """
         if func:
             sig = inspect.signature(func)
@@ -350,9 +350,9 @@ class Catalyst(BaseCatalyst, metaclass=CatalystMeta):
             # init calalyst object
             if isinstance(value, CatalystMeta):
                 value = value()
-            # wrap catalyst object as NestedField
+            # wrap catalyst object as Nested
             if isinstance(value, BaseCatalyst):
-                value = NestedField(value)
+                value = Nested(value)
             # automatic generate field name or key
             if isinstance(value, Field):
                 if value.name is None:
