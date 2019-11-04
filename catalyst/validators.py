@@ -1,5 +1,7 @@
 """Validators"""
 
+import re
+
 from .utils import ErrorMessageMixin, ERROR_MESSAGES
 
 
@@ -19,8 +21,6 @@ class LengthValidator(Validator):
 
     :param error_messages: includ keys {'too_short', 'too_long'}
     """
-    error_messages = {}
-
     def __init__(
             self,
             min_length: int = None,
@@ -94,4 +94,25 @@ class TypeValidator(Validator):
 
 ERROR_MESSAGES[TypeValidator] = {
     'wrong_type': 'Type must be {self.class_or_tuple}.',
+}
+
+
+class RegexValidator(Validator):
+    """
+    Check if string match regex pattern.
+
+    :param error_messages: includ keys {'no_match'}
+    """
+    def __init__(self, regex: str, error_messages: dict = None):
+        self.regex = re.compile(regex)
+        super().__init__(error_messages)
+
+    def __call__(self, string: str):
+        match = self.regex.search(string)
+        if not match:
+            self.error('no_match')
+        return match
+
+ERROR_MESSAGES[RegexValidator] = {
+    'no_match': 'No match for pattern "{self.regex.pattern}".',
 }

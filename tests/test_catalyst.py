@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from catalyst.catalyst import Catalyst, BaseCatalyst
+from catalyst.catalyst import Catalyst, BaseCatalyst, CatalystMeta
 from catalyst.fields import Field, String, Integer, \
     Float, Boolean, Method, List
 from catalyst.exceptions import ValidationError
@@ -70,6 +70,10 @@ class CatalystTest(TestCase):
         self.assertEqual(a.opts.raise_error, False)
         self.assertEqual(b.opts.all_errors, False)
         self.assertEqual(b.opts.raise_error, True)
+
+        # wrong type for Options
+        with self.assertRaises(TypeError):
+            CatalystMeta('X', (object,), {'Options': object})
 
     def test_change_field_name_and_key_naming_style(self):
         # change field key naming style

@@ -64,9 +64,6 @@ class BaseCatalyst:
             load_fields: Iterable[str] = None,
             load_method: str = None,
             **kwargs):
-        if not (isinstance(self.Options, type) and issubclass(self.Options, OptionBox)):
-            raise TypeError('Class attribute `Options` must inherit from `OptionBox`.')
-
         self.opts = self.Options(
             schema=schema,
             raise_error=raise_error,
@@ -325,6 +322,9 @@ class CatalystMeta(type):
 
     def __new__(cls, name, bases, attrs):
         new_cls = type.__new__(cls, name, bases, attrs)
+        if not (isinstance(new_cls.Options, type) and issubclass(new_cls.Options, OptionBox)):
+            raise TypeError('Class attribute `Options` must inherit from `OptionBox`.')
+
         new_cls._set_fields(new_cls, attrs.items())
         return new_cls
 

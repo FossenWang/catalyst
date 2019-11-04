@@ -11,6 +11,7 @@ from .utils import (
 from .validators import (
     LengthValidator,
     ComparisonValidator,
+    RegexValidator,
 )
 from .exceptions import ValidationError
 
@@ -174,13 +175,22 @@ class String(Field):
         formatter = str
         parser = str
 
-    def __init__(self, min_length: int = None, max_length: int = None, **kwargs):
+    def __init__(
+            self,
+            min_length: int = None,
+            max_length: int = None,
+            regex: str = None,
+            **kwargs):
         super().__init__(**kwargs)
         if min_length is not None or max_length is not None:
-            self.add_validator(LengthValidator(min_length, max_length))
+            self.add_validator(
+                LengthValidator(min_length, max_length, self.error_messages))
+        if regex:
+            self.add_validator(
+                RegexValidator(regex, self.error_messages))
 
 
-class NumberField(Field):
+class Number(Field):
     class Options(Field.Options):
         formatter = float
         parser = float
@@ -188,14 +198,15 @@ class NumberField(Field):
     def __init__(self, min_value=None, max_value=None, **kwargs):
         super().__init__(**kwargs)
         if min_value is not None or max_value is not None:
-            self.add_validator(ComparisonValidator(min_value, max_value))
+            self.add_validator(
+                ComparisonValidator(min_value, max_value, self.error_messages))
 
 
-class Float(NumberField):
+class Float(Number):
     pass
 
 
-class Integer(NumberField):
+class Integer(Number):
     class Options(Field.Options):
         formatter = int
         parser = int
@@ -230,14 +241,15 @@ class Datetime(Field):
     def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
         super().__init__(fmt=fmt, **kwargs)
         if min_time is not None or max_time is not None:
-            self.add_validator(ComparisonValidator(min_time, max_time))
+            self.add_validator(
+                ComparisonValidator(min_time, max_time, self.error_messages))
 
     class Options(Field.Options):
-        _type = datetime
+        type_ = datetime
         fmt = r'%Y-%m-%d %H:%M:%S.%f'
 
         def formatter(self, dt):
-            return self._type.strftime(dt, self.fmt)
+            return self.type_.strftime(dt, self.fmt)
 
         def parser(self, date_string: str):
             return datetime.strptime(date_string, self.fmt)
@@ -245,7 +257,7 @@ class Datetime(Field):
 
 class Time(Datetime):
     class Options(Datetime.Options):
-        _type = time
+        type_ = time
         fmt = r'%H:%M:%S.%f'
 
         def parser(self, date_string: str):
@@ -254,7 +266,7 @@ class Time(Datetime):
 
 class Date(Datetime):
     class Options(Datetime.Options):
-        _type = date
+        type_ = date
         fmt = r'%Y-%m-%d'
 
         def parser(self, date_string: str):

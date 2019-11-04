@@ -85,7 +85,9 @@ class FieldTest(TestCase):
         self.assertEqual(ctx.exception.msg, '666')
 
     def test_string_field(self):
-        field = String(name='string', key='string', min_length=2, max_length=12)
+        field = String(
+            name='string', key='string', min_length=2, max_length=12,
+            error_messages={'too_short': 'Must >= {self.min_length}'})
 
         # dump
         self.assertEqual(field.dump('xxx'), 'xxx')
@@ -100,12 +102,28 @@ class FieldTest(TestCase):
         self.assertEqual(field.load(123), '123')
         self.assertEqual(field.load([1]), '[1]')
         self.assertEqual(field.load(None), None)
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(ValidationError) as ctx:
             field.load('')
+
+        # change validator's error message
+        self.assertEqual(ctx.exception.msg, 'Must >= 2')
+        self.assertEqual(
+            field.error_messages['too_short'],
+            field.opts.validators[0].error_messages['too_short'])
 
         field.opts.allow_none = False
         with self.assertRaises(ValidationError):
             field.load(None)
+
+        # match regex
+        field = String(
+            regex='a',
+            error_messages={'no_match': 'not match "{self.regex.pattern}"'})
+        self.assertEqual(field.load('a'), 'a')
+
+        with self.assertRaises(ValidationError) as ctx:
+            field.load('')
+        self.assertEqual(ctx.exception.msg, 'not match "a"')
 
     def test_int_field(self):
         field = Integer(name='integer', key='integer', min_value=-10, max_value=100)

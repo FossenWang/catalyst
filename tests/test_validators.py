@@ -5,7 +5,8 @@ from catalyst.exceptions import ValidationError
 from catalyst.utils import ERROR_MESSAGES
 from catalyst.validators import (
     Validator, LengthValidator,
-    ComparisonValidator, TypeValidator
+    ComparisonValidator, TypeValidator,
+    RegexValidator,
 )
 
 
@@ -121,3 +122,16 @@ class ValidationTest(TestCase):
         validator('')
         with self.assertRaises(TypeError):
             validator(0.0)
+
+    def test_regex_validator(self):
+        validator = RegexValidator('a')
+
+        validator('cat')
+        with self.assertRaises(TypeError):
+            validator(None)
+
+        with self.assertRaises(ValidationError):
+            validator('dog')
+
+        with self.assertRaises(TypeError):
+            validator = RegexValidator(None)
