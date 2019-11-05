@@ -5,7 +5,7 @@ from catalyst.exceptions import ValidationError
 from catalyst.utils import ERROR_MESSAGES
 from catalyst.validators import (
     Validator, LengthValidator,
-    ComparisonValidator, TypeValidator,
+    RangeValidator, TypeValidator,
     RegexValidator,
 )
 
@@ -38,9 +38,9 @@ class ValidationTest(TestCase):
         self.assertEqual(repr(c.exception), "ValidationError('custom')")
 
     @patch.dict('catalyst.utils.ERROR_MESSAGES')
-    def test_comparison_validator(self):
-        ERROR_MESSAGES[ComparisonValidator].update({'too_small': 'too_small'})
-        compare_integer = ComparisonValidator(0, 100, {'too_large': 'too_large'})
+    def test_range_validator(self):
+        ERROR_MESSAGES[RangeValidator].update({'too_small': 'too_small'})
+        compare_integer = RangeValidator(0, 100, {'too_large': 'too_large'})
         compare_integer(1)
         compare_integer(0)
         compare_integer(100)
@@ -55,7 +55,7 @@ class ValidationTest(TestCase):
         with self.assertRaises(TypeError):
             compare_integer([1])
 
-        compare_integer_float = ComparisonValidator(-1.1, 1.1)
+        compare_integer_float = RangeValidator(-1.1, 1.1)
 
         compare_integer_float(1)
         compare_integer_float(0)
@@ -72,12 +72,12 @@ class ValidationTest(TestCase):
             compare_integer_float([1.1])
 
         with self.assertRaises(ValueError):
-            ComparisonValidator(1, 0)
+            RangeValidator(1, 0)
 
     @patch.dict('catalyst.utils.ERROR_MESSAGES')
     def test_length_validator(self):
-        ERROR_MESSAGES[LengthValidator].update({'too_short': 'too_short'})
-        validator = LengthValidator(2, 10, {'too_long': 'too_long'})
+        ERROR_MESSAGES[LengthValidator].update({'too_small': 'too_small'})
+        validator = LengthValidator(2, 10, {'too_large': 'too_large'})
 
         validator('x' * 2)
         validator('x' * 5)
@@ -85,10 +85,10 @@ class ValidationTest(TestCase):
         validator(['xzc', 1])
         with self.assertRaises(ValidationError) as c:
             validator('x')
-        self.assertEqual(str(c.exception), 'too_short')
+        self.assertEqual(str(c.exception), 'too_small')
         with self.assertRaises(ValidationError) as c:
             validator('x' * 11)
-        self.assertEqual(str(c.exception), 'too_long')
+        self.assertEqual(str(c.exception), 'too_large')
         with self.assertRaises(ValidationError):
             validator('')
         with self.assertRaises(TypeError):
@@ -98,12 +98,12 @@ class ValidationTest(TestCase):
         validator('')
         validator([])
 
-        validator = LengthValidator(min_length=1)
+        validator = LengthValidator(minimum=1)
         with self.assertRaises(ValidationError):
             validator('')
         validator('1')
 
-        validator = LengthValidator(max_length=2)
+        validator = LengthValidator(maximum=2)
         with self.assertRaises(ValidationError):
             validator('123')
         validator('1')

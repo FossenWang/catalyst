@@ -25,8 +25,8 @@ class TestData:
 class TestDataCatalyst(Catalyst):
     string = String(min_length=2, max_length=12,
                     dump_default='default', load_default='default')
-    integer = Integer(min_value=0, max_value=12, load_required=True)
-    float_field = Float(name='float_', key='float', min_value=-1.1, max_value=1.1)
+    integer = Integer(minimum=0, maximum=12, load_required=True)
+    float_field = Float(name='float_', key='float', minimum=-1.1, maximum=1.1)
     bool_field = Boolean(name='bool_', key='bool')
     func = Method(name='func', key='func', func_args=(1, 2, 3))
     list_ = List(String())

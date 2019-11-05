@@ -338,9 +338,9 @@ class Catalyst(BaseCatalyst, metaclass=CatalystMeta):
         Fields are bond to `cls_or_obj._field_dict` which are set separately
         on class or its instance, which works like class inheritance.
 
-        :param cls_or_obj: `Catalyst` class or its instance
-        :param attrs: iterable which contains name, field pairs
-            [(name, Field), ...]
+        :param cls_or_obj: `Catalyst` class or its instance.
+        :param attrs: iterable which contains name, field pairs,
+            such as `[(name, Field), ...]`.
         """
         fields = {}  # type: FieldDict
         # inherit fields

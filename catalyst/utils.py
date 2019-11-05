@@ -55,8 +55,7 @@ class ErrorMessageMixin:
         """
         Collect default error message from self and parent classes.
 
-        :param error_messages: message dict, defaults to None
-        :type error_messages: dict, optional
+        :param error_messages: error messages dict.
         """
         messages = {}
         for cls in reversed(self.__class__.__mro__):

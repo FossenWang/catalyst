@@ -10,7 +10,7 @@ from .utils import (
 )
 from .validators import (
     LengthValidator,
-    ComparisonValidator,
+    RangeValidator,
     RegexValidator,
 )
 from .exceptions import ValidationError
@@ -191,28 +191,51 @@ class String(Field):
 
 
 class Number(Field):
+    """Base class for number fields. Using RangeValidator for validating.
+
+    :param minimum: Value must >= minimum, and `None` is equal to -∞.
+    :param maximum: Value must <= maximum, and `None` is equal to +∞.
+    :param error_messages: Keys `{'too_small', 'too_large'}`.
+    """
+
     class Options(Field.Options):
         formatter = float
         parser = float
 
-    def __init__(self, min_value=None, max_value=None, **kwargs):
+    def __init__(self, minimum=None, maximum=None, **kwargs):
         super().__init__(**kwargs)
-        if min_value is not None or max_value is not None:
+        if minimum is not None or maximum is not None:
             self.add_validator(
-                ComparisonValidator(min_value, max_value, self.error_messages))
+                RangeValidator(minimum, maximum, error_messages=self.error_messages))
 
 
 class Float(Number):
-    pass
+    """Float field.
+
+    :param minimum: Value must >= minimum, and `None` is equal to -∞.
+    :param maximum: Value must <= maximum, and `None` is equal to +∞.
+    :param error_messages: Keys `{'too_small', 'too_large'}`.
+    """
 
 
 class Integer(Number):
+    """Integer field.
+
+    :param minimum: Value must >= minimum, and `None` is equal to -∞.
+    :param maximum: Value must <= maximum, and `None` is equal to +∞.
+    :param error_messages: Keys `{'too_small', 'too_large'}`.
+    """
     class Options(Field.Options):
         formatter = int
         parser = int
 
 
 class Boolean(Field):
+    """Boolean field.
+
+    :param value_map: Values that will be onverted to `True` or `False`.
+        The keys are `True` and `False`, values are `Hashable`.
+    """
     def __init__(self, value_map: dict = None, **kwargs):
         super().__init__(value_map=value_map, **kwargs)
         self.opts.reverse_value_map = {
@@ -242,7 +265,7 @@ class Datetime(Field):
         super().__init__(fmt=fmt, **kwargs)
         if min_time is not None or max_time is not None:
             self.add_validator(
-                ComparisonValidator(min_time, max_time, self.error_messages))
+                RangeValidator(min_time, max_time, self.error_messages))
 
     class Options(Field.Options):
         type_ = datetime

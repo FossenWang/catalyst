@@ -15,73 +15,58 @@ class Validator(ErrorMessageMixin):
             'or raise any exception if invalid.'))
 
 
-class LengthValidator(Validator):
-    """
-    Compares length between values.
+# class ComparisonValidator(Validator):
+class RangeValidator(Validator):
+    """Check the passed value whether it is greater than
+    or equal to `minimum` and less than or equal to `maximum`.
 
-    :param error_messages: includ keys {'too_short', 'too_long'}
+    :param minimum: Value must >= minimum, and `None` is equal to -∞.
+    :param maximum: Value must <= maximum, and `None` is equal to +∞.
+    :param error_messages: Keys `{'too_small', 'too_large'}`
     """
-    def __init__(
-            self,
-            min_length: int = None,
-            max_length: int = None,
-            error_messages: dict = None):
-        if min_length is not None and max_length is not None \
-            and min_length > max_length:
-            raise ValueError('`min_length` can\'t be greater than `max_length`.')
+    def __init__(self, minimum=None, maximum=None, error_messages: dict = None):
+        if minimum is not None and maximum is not None \
+            and minimum > maximum:
+            raise ValueError('`minimum` can\'t be greater than `maximum`.')
 
-        self.min_length = min_length
-        self.max_length = max_length
+        self.minimum = minimum
+        self.maximum = maximum
         super().__init__(error_messages)
 
     def __call__(self, value):
-        if self.min_length is not None and len(value) < self.min_length:
-            self.error('too_short')
+        if self.minimum is not None and value < self.minimum:
+            self.error('too_small')
 
-        if self.max_length is not None and len(value) > self.max_length:
-            self.error('too_long')
+        if self.maximum is not None and value > self.maximum:
+            self.error('too_large')
 
-ERROR_MESSAGES[LengthValidator] = {
-    'too_short': 'Length must >= {self.min_length}.',
-    'too_long': 'Length must <= {self.max_length}.',
+ERROR_MESSAGES[RangeValidator] = {
+    'too_small': 'Value must >= {self.minimum}.',
+    'too_large': 'Value must <= {self.maximum}.',
 }
 
 
-class ComparisonValidator(Validator):
-    """Compare between values.
-
-    :param error_messages: includ keys {'too_small', 'too_large'}
+class LengthValidator(RangeValidator):
     """
-    def __init__(
-            self,
-            min_value=None,
-            max_value=None,
-            error_messages: dict = None):
-        if min_value is not None and max_value is not None \
-            and min_value > max_value:
-            raise ValueError('`min_value` can\'t be greater than `max_value`.')
+    Check length of the passed value.
 
-        self.min_value = min_value
-        self.max_value = max_value
-        super().__init__(error_messages)
-
+    :param minimum: Value must >= minimum, and `None` is equal to -∞.
+    :param maximum: Value must <= maximum, and `None` is equal to +∞.
+    :param error_messages: Keys `{'too_small', 'too_large'}`.
+    """
     def __call__(self, value):
-        if self.min_value is not None and value < self.min_value:
-            self.error('too_small')
+        super().__call__(len(value))
 
-        if self.max_value is not None and value > self.max_value:
-            self.error('too_large')
-
-ERROR_MESSAGES[ComparisonValidator] = {
-    'too_small': 'Value must >= {self.min_value}.',
-    'too_large': 'Value must <= {self.max_value}.',
+ERROR_MESSAGES[LengthValidator] = {
+    'too_small': 'Length must >= {self.minimum}.',
+    'too_large': 'Length must <= {self.maximum}.',
 }
 
 
 class TypeValidator(Validator):
     """Check type of value.
 
-    :param error_messages: includ keys {'wrong_type'}
+    :param error_messages: Keys `{'wrong_type'}`.
     """
     def __init__(self, class_or_tuple, error_messages: dict = None):
         self.class_or_tuple = class_or_tuple
@@ -101,7 +86,7 @@ class RegexValidator(Validator):
     """
     Check if string match regex pattern.
 
-    :param error_messages: includ keys {'no_match'}
+    :param error_messages: Keys `{'no_match'}`.
     """
     def __init__(self, regex: str, error_messages: dict = None):
         self.regex = re.compile(regex)

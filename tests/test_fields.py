@@ -87,7 +87,7 @@ class FieldTest(TestCase):
     def test_string_field(self):
         field = String(
             name='string', key='string', min_length=2, max_length=12,
-            error_messages={'too_short': 'Must >= {self.min_length}'})
+            error_messages={'too_small': 'Must >= {self.minimum}'})
 
         # dump
         self.assertEqual(field.dump('xxx'), 'xxx')
@@ -108,8 +108,8 @@ class FieldTest(TestCase):
         # change validator's error message
         self.assertEqual(ctx.exception.msg, 'Must >= 2')
         self.assertEqual(
-            field.error_messages['too_short'],
-            field.opts.validators[0].error_messages['too_short'])
+            field.error_messages['too_small'],
+            field.opts.validators[0].error_messages['too_small'])
 
         field.opts.allow_none = False
         with self.assertRaises(ValidationError):
@@ -126,7 +126,9 @@ class FieldTest(TestCase):
         self.assertEqual(ctx.exception.msg, 'not match "a"')
 
     def test_int_field(self):
-        field = Integer(name='integer', key='integer', min_value=-10, max_value=100)
+        field = Integer(
+            name='integer', key='integer', minimum=-10, maximum=100,
+            error_messages={'too_large': '{self.maximum}'})
 
         # dump
         self.assertEqual(field.dump(1), 1)
@@ -139,17 +141,18 @@ class FieldTest(TestCase):
         self.assertEqual(field.load('1'), 1)
         self.assertEqual(field.load(None), None)
 
+        with self.assertRaises(ValidationError) as ctx:
+            field.load(111)
+        self.assertEqual(ctx.exception.msg, '100')
         with self.assertRaises(ValueError):
             field.load('')
-        with self.assertRaises(ValidationError):
-            field.load(111)
         with self.assertRaises(ValueError):
             field.load('asd')
         with self.assertRaises(TypeError):
             field.load([])
 
     def test_float_field(self):
-        field = Float(name='float_', key='float', min_value=-11.1, max_value=111.1)
+        field = Float(name='float_', key='float', minimum=-11.1, maximum=111.1)
 
         # dump
         self.assertEqual(field.dump(5.5), 5.5)

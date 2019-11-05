@@ -19,6 +19,6 @@ from .fields import (
 from .validators import (
     Validator,
     LengthValidator,
-    ComparisonValidator,
+    RangeValidator,
 )
 from .exceptions import ValidationError
