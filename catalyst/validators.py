@@ -1,12 +1,17 @@
 """Validators"""
 
 import re
+from typing import Dict
 
 from .utils import ErrorMessageMixin, ERROR_MESSAGES
 
 
 class Validator(ErrorMessageMixin):
-    def __init__(self, error_messages: dict = None):
+    """Check whether value is valid.
+
+    :param error_messages: see `catalyst.utils.ErrorMessageMixin`.
+    """
+    def __init__(self, error_messages: Dict[str, str] = None):
         self.collect_error_messages(error_messages)
 
     def __call__(self, value):
@@ -24,7 +29,7 @@ class RangeValidator(Validator):
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
     :param error_messages: Keys `{'too_small', 'too_large'}`
     """
-    def __init__(self, minimum=None, maximum=None, error_messages: dict = None):
+    def __init__(self, minimum=None, maximum=None, error_messages: Dict[str, str] = None):
         if minimum is not None and maximum is not None \
             and minimum > maximum:
             raise ValueError('`minimum` can\'t be greater than `maximum`.')
@@ -66,9 +71,10 @@ ERROR_MESSAGES[LengthValidator] = {
 class TypeValidator(Validator):
     """Check type of value.
 
+    :param class_or_tuple: Same as `isinstance` function's argument.
     :param error_messages: Keys `{'wrong_type'}`.
     """
-    def __init__(self, class_or_tuple, error_messages: dict = None):
+    def __init__(self, class_or_tuple, error_messages: Dict[str, str] = None):
         self.class_or_tuple = class_or_tuple
         super().__init__(error_messages)
 
@@ -83,12 +89,12 @@ ERROR_MESSAGES[TypeValidator] = {
 
 
 class RegexValidator(Validator):
-    """
-    Check if string match regex pattern.
+    """Check if string match regex pattern.
 
+    :param regex: Regex pattern.
     :param error_messages: Keys `{'no_match'}`.
     """
-    def __init__(self, regex: str, error_messages: dict = None):
+    def __init__(self, regex: str, error_messages: Dict[str, str] = None):
         self.regex = re.compile(regex)
         super().__init__(error_messages)
 

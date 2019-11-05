@@ -1,4 +1,4 @@
-from typing import Mapping, Iterable
+from typing import Mapping, Iterable, Dict
 
 from .exceptions import ValidationError
 
@@ -45,17 +45,27 @@ class LoadResult(CatalystResult):
 
 
 # global error messages, {'class': {'error_key': 'error_message'}}
-ERROR_MESSAGES = {}
+ERROR_MESSAGES = {}  # type: Dict[type, Dict[str, str]]
 UNKNOWN_ERROR_MESSAGE = (
     'Error key `{key}` does not exist in the `error_messages` dict of `{self}`.'
 )
 
 class ErrorMessageMixin:
-    def collect_error_messages(self, error_messages: dict = None):
-        """
-        Collect default error message from self and parent classes.
+    """A helper mixin for error messages management.
+    Use a global variable `ERROR_MESSAGES` which its keys are classes,
+    and values are error message dicts. Error messages will
+    be collect into `self.error_messages` in the order of class inheritance.
+    It is easy to manage messages centrally or separately.
 
-        :param error_messages: error messages dict.
+    The keys in error message dict are used to find message.
+    Message string support format syntax, and always takes an argument
+    named `self` which is the instance who has `self.error_messages`.
+    """
+
+    def collect_error_messages(self, error_messages: Dict[str, str] = None):
+        """Collect default error messages from self and parent classes.
+
+        :param error_messages: Error messages that override default.
         """
         messages = {}
         for cls in reversed(self.__class__.__mro__):
@@ -64,9 +74,15 @@ class ErrorMessageMixin:
         self.error_messages = messages
 
     def error(self, error_key: str, **kwargs):
+        """Raise `Exception` with message by key."""
         raise self.get_error(error_key, **kwargs)
 
     def get_error(self, error_key: str, **kwargs):
+        """Get formated message by key and return it as `Exception`.
+
+        :param error_key: Key of `self.error_messages`.
+        :param kwargs: Passed to `str.format` method.
+        """
         try:
             msg = self.error_messages[error_key]
         except KeyError:

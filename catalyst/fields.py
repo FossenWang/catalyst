@@ -1,6 +1,6 @@
 "Fields"
 
-from typing import Callable, Any, Iterable, Union, Mapping, Hashable
+from typing import Callable, Any, Iterable, Union, Mapping, Hashable, Dict
 from datetime import datetime, time, date
 
 from .utils import (
@@ -56,7 +56,7 @@ class Field(ErrorMessageMixin):
             no_load: bool = None,
             validators: MultiValidator = None,
             allow_none: bool = None,
-            error_messages: dict = None,
+            error_messages: Dict[str, str] = None,
             **kwargs):
         """if `default` is set, `required` has no effect."""
         self.name = name
@@ -177,8 +177,8 @@ class String(Field):
 
     def __init__(
             self,
-            min_length: int = None,
             max_length: int = None,
+            min_length: int = None,
             regex: str = None,
             **kwargs):
         super().__init__(**kwargs)
