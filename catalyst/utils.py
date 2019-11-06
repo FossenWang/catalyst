@@ -44,32 +44,28 @@ class LoadResult(CatalystResult):
     pass
 
 
-# global error messages, {'class': {'error_key': 'error_message'}}
-ERROR_MESSAGES = {}  # type: Dict[type, Dict[str, str]]
 UNKNOWN_ERROR_MESSAGE = (
     'Error key `{key}` does not exist in the `error_messages` dict of `{self}`.'
 )
 
 class ErrorMessageMixin:
     """A helper mixin for error messages management.
-    Use a global variable `ERROR_MESSAGES` which its keys are classes,
-    and values are error message dicts. Error messages will
-    be collect into `self.error_messages` in the order of class inheritance.
-    It is easy to manage messages centrally or separately.
-
-    The keys in error message dict are used to find message.
-    Message string support format syntax, and always takes an argument
-    named `self` which is the instance who has `self.error_messages`.
+    Class attribute `default_error_messages` stores default error messages.
+    Error messages will be collect into `self.error_messages` in the order
+    of class inheritance, and can be overrided by `error_messages` argument.
     """
+    default_error_messages = {}
 
     def collect_error_messages(self, error_messages: Dict[str, str] = None):
         """Collect default error messages from self and parent classes.
 
-        :param error_messages: Error messages that override default.
+        :param error_messages: Its keys are used to find message., values are
+        string which support format syntax, and always takes an argument
+        named `self` which is the instance.
         """
         messages = {}
         for cls in reversed(self.__class__.__mro__):
-            messages.update(ERROR_MESSAGES.get(cls, {}))
+            messages.update(cls.__dict__.get('default_error_messages', {}))
         messages.update(error_messages or {})
         self.error_messages = messages
 

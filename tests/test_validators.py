@@ -2,28 +2,24 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from catalyst.exceptions import ValidationError
-from catalyst.utils import ERROR_MESSAGES
 from catalyst.validators import (
-    Validator, LengthValidator,
-    RangeValidator, TypeValidator,
+    Validator,
+    LengthValidator,
+    RangeValidator,
+    TypeValidator,
     RegexValidator,
 )
 
 
 class ValidationTest(TestCase):
-
-    @patch.dict('catalyst.utils.ERROR_MESSAGES')
     def test_base_validator(self):
         with self.assertRaises(NotImplementedError):
             Validator()(None)
 
         class NewValidator(Validator):
+            default_error_messages = {'msg': 'default'}
             def __call__(self, value):
                 self.error('msg')
-
-        ERROR_MESSAGES.update({
-            NewValidator: {'msg': 'default'}
-        })
 
         # test alterable error messages
         default_validator = NewValidator()
@@ -37,9 +33,9 @@ class ValidationTest(TestCase):
         self.assertEqual(str(c.exception), 'custom')
         self.assertEqual(repr(c.exception), "ValidationError('custom')")
 
-    @patch.dict('catalyst.utils.ERROR_MESSAGES')
+    @patch.dict('catalyst.validators.RangeValidator.default_error_messages')
     def test_range_validator(self):
-        ERROR_MESSAGES[RangeValidator].update({'too_small': 'too_small'})
+        RangeValidator.default_error_messages.update({'too_small': 'too_small'})
         compare_integer = RangeValidator(0, 100, {'too_large': 'too_large'})
         compare_integer(1)
         compare_integer(0)
@@ -74,9 +70,9 @@ class ValidationTest(TestCase):
         with self.assertRaises(ValueError):
             RangeValidator(1, 0)
 
-    @patch.dict('catalyst.utils.ERROR_MESSAGES')
+    @patch.dict('catalyst.validators.LengthValidator.default_error_messages')
     def test_length_validator(self):
-        ERROR_MESSAGES[LengthValidator].update({'too_small': 'too_small'})
+        LengthValidator.default_error_messages.update({'too_small': 'too_small'})
         validator = LengthValidator(2, 10, {'too_large': 'too_large'})
 
         validator('x' * 2)

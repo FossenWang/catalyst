@@ -4,7 +4,7 @@ from unittest.mock import patch
 from catalyst.exceptions import ValidationError
 from catalyst.utils import (
     snake_to_camel, ErrorMessageMixin, CatalystResult,
-    missing, OptionBox, ERROR_MESSAGES,
+    missing, OptionBox,
 )
 
 
@@ -17,18 +17,13 @@ class UtilsTest(TestCase):
         self.assertEqual(snake_to_camel(''), '')
         self.assertEqual(snake_to_camel('___'), '')
 
-    @patch.dict('catalyst.utils.ERROR_MESSAGES')
+    @patch.dict('catalyst.utils.ErrorMessageMixin.default_error_messages')
     def test_error_msg(self):
         class A(ErrorMessageMixin):
-            pass
+            default_error_messages = {'a': 'a'}
 
         class B(A):
-            pass
-
-        ERROR_MESSAGES.update({
-            A: {'a': 'a'},
-            B: {'b': 'b'},
-        })
+            default_error_messages = {'b': 'b'}
 
         b = B()
         b.collect_error_messages({'c': 'c'})
@@ -48,23 +43,19 @@ class UtilsTest(TestCase):
             b.error('b')
         self.assertEqual(str(context.exception), 'bb')
 
-        # test global error messages
+        # test change default_error_messages
         a = A()
 
-        ERROR_MESSAGES.update({
-            ErrorMessageMixin: {1: 1},
-        })
+        ErrorMessageMixin.default_error_messages = {1: 1}
         a.collect_error_messages()
         self.assertDictEqual(a.error_messages, {'a': 'a', 1: 1})
 
-        ERROR_MESSAGES.update({
-            A: {2: 2, 'a': 'aaaaa'},
-        })
+        A.default_error_messages = {2: 2, 'a': 'aaaaa'}
         a.collect_error_messages()
         self.assertDictEqual(a.error_messages, {'a': 'aaaaa', 1: 1, 2: 2})
 
-        del ERROR_MESSAGES[A]
-        del ERROR_MESSAGES[ErrorMessageMixin]
+        del A.default_error_messages
+        del ErrorMessageMixin.default_error_messages
         a.collect_error_messages()
         self.assertDictEqual(a.error_messages, {})
 

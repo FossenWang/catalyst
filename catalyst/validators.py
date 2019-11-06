@@ -1,9 +1,7 @@
-"""Validators"""
-
 import re
 from typing import Dict
 
-from .utils import ErrorMessageMixin, ERROR_MESSAGES
+from .utils import ErrorMessageMixin
 
 
 class Validator(ErrorMessageMixin):
@@ -20,7 +18,6 @@ class Validator(ErrorMessageMixin):
             'or raise any exception if invalid.'))
 
 
-# class ComparisonValidator(Validator):
 class RangeValidator(Validator):
     """Check the passed value whether it is greater than
     or equal to `minimum` and less than or equal to `maximum`.
@@ -29,6 +26,11 @@ class RangeValidator(Validator):
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
     :param error_messages: Keys `{'too_small', 'too_large'}`
     """
+    default_error_messages = {
+        'too_small': 'Value must >= {self.minimum}.',
+        'too_large': 'Value must <= {self.maximum}.',
+    }
+
     def __init__(self, minimum=None, maximum=None, error_messages: Dict[str, str] = None):
         if minimum is not None and maximum is not None \
             and minimum > maximum:
@@ -45,11 +47,6 @@ class RangeValidator(Validator):
         if self.maximum is not None and value > self.maximum:
             self.error('too_large')
 
-ERROR_MESSAGES[RangeValidator] = {
-    'too_small': 'Value must >= {self.minimum}.',
-    'too_large': 'Value must <= {self.maximum}.',
-}
-
 
 class LengthValidator(RangeValidator):
     """
@@ -59,13 +56,13 @@ class LengthValidator(RangeValidator):
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
     :param error_messages: Keys `{'too_small', 'too_large'}`.
     """
+    default_error_messages = {
+        'too_small': 'Length must >= {self.minimum}.',
+        'too_large': 'Length must <= {self.maximum}.',
+    }
+
     def __call__(self, value):
         super().__call__(len(value))
-
-ERROR_MESSAGES[LengthValidator] = {
-    'too_small': 'Length must >= {self.minimum}.',
-    'too_large': 'Length must <= {self.maximum}.',
-}
 
 
 class TypeValidator(Validator):
@@ -74,6 +71,10 @@ class TypeValidator(Validator):
     :param class_or_tuple: Same as `isinstance` function's argument.
     :param error_messages: Keys `{'wrong_type'}`.
     """
+    default_error_messages = {
+        'wrong_type': 'Type must be {self.class_or_tuple}.',
+    }
+
     def __init__(self, class_or_tuple, error_messages: Dict[str, str] = None):
         self.class_or_tuple = class_or_tuple
         super().__init__(error_messages)
@@ -83,10 +84,6 @@ class TypeValidator(Validator):
             error = self.get_error('wrong_type')
             raise TypeError(error.msg)
 
-ERROR_MESSAGES[TypeValidator] = {
-    'wrong_type': 'Type must be {self.class_or_tuple}.',
-}
-
 
 class RegexValidator(Validator):
     """Check if string match regex pattern.
@@ -94,6 +91,10 @@ class RegexValidator(Validator):
     :param regex: Regex pattern.
     :param error_messages: Keys `{'no_match'}`.
     """
+    default_error_messages = {
+        'no_match': 'No match for pattern "{self.regex.pattern}".',
+    }
+
     def __init__(self, regex: str, error_messages: Dict[str, str] = None):
         self.regex = re.compile(regex)
         super().__init__(error_messages)
@@ -103,7 +104,3 @@ class RegexValidator(Validator):
         if not match:
             self.error('no_match')
         return match
-
-ERROR_MESSAGES[RegexValidator] = {
-    'no_match': 'No match for pattern "{self.regex.pattern}".',
-}
