@@ -1,3 +1,4 @@
+import decimal
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable, Dict
 from datetime import datetime, time, date
 
@@ -209,22 +210,42 @@ class Number(Field):
 class Float(Number):
     """Float field.
 
-    :param minimum: Value must >= minimum, and `None` is equal to -∞.
-    :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys `{'too_small', 'too_large'}`.
+    :param kwargs: Same as `Number` field.
     """
 
 
 class Integer(Number):
     """Integer field.
 
-    :param minimum: Value must >= minimum, and `None` is equal to -∞.
-    :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys `{'too_small', 'too_large'}`.
+    :param kwargs: Same as `Number` field.
     """
-    class Options(Field.Options):
+    class Options(Number.Options):
         formatter = int
         parser = int
+
+
+class Decimal(Number):
+    """Decimal field.
+
+    :param kwargs: Same as `Number` field.
+    """
+    def __init__(self, to_string: bool = None, **kwargs):
+        super().__init__(to_string=to_string, **kwargs)
+
+    class Options(Number.Options):
+        to_string = True
+
+        @staticmethod
+        def to_decimal(value):
+            return decimal.Decimal(str(value))
+
+        parser = to_decimal
+
+        def formatter(self, value):
+            num = self.to_decimal(value)
+            if self.to_string:
+                num = str(num)
+            return num
 
 
 class Boolean(Field):

@@ -1,3 +1,4 @@
+import decimal
 from unittest import TestCase
 from datetime import datetime, timedelta
 
@@ -6,7 +7,7 @@ from catalyst.fields import (
     Field, String, Integer, Float,
     Boolean, List, Method,
     Datetime, Time, Date,
-    Nested,
+    Nested, Decimal,
 )
 from catalyst.exceptions import ValidationError
 
@@ -175,6 +176,17 @@ class FieldTest(TestCase):
             field.load(111.11)
         with self.assertRaises(TypeError):
             field.load([])
+
+    def test_decimal_field(self):
+        field = Decimal()
+
+        self.assertEqual(field.format(1), '1')
+        self.assertEqual(field.format(1.1), '1.1')
+        self.assertEqual(field.format('1.1'), '1.1')
+        self.assertEqual(field.format('nan'), 'NaN')
+        self.assertEqual(field.format('inf'), 'Infinity')
+
+        print(field)
 
     def test_bool_field(self):
         field = Boolean()
