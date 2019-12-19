@@ -186,7 +186,21 @@ class FieldTest(TestCase):
         self.assertEqual(field.format('nan'), 'NaN')
         self.assertEqual(field.format('inf'), 'Infinity')
 
-        print(field)
+        self.assertEqual(field.parse(1), decimal.Decimal('1'))
+        self.assertEqual(field.parse(1.1), decimal.Decimal('1.1'))
+        self.assertEqual(field.parse('1.1'), decimal.Decimal('1.1'))
+        self.assertEqual(str(field.parse('nan')), 'NaN')
+        self.assertEqual(str(field.parse('inf')), 'Infinity')
+
+        field = Decimal(dump_as=float, scale=2, rounding=decimal.ROUND_CEILING)
+        self.assertEqual(field.format(1.1), 1.1)
+        self.assertEqual(field.format(1), 1.0)
+        self.assertEqual(field.format('inf'), float('inf'))
+        self.assertEqual(field.format(1.111), 1.12)
+        self.assertEqual(field.format(-1.111), -1.11)
+
+        with self.assertRaises(TypeError):
+            Decimal(dump_as=1)
 
     def test_bool_field(self):
         field = Boolean()

@@ -227,25 +227,46 @@ class Integer(Number):
 class Decimal(Number):
     """Decimal field.
 
+    :param scale: The number of digits to the right of the decimal point.
+        If `None`, does not quantize the value.
+    :param rounding: The rounding mode, for example `decimal.ROUND_UP`.
+        If `None`, the rounding mode of the current thread's context is used.
+    :param dump_as: Data type that the value is serialized to.
     :param kwargs: Same as `Number` field.
     """
-    def __init__(self, to_string: bool = None, **kwargs):
-        super().__init__(to_string=to_string, **kwargs)
+    def __init__(
+            self,
+            scale: int = None,
+            rounding: str = None,
+            dump_as: type = None,
+            **kwargs):
+        super().__init__(
+            scale=scale, rounding=rounding, dump_as=dump_as, **kwargs)
+        if not callable(self.opts.dump_as):
+            raise TypeError('`dump_as` must be callable.')
+        scale = self.opts.scale
+        if isinstance(scale, int):
+            self.opts.exponent = decimal.Decimal((0, (), -scale))
 
     class Options(Number.Options):
-        to_string = True
+        dump_as = str
+        scale = None
+        rounding = None
+        exponent = None
 
-        @staticmethod
-        def to_decimal(value):
-            return decimal.Decimal(str(value))
+        def to_decimal(self, value):
+            if isinstance(value, float):
+                value = str(value)
+            value = decimal.Decimal(value)
+            if self.exponent is not None and value.is_finite():
+                value = value.quantize(self.exponent, rounding=self.rounding)
+            return value
 
         parser = to_decimal
 
         def formatter(self, value):
             num = self.to_decimal(value)
-            if self.to_string:
-                num = str(num)
-            return num
+            return self.dump_as(num)
 
 
 class Boolean(Field):
