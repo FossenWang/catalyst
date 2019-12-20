@@ -205,8 +205,8 @@ class CatalystTest(TestCase):
         self.assertIs(fields['a'], Schema.a)
         self.assertIs(fields['b'], Schema.b)
         # setting opts of field works
-        self.assertIsNone(Schema.b.opts.formatter(None))
-        self.assertIs(Schema.b.opts.formatter, Schema.test)
+        self.assertIsNone(Schema.b.formatter(None))
+        self.assertIs(Schema.b.formatter, Schema.test)
 
         # instance also works
         catalyst = TestDataCatalyst(Schema())

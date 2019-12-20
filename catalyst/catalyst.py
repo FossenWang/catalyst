@@ -88,7 +88,7 @@ class BaseCatalyst:
             self._set_fields(self, attrs)
 
         if not fields:
-            fields = set(self._field_dict.keys())
+            fields = self._field_dict.keys()
         if not dump_fields:
             dump_fields = fields
         if not load_fields:

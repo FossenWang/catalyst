@@ -60,7 +60,7 @@ class FieldTest(TestCase):
             a.fixed_value.load(100)
 
         # test validators
-        self.assertEqual(len(a.fixed_value.opts.validators), 2)
+        self.assertEqual(len(a.fixed_value.validators), 2)
 
         # test wrong args
         with self.assertRaises(TypeError):
@@ -75,9 +75,9 @@ class FieldTest(TestCase):
         # test set opts when init field
         field = Field(
             formatter=A.fixed_value_formatter,
-            parser=a.fixed_value.opts.parser)
-        self.assertEqual(field.opts.formatter, A.fixed_value_formatter)
-        self.assertEqual(field.opts.parser, A.fixed_value_add_1)
+            parser=a.fixed_value.parser)
+        self.assertEqual(field.formatter, A.fixed_value_formatter)
+        self.assertEqual(field.parser, A.fixed_value_add_1)
 
         # test error msg
         field = Field(key='a', allow_none=False, error_messages={'none': '666'})
@@ -110,7 +110,7 @@ class FieldTest(TestCase):
         self.assertEqual(ctx.exception.msg, 'Must >= 2')
         self.assertEqual(
             field.error_messages['too_small'],
-            field.opts.validators[0].error_messages['too_small'])
+            field.validators[0].error_messages['too_small'])
 
         field.opts.allow_none = False
         with self.assertRaises(ValidationError):
@@ -263,7 +263,7 @@ class FieldTest(TestCase):
         self.assertEqual(result.valid_data, [1.0])
 
         with self.assertRaises(ValueError):
-            field.opts._process_many('xxx', None)
+            field._process_many('xxx', None)
 
     def test_callable_field(self):
         field = Method(
