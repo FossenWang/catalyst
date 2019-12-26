@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 
-from catalyst.catalyst import Catalyst
+from catalyst.core import Catalyst
 from catalyst.packer import CatalystPacker
 from catalyst.fields import Float
 from catalyst.exceptions import ValidationError

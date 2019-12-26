@@ -1,4 +1,4 @@
-from .catalyst import (
+from .core import (
     Catalyst,
 )
 from .fields import (

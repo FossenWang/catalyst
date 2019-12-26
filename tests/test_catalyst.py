@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from catalyst.catalyst import Catalyst, BaseCatalyst, CatalystMeta
+from catalyst.core import Catalyst, BaseCatalyst, CatalystMeta
 from catalyst.fields import Field, String, Integer, \
     Float, Boolean, Method, List
 from catalyst.exceptions import ValidationError
