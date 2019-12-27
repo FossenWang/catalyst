@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from .utils import LoadResult, DumpResult, CatalystResult
+from .utils import LoadResult, DumpResult, BaseResult
 from .exceptions import ValidationError
 
 
@@ -26,7 +26,7 @@ class CatalystPacker:
             data: Sequence,
             raise_error: bool = None,
             all_errors: bool = None,
-        ) -> CatalystResult:
+        ) -> BaseResult:
         if name == 'dump':
             ResultClass = DumpResult
         elif name == 'load':

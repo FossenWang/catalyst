@@ -7,7 +7,7 @@ from .fields import Field, Nested
 from .exceptions import ValidationError
 from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,
-    LoadResult, DumpResult, CatalystResult, OptionBox
+    LoadResult, DumpResult, BaseResult, OptionBox
 )
 
 
@@ -116,83 +116,40 @@ class BaseCatalyst:
         args = ', '.join(args)
         return f'<{self.__class__.__name__}({args})>'
 
-    def _process_flow(
-            self,
-            name: str,
-            many: bool,
-            data: Any,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> CatalystResult:
-        """Core basic process flow.
-        """
-        if name == 'dump':
-            ResultClass = DumpResult
-        elif name == 'load':
-            ResultClass = LoadResult
-        else:
-            raise ValueError("Argument `name` must be `dump` or `load`.")
+    def _get_dump_params(self):
+        return {
+            'source_attr': 'name',
+            'target_attr': 'key',
+            'required_attr': 'dump_required',
+            'default_attr': 'dump_default',
+            'field_method': self.opts.dump_method,
+            'field_dict': self._dump_field_dict,
+            'assign_getter': self._assign_dump_getter
+        }
 
-        if many:
-            method_name = f'{name}_many'
-            main_process = self._process_many
-            empty_data = []
-        else:
-            method_name = name
-            main_process = self._process_one
-            empty_data = {}
+    def _get_load_params(self):
+        return {
+            'source_attr': 'key',
+            'target_attr': 'name',
+            'required_attr': 'load_required',
+            'default_attr': 'load_default',
+            'field_method': self.opts.load_method,
+            'field_dict': self._load_field_dict,
+            'assign_getter': self._assign_load_getter
+        }
 
-        all_errors = self.opts.get(all_errors=all_errors)
-        raise_error = self.opts.get(raise_error=raise_error)
-
-        try:
-            # pre process
-            process_name = f'pre_{method_name}'
-            valid_data = getattr(self, process_name)(data)
-
-            # main process
-            process_name = method_name
-            valid_data, errors, invalid_data = main_process(name, valid_data, all_errors)
-
-            # post process
-            process_name = f'post_{method_name}'
-            valid_data = getattr(self, process_name)(valid_data)
-        except Exception as e:
-            # handle error which raised during processing
-            error_key = self.opts.error_keys.get(process_name, process_name)
-            errors = {error_key: e}
-            invalid_data = data
-            valid_data = empty_data
-
-        result = ResultClass(valid_data, errors, invalid_data)
-        if errors and raise_error:
-            raise ValidationError(result)
-        return result
-
-    def _process_one(self, name: str, data: Any, all_errors: bool):
-        if name == 'dump':
-            source_attr = 'name'
-            target_attr = 'key'
-            field_dict = self._dump_field_dict  # type: FieldDict
-            assign_getter = self._assign_dump_getter
-            method = self.opts.dump_method
-        elif name == 'load':
-            source_attr = 'key'
-            target_attr = 'name'
-            field_dict = self._load_field_dict  # type: FieldDict
-            assign_getter = self._assign_load_getter
-            method = self.opts.load_method
-        else:
-            raise ValueError("Argument `name` must be 'dump' or 'load'.")
-
+    def _process_one(
+            self, data: Any, all_errors: bool,
+            assign_getter: Callable, field_dict: FieldDict, field_method: str,
+            source_attr: str, target_attr: str, required_attr: str, default_attr: str, **context):
         # According to the type of `data`, assign a function to get field value from `data`
         get_value = assign_getter(data)
 
         valid_data, errors, invalid_data = {}, {}, {}
 
         for field in field_dict.values():
-            required = getattr(field.opts, f'{name}_required')
-            default = getattr(field, f'{name}_default')
+            required = getattr(field.opts, required_attr)
+            default = getattr(field, default_attr)
             source = getattr(field, source_attr)
             target = getattr(field, target_attr)
 
@@ -207,11 +164,11 @@ class BaseCatalyst:
                             break
                     continue
 
-                valid_data[target] = getattr(field, method)(raw_value)
+                valid_data[target] = getattr(field, field_method)(raw_value)
             except Exception as e:
                 # collect errors and invalid data
-                if isinstance(e, ValidationError) and isinstance(e.msg, CatalystResult):
-                    # distribute nested data in CatalystResult
+                if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
+                    # distribute nested data in BaseResult
                     valid_data[target] = e.msg.valid_data
                     errors[source] = e.msg.errors
                     invalid_data[source] = e.msg.invalid_data
@@ -223,10 +180,15 @@ class BaseCatalyst:
 
         return valid_data, errors, invalid_data
 
-    def _process_many(self, name: str, data: Sequence, all_errors: bool):
+    def _process_many(self, data: Sequence, all_errors: bool, method_name: str, **context):
         valid_data, errors, invalid_data = [], {}, {}
+        method_name = method_name[:4]
+        # TODO 这个参数存疑, 如果出错, post_xxx_many 函数不应该继续运行
+        raise_error = False
         for i, item in enumerate(data):
-            result = self._process_flow(name, False, item, False, all_errors)
+            result = self._process_flow(
+                item, method_name, self._process_one,
+                raise_error, all_errors, **context)
             valid_data.append(result.valid_data)
             if not result.is_valid:
                 errors[i] = result.errors
@@ -235,8 +197,62 @@ class BaseCatalyst:
                     break
         return valid_data, errors, invalid_data
 
+    def _process_flow(
+            self,
+            data: Any,
+            method_name: str,
+            main_process: Callable,
+            raise_error: bool = None,
+            all_errors: bool = None,
+            **context,
+        ) -> BaseResult:
+        """Core basic process flow."""
+        # context 为一次数据处理的上下文, 里面保存着 main_process 需要的参数
+        # 只有在 _process_many 函数里调用 _process_flow 时必须传 context
+        # 也就是说有 context 时, 该函数是在 _process_many 里面被调用的
+        if not context:
+            if method_name.startswith('dump'):
+                context = self._get_dump_params()
+                context['ResultClass'] = DumpResult
+            else:
+                context = self._get_load_params()
+                context['ResultClass'] = LoadResult
+            raise_error = self.opts.get(raise_error=raise_error)
+            all_errors = self.opts.get(all_errors=all_errors)
+
+        context['method_name'] = method_name
+        context['all_errors'] = all_errors
+
+        try:
+            # pre process
+            process_name = f'pre_{method_name}'
+            valid_data = getattr(self, process_name)(data)
+
+            # main process
+            process_name = method_name
+            valid_data, errors, invalid_data = main_process(valid_data, **context)
+
+            # post process
+            process_name = f'post_{method_name}'
+            valid_data = getattr(self, process_name)(valid_data)
+        except Exception as e:
+            # handle error which raised during processing
+            error_key = self.opts.error_keys.get(process_name, process_name)
+            errors = {error_key: e}
+            invalid_data = data
+            # valid_data = None
+            if method_name.endswith('_many'):
+                valid_data = []
+            else:
+                valid_data = {}
+
+        result = context['ResultClass'](valid_data, errors, invalid_data)
+        if errors and raise_error:
+            raise ValidationError(result)
+        return result
+
     def _process_args(
-            self, func: Callable = None, name: str = None, all_errors: bool = None,
+            self, func: Callable = None, method_name: str = None, all_errors: bool = None,
         ) -> Callable:
         """Decorator for handling args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
@@ -248,11 +264,12 @@ class BaseCatalyst:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 ba = sig.bind(*args, **kwargs)
-                result = self._process_flow(name, False, ba.arguments, True, all_errors)
+                result = self._process_flow(
+                    ba.arguments, method_name, self._process_one, True, all_errors)
                 ba.arguments.update(result.valid_data)
                 return func(*ba.args, **ba.kwargs)
             return wrapper
-        return partial(self._process_args, name=name, all_errors=all_errors)
+        return partial(self._process_args, method_name=method_name, all_errors=all_errors)
 
     def dump(
             self,
@@ -260,7 +277,7 @@ class BaseCatalyst:
             raise_error: bool = None,
             all_errors: bool = None,
         ) -> DumpResult:
-        return self._process_flow('dump', False, data, raise_error, all_errors)
+        return self._process_flow(data, 'dump', self._process_one, raise_error, all_errors)
 
     def load(
             self,
@@ -268,7 +285,7 @@ class BaseCatalyst:
             raise_error: bool = None,
             all_errors: bool = None,
         ) -> LoadResult:
-        return self._process_flow('load', False, data, raise_error, all_errors)
+        return self._process_flow(data, 'load', self._process_one, raise_error, all_errors)
 
     def dump_many(
             self,
@@ -276,7 +293,7 @@ class BaseCatalyst:
             raise_error: bool = None,
             all_errors: bool = None,
         ) -> DumpResult:
-        return self._process_flow('dump', True, data, raise_error, all_errors)
+        return self._process_flow(data, 'dump_many', self._process_many, raise_error, all_errors)
 
     def load_many(
             self,
@@ -284,7 +301,7 @@ class BaseCatalyst:
             raise_error: bool = None,
             all_errors: bool = None,
         ) -> LoadResult:
-        return self._process_flow('load', True, data, raise_error, all_errors)
+        return self._process_flow(data, 'load_many', self._process_many, raise_error, all_errors)
 
     def dump_args(self, func: Callable = None, all_errors: bool = None) -> Callable:
         return self._process_args(func, 'dump', all_errors)

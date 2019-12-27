@@ -3,7 +3,7 @@ from typing import Mapping, Iterable, Dict
 from .exceptions import ValidationError
 
 
-class CatalystResult:
+class BaseResult:
     def __init__(self, valid_data: Iterable, errors: Mapping, invalid_data: Mapping):
         self.valid_data = valid_data
         self.errors = errors
@@ -36,11 +36,11 @@ class CatalystResult:
         return not self.errors
 
 
-class DumpResult(CatalystResult):
+class DumpResult(BaseResult):
     pass
 
 
-class LoadResult(CatalystResult):
+class LoadResult(BaseResult):
     pass
 
 

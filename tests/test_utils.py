@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from catalyst.exceptions import ValidationError
 from catalyst.utils import (
-    snake_to_camel, ErrorMessageMixin, CatalystResult,
+    snake_to_camel, ErrorMessageMixin, BaseResult,
     missing, OptionBox,
 )
 
@@ -59,17 +59,17 @@ class UtilsTest(TestCase):
         a.collect_error_messages()
         self.assertDictEqual(a.error_messages, {})
 
-    def test_catalyst_result(self):
-        result = CatalystResult({}, {}, {})
+    def test_base_result(self):
+        result = BaseResult({}, {}, {})
         self.assertTrue(result.is_valid)
-        s = 'CatalystResult(valid_data={}, errors={}, invalid_data={})'
+        s = 'BaseResult(valid_data={}, errors={}, invalid_data={})'
         self.assertEqual(repr(result), s)
         self.assertEqual(str(result), '{}')
 
-        result = CatalystResult(
+        result = BaseResult(
             valid_data={}, errors={'error': ValidationError('error')}, invalid_data={0: 0})
         self.assertFalse(result.is_valid)
-        s = ("CatalystResult(valid_data={}, "
+        s = ("BaseResult(valid_data={}, "
              "errors={'error': ValidationError('error')}, invalid_data={0: 0})")
         self.assertEqual(repr(result), s)
         self.assertDictEqual(result.format_errors(), {'error': 'error'})

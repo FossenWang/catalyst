@@ -1,6 +1,11 @@
 from unittest import TestCase
 
-from catalyst.core import Catalyst, BaseCatalyst, CatalystMeta
+from catalyst.core import (
+    # xxx,
+    BaseCatalyst,
+    CatalystMeta,
+    Catalyst,
+)
 from catalyst.fields import Field, String, Integer, \
     Float, Boolean, Method, List
 from catalyst.exceptions import ValidationError
@@ -350,10 +355,10 @@ class CatalystTest(TestCase):
             TestDataCatalyst(load_method=1)
 
         # wrong handle name
-        with self.assertRaises(ValueError):
-            test_catalyst._process_flow(1, False, {})
-        with self.assertRaises(ValueError):
-            test_catalyst._process_one(1, {}, True)
+        # with self.assertRaises(ValueError):
+        #     test_catalyst._process_flow(1, False, {})
+        # with self.assertRaises(ValueError):
+        #     test_catalyst._process_one(1, {}, True)
 
     def test_field_args_for_dump_and_load(self):
         def create_catalyst(**kwargs):
