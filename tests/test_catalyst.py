@@ -1,7 +1,6 @@
 from unittest import TestCase
 
 from catalyst.core import (
-    # xxx,
     BaseCatalyst,
     CatalystMeta,
     Catalyst,
