@@ -52,7 +52,8 @@ class CatalystPacker:
     def _process_one(self, name: str, data: Sequence, all_errors: bool):
         valid_data, errors, invalid_data = {}, {}, {}
         for catalyst, item in zip(self.catalysts, data):
-            result = catalyst._process_flow(name, False, item, False, all_errors)
+            result = catalyst._process_flow(
+                item, name=name, many=False, raise_error=False, all_errors=all_errors)
             if result.is_valid:
                 valid_data.update(result.valid_data)
             else:
@@ -67,7 +68,8 @@ class CatalystPacker:
         for i, items in enumerate(zip(*data)):
             temp_valid_data, temp_errors, temp_invalid_data = {}, {}, {}
             for catalyst, item in zip(self.catalysts, items):
-                result = catalyst._process_flow(name, False, item, False, all_errors)
+                result = catalyst._process_flow(
+                    item, name=name, many=False, raise_error=False, all_errors=all_errors)
                 if result.is_valid:
                     temp_valid_data.update(result.valid_data)
                 else:
