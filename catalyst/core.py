@@ -116,45 +116,27 @@ class BaseCatalyst:
         args = ', '.join(args)
         return f'<{self.__class__.__name__}({args})>'
 
-    def _get_dump_params(self):
-        return {
-            'source_attr': 'name',
-            'target_attr': 'key',
-            'default_attr': 'dump_default',
-            'required_attr': 'dump_required',
-            'field_dict': self._dump_field_dict,
-            'field_method': self.opts.dump_method,
-            'assign_getter': self._assign_dump_getter,
-            'ResultClass': DumpResult,
-        }
-
-    def _get_load_params(self):
-        return {
-            'source_attr': 'key',
-            'target_attr': 'name',
-            'default_attr': 'load_default',
-            'required_attr': 'load_required',
-            'field_dict': self._load_field_dict,
-            'field_method': self.opts.load_method,
-            'assign_getter': self._assign_load_getter,
-            'ResultClass': LoadResult,
-        }
-
     @staticmethod
     def _process_one(
-            data: Any, all_errors: bool,
-            assign_getter: Callable, field_dict: FieldDict, field_method: str,
-            source_attr: str, target_attr: str, required_attr: str, default_attr: str, **context):
+            data: Any,
+            all_errors: bool,
+            assign_getter: Callable,
+            field_dict: FieldDict,
+            field_method: str,
+            source_attr: str,
+            target_attr: str,
+            default_attr: str,
+            required_attr: str):
         # According to the type of `data`, assign a function to get field value from `data`
         get_value = assign_getter(data)
 
         valid_data, errors, invalid_data = {}, {}, {}
 
         for field in field_dict.values():
-            required = getattr(field.opts, required_attr)
-            default = getattr(field, default_attr)
             source = getattr(field, source_attr)
             target = getattr(field, target_attr)
+            default = getattr(field, default_attr)
+            required = getattr(field.opts, required_attr)
 
             raw_value = get_value(data, source, default)
             try:
@@ -184,10 +166,10 @@ class BaseCatalyst:
         return valid_data, errors, invalid_data
 
     @staticmethod
-    def _process_many(data: Sequence, all_errors: bool, process_one: Callable, **context):
+    def _process_many(data: Sequence, all_errors: bool, process_one: Callable):
         valid_data, errors, invalid_data = [], {}, {}
         for i, item in enumerate(data):
-            result = process_one(data=item)
+            result = process_one(item)
             valid_data.append(result.valid_data)
             if not result.is_valid:
                 errors[i] = result.errors
@@ -197,36 +179,59 @@ class BaseCatalyst:
         return valid_data, errors, invalid_data
 
     def _process_flow(
-            self, data: Any, name: str, many: True,
-            raise_error: bool = None, all_errors: bool = None, **context,
+            self,
+            data: Any,
+            name: str,
+            many: True,
+            raise_error: bool,
+            all_errors: bool,
+            main_process: Callable = None,
+            method_name: str = None,
+            ResultClass: BaseResult = None,
         ) -> BaseResult:
-        """Core basic process flow."""
-        # context 为一次数据处理的上下文, 里面保存着 main_process 需要的参数
-        # 只有在 _process_many 函数里调用 _process_flow 时必须传 context
-        # 也就是说有 context 时, 该函数是在 _process_many 里面被调用的
-        if not context:
-            if name == 'dump':
-                context = self._get_dump_params()
-            else:
-                context = self._get_load_params()
+        """Core basic process flow. Use the same functions to handle
+        dumping or loading processes by passing different params.
+        And wrap basic main process with pre and post processes.
+        """
+        # set params for the following process, and avoid setting params again
+        if main_process is None:
             raise_error = self.opts.get(raise_error=raise_error)
             all_errors = self.opts.get(all_errors=all_errors)
 
-            if many:
-                context['process_one'] = partial(
-                    self._process_flow, name=name, many=False,
-                    raise_error=False, all_errors=all_errors,
-                    main_process=self._process_one, method_name=name, **context)
-                context['method_name'] = name + '_many'
-                context['main_process'] = self._process_many
+            if name == 'dump':
+                source_attr = 'name'
+                target_attr = 'key'
+                default_attr = 'dump_default'
+                required_attr = 'dump_required'
+                field_dict = self._dump_field_dict
+                field_method = self.opts.dump_method
+                assign_getter = self._assign_dump_getter
+                ResultClass = DumpResult
             else:
-                context['method_name'] = name
-                context['main_process'] = self._process_one
+                source_attr = 'key'
+                target_attr = 'name'
+                default_attr = 'load_default'
+                required_attr = 'load_required'
+                field_dict = self._load_field_dict
+                field_method = self.opts.load_method
+                assign_getter = self._assign_load_getter
+                ResultClass = LoadResult
 
-        context['all_errors'] = all_errors
-        main_process = context['main_process']
-        method_name = context['method_name']
-        ResultClass = context['ResultClass']
+            process_one = partial(
+                self._process_one, all_errors=all_errors, assign_getter=assign_getter,
+                field_dict=field_dict, field_method=field_method, source_attr=source_attr,
+                target_attr=target_attr, default_attr=default_attr, required_attr=required_attr)
+            if many:
+                process_one = partial(
+                    self._process_flow, name=name, many=False, raise_error=False,
+                    all_errors=all_errors, main_process=process_one, method_name=name,
+                    ResultClass=ResultClass)
+                method_name = name + '_many'
+                main_process = partial(
+                    self._process_many, all_errors=all_errors, process_one=process_one)
+            else:
+                method_name = name
+                main_process = process_one
 
         try:
             # pre process
@@ -235,7 +240,7 @@ class BaseCatalyst:
 
             # main process
             process_name = method_name
-            valid_data, errors, invalid_data = main_process(valid_data, **context)
+            valid_data, errors, invalid_data = main_process(valid_data)
 
             # post process
             if not errors:
@@ -246,7 +251,6 @@ class BaseCatalyst:
             error_key = self.opts.error_keys.get(process_name, process_name)
             errors = {error_key: e}
             invalid_data = data
-            # valid_data = None
             if many:
                 valid_data = []
             else:

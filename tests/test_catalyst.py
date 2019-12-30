@@ -529,12 +529,19 @@ class CatalystTest(TestCase):
         self.assertTrue('wrong_value' in result.errors[1])
         self.assertDictEqual(result.invalid_data[1], invalid_data)
 
+        # shouldn't execute post_load when load raises error
+        result = c.load({'max_value': 'x', 'min_value': 2})
+        self.assertFalse(result.is_valid)
+        self.assertFalse('wrong_value' in result.errors)
+        self.assertTrue('max_value' in result.errors)
+
         # pre_load_many invalid
         result = c.load_many([{}, {}, {}])
         self.assertFalse(result.is_valid)
         self.assertFalse(result.valid_data)
         self.assertTrue('pre_load_many' in result.errors)
         self.assertListEqual(result.invalid_data, [{}, {}, {}])
+
 
     def test_load_and_dump_args(self):
         class A(Catalyst):
