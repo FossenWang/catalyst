@@ -77,10 +77,6 @@ class UtilsTest(TestCase):
 
     def test_option_box(self):
         opts = OptionBox()
-        with self.assertRaises(ValueError):
-            opts.get()
-        with self.assertRaises(ValueError):
-            opts.get(a=1, b=2)
 
         class BaseOptions(OptionBox):
             a = 1

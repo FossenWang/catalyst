@@ -102,6 +102,7 @@ class BaseCatalyst:
             self._field_dict, load_fields,
             lambda k: not self._field_dict[k].opts.no_load)
 
+        # make processors when initializing for shorter run time
         self._do_dump = self._make_processor('dump', False)
         self._do_load = self._make_processor('load', False)
         self._do_dump_many = self._make_processor('dump', True)
@@ -209,37 +210,38 @@ class BaseCatalyst:
             main_process: Callable = None,
             method_name: str = None,
             ResultClass: BaseResult = None,
-        ):
-        """Core basic process flow. Use the same functions to handle
-        dumping or loading processes by passing different params.
-        And wrap basic main process with pre and post processes.
+        ) -> Callable:
+        """Make data processor. Wrap basic main process with pre and post
+        processes, and use the same functions to handle dumping or loading
+        processes by passing different params. Most params can't be changed
+        arbitrarily, since they are closure variables.
         """
         # set params for the following process, and avoid setting params again
         is_entry = main_process is None
         if is_entry:
             if name == 'dump':
-                source_attr = 'name'
-                target_attr = 'key'
-                default_attr = 'dump_default'
-                required_attr = 'dump_required'
-                field_dict = self._dump_field_dict
-                field_method = self.opts.dump_method
-                assign_getter = self._assign_dump_getter
                 ResultClass = DumpResult
+                process_one = partial(
+                    self._process_one,
+                    assign_getter=self._assign_dump_getter,
+                    field_dict=self._dump_field_dict,
+                    field_method=self.opts.dump_method,
+                    source_attr='name',
+                    target_attr='key',
+                    default_attr='dump_default',
+                    required_attr='dump_required')
             else:
-                source_attr = 'key'
-                target_attr = 'name'
-                default_attr = 'load_default'
-                required_attr = 'load_required'
-                field_dict = self._load_field_dict
-                field_method = self.opts.load_method
-                assign_getter = self._assign_load_getter
                 ResultClass = LoadResult
+                process_one = partial(
+                    self._process_one,
+                    assign_getter=self._assign_load_getter,
+                    field_dict=self._load_field_dict,
+                    field_method=self.opts.load_method,
+                    source_attr='key',
+                    target_attr='name',
+                    default_attr='load_default',
+                    required_attr='load_required')
 
-            process_one = partial(
-                self._process_one, assign_getter=assign_getter,
-                field_dict=field_dict, field_method=field_method, source_attr=source_attr,
-                target_attr=target_attr, default_attr=default_attr, required_attr=required_attr)
             if many:
                 process_one = self._make_processor(
                     name=name, many=False, main_process=process_one,
@@ -249,12 +251,17 @@ class BaseCatalyst:
             else:
                 method_name = name
                 main_process = process_one
+        pre_process_name = f'pre_{method_name}'
+        post_process_name = f'post_{method_name}'
+        pre_process = getattr(self, pre_process_name)
+        post_process = getattr(self, post_process_name)
+        error_keys = self.opts.error_keys
 
         def integrated_process(data, raise_error, all_errors):
             try:
                 # pre process
-                process_name = f'pre_{method_name}'
-                valid_data = getattr(self, process_name)(data)
+                process_name = pre_process_name
+                valid_data = pre_process(data)
 
                 # main process
                 process_name = method_name
@@ -262,11 +269,11 @@ class BaseCatalyst:
 
                 # post process
                 if not errors:
-                    process_name = f'post_{method_name}'
-                    valid_data = getattr(self, process_name)(valid_data)
+                    process_name = post_process_name
+                    valid_data = post_process(valid_data)
             except Exception as e:
                 # handle error which raised during processing
-                error_key = self.opts.error_keys.get(process_name, process_name)
+                error_key = error_keys.get(process_name, process_name)
                 errors = {error_key: e}
                 invalid_data = data
                 if many:
@@ -278,9 +285,11 @@ class BaseCatalyst:
             if errors and raise_error:
                 raise ValidationError(result)
             return result
+
         if not is_entry:
             return integrated_process
 
+        # only get these options when process begins
         def entry_process(data, raise_error, all_errors):
             raise_error = self.opts.get(raise_error=raise_error)
             all_errors = self.opts.get(all_errors=all_errors)

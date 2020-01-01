@@ -95,8 +95,9 @@ class OptionBox:
                 setattr(self, key, value)
 
     def get(self, **kwargs):
-        if len(kwargs) != 1:
-            raise ValueError('Only accept a pair of kwargs.')
+        """Return not None value or instance attribute.
+        :param kwargs: Only accept a pair of kwargs.
+        """
         for key, value in kwargs.items():
             if value is None:
                 return getattr(self, key)
