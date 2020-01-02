@@ -354,11 +354,9 @@ class CatalystTest(TestCase):
         with self.assertRaises(ValueError):
             TestDataCatalyst(load_method=1)
 
-        # wrong handle name
-        # with self.assertRaises(ValueError):
-        #     test_catalyst._process_flow(1, False, {})
-        # with self.assertRaises(ValueError):
-        #     test_catalyst._process_one(1, {}, True)
+        # wrong process name
+        with self.assertRaises(ValueError):
+            test_catalyst._make_processor(1, False)
 
     def test_field_args_for_dump_and_load(self):
         def create_catalyst(**kwargs):

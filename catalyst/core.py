@@ -203,25 +203,27 @@ class BaseCatalyst:
             return wrapper
         return partial(self._process_args, processor=processor, all_errors=all_errors)
 
-    def _make_processor(
-            self,
-            name: str,
-            many: True,
-            main_process: Callable = None,
-            method_name: str = None,
-            ResultClass: BaseResult = None,
-        ) -> Callable:
-        """Make data processor. Wrap basic main process with pre and post
-        processes, and use the same functions to handle dumping or loading
-        processes by passing different params. Most params can't be changed
-        arbitrarily, since they are closure variables.
+    def _make_processor(self, name: str, many: True) -> Callable:
+        """Create processor for dumping and loading processes. And wrap basic
+        main process with pre and post processes. To avoid assigning params
+        every time a processor is called, the params are stored in the closure.
         """
-        # set params for the following process, and avoid setting params again
-        is_entry = main_process is None
-        if is_entry:
+        # assign params as closure variables for processor
+        if name == 'dump':
+            ResultClass = DumpResult
+        elif name == 'load':
+            ResultClass = LoadResult
+        else:
+            raise ValueError("Argument `name` must be 'dump' or 'load'.")
+
+        if many:
+            process_one = getattr(self, name)
+            main_process = partial(self._process_many, process_one=process_one)
+            method_name = name + '_many'
+        else:
+            method_name = name
             if name == 'dump':
-                ResultClass = DumpResult
-                process_one = partial(
+                main_process = partial(
                     self._process_one,
                     assign_getter=self._assign_dump_getter,
                     field_dict=self._dump_field_dict,
@@ -231,8 +233,7 @@ class BaseCatalyst:
                     default_attr='dump_default',
                     required_attr='dump_required')
             else:
-                ResultClass = LoadResult
-                process_one = partial(
+                main_process = partial(
                     self._process_one,
                     assign_getter=self._assign_load_getter,
                     field_dict=self._load_field_dict,
@@ -242,22 +243,20 @@ class BaseCatalyst:
                     default_attr='load_default',
                     required_attr='load_required')
 
-            if many:
-                process_one = self._make_processor(
-                    name=name, many=False, main_process=process_one,
-                    method_name=name, ResultClass=ResultClass)
-                main_process = partial(self._process_many, process_one=process_one)
-                method_name = name + '_many'
-            else:
-                method_name = name
-                main_process = process_one
         pre_process_name = f'pre_{method_name}'
         post_process_name = f'post_{method_name}'
         pre_process = getattr(self, pre_process_name)
         post_process = getattr(self, post_process_name)
         error_keys = self.opts.error_keys
+        default_raise_error = self.opts.raise_error
+        default_all_errors = self.opts.all_errors
 
         def integrated_process(data, raise_error, all_errors):
+            if raise_error is None:
+                raise_error = default_raise_error
+            if all_errors is None:
+                all_errors = default_all_errors
+
             try:
                 # pre process
                 process_name = pre_process_name
@@ -286,15 +285,7 @@ class BaseCatalyst:
                 raise ValidationError(result)
             return result
 
-        if not is_entry:
-            return integrated_process
-
-        # only get these options when process begins
-        def entry_process(data, raise_error, all_errors):
-            raise_error = self.opts.get(raise_error=raise_error)
-            all_errors = self.opts.get(all_errors=all_errors)
-            return integrated_process(data, raise_error, all_errors)
-        return entry_process
+        return integrated_process
 
     def dump(
             self,
@@ -329,10 +320,10 @@ class BaseCatalyst:
         return self._do_load_many(data, raise_error, all_errors)
 
     def dump_args(self, func: Callable = None, all_errors: bool = None) -> Callable:
-        return self._process_args(func, self._do_dump, all_errors)
+        return self._process_args(func, self.dump, all_errors)
 
     def load_args(self, func: Callable = None, all_errors: bool = None) -> Callable:
-        return self._process_args(func, self._do_load, all_errors)
+        return self._process_args(func, self.load, all_errors)
 
     def pre_dump(self, data):
         return data
