@@ -120,7 +120,7 @@ class BaseCatalyst:
         args.append(f'raise_error={self.opts.raise_error}')
         args.append(f'all_errors={self.opts.all_errors}')
         args = ', '.join(args)
-        return f'<{self.__class__.__name__}({args})>'
+        return f'{self.__class__.__name__}({args})'
 
     @staticmethod
     def _process_one(
@@ -184,26 +184,7 @@ class BaseCatalyst:
                     break
         return valid_data, errors, invalid_data
 
-    def _process_args(
-            self, func: Callable = None, processor: Callable = None, all_errors: bool = None,
-        ) -> Callable:
-        """Decorator for handling args by catalyst before function is called.
-        The wrapper function takes args as same as args of the raw function.
-        If args are invalid, error will be raised. In general, `*args` should
-        be handled by List, and `**kwargs` should be handled by Nested.
-        """
-        if func:
-            sig = inspect.signature(func)
-            @wraps(func)
-            def wrapper(*args, **kwargs):
-                ba = sig.bind(*args, **kwargs)
-                result = processor(ba.arguments, raise_error=True, all_errors=all_errors)
-                ba.arguments.update(result.valid_data)
-                return func(*ba.args, **ba.kwargs)
-            return wrapper
-        return partial(self._process_args, processor=processor, all_errors=all_errors)
-
-    def _make_processor(self, name: str, many: True) -> Callable:
+    def _make_processor(self, name: str, many: bool) -> Callable:
         """Create processor for dumping and loading processes. And wrap basic
         main process with pre and post processes. To avoid assigning params
         every time a processor is called, the params are stored in the closure.
@@ -269,7 +250,7 @@ class BaseCatalyst:
                 # post process
                 if not errors:
                     process_name = post_process_name
-                    valid_data = post_process(valid_data)
+                    valid_data = post_process(valid_data, original_data=data)
             except Exception as e:
                 # handle error which raised during processing
                 error_key = error_keys.get(process_name, process_name)
@@ -286,6 +267,25 @@ class BaseCatalyst:
             return result
 
         return integrated_process
+
+    def _process_args(
+            self, func: Callable = None, processor: Callable = None, all_errors: bool = None,
+        ) -> Callable:
+        """Decorator for handling args by catalyst before function is called.
+        The wrapper function takes args as same as args of the raw function.
+        If args are invalid, error will be raised. In general, `*args` should
+        be handled by List, and `**kwargs` should be handled by Nested.
+        """
+        if func:
+            sig = inspect.signature(func)
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                ba = sig.bind(*args, **kwargs)
+                result = processor(ba.arguments, raise_error=True, all_errors=all_errors)
+                ba.arguments.update(result.valid_data)
+                return func(*ba.args, **ba.kwargs)
+            return wrapper
+        return partial(self._process_args, processor=processor, all_errors=all_errors)
 
     def dump(
             self,
@@ -328,25 +328,25 @@ class BaseCatalyst:
     def pre_dump(self, data):
         return data
 
-    def post_dump(self, data):
+    def post_dump(self, data, original_data):
         return data
 
     def pre_load(self, data):
         return data
 
-    def post_load(self, data):
+    def post_load(self, data, original_data):
         return data
 
     def pre_dump_many(self, data):
         return data
 
-    def post_dump_many(self, data):
+    def post_dump_many(self, data, original_data):
         return data
 
     def pre_load_many(self, data):
         return data
 
-    def post_load_many(self, data):
+    def post_load_many(self, data, original_data):
         return data
 
 

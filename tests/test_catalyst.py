@@ -201,7 +201,7 @@ class CatalystTest(TestCase):
             @staticmethod
             @b.set_formatter
             def test(value):
-                return value
+                return value + 1
 
         catalyst = Catalyst(Schema)
         fields = catalyst._field_dict
@@ -209,7 +209,7 @@ class CatalystTest(TestCase):
         self.assertIs(fields['a'], Schema.a)
         self.assertIs(fields['b'], Schema.b)
         # setting opts of field works
-        self.assertIsNone(Schema.b.formatter(None))
+        self.assertEqual(Schema.b.dump(1), 2)
         self.assertIs(Schema.b.formatter, Schema.test)
 
         # instance also works
@@ -445,7 +445,7 @@ class CatalystTest(TestCase):
             def pre_dump(self, obj):
                 return self.pre_load(obj)
 
-            def post_dump(self, data):
+            def post_dump(self, data, original_data):
                 return self.post_load(data)
 
             def pre_load(self, data):
@@ -455,7 +455,7 @@ class CatalystTest(TestCase):
                     raise ValidationError(f'This keys should not be present: {extra_keys}.')
                 return data
 
-            def post_load(self, data):
+            def post_load(self, data, original_data):
                 if data['max_value'] < data['min_value']:
                     raise ValidationError('"max_value" must be larger than "min_value".')
                 return data

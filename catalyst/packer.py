@@ -1,4 +1,5 @@
-from typing import Sequence
+from typing import Sequence, Callable
+from functools import partial
 
 from .utils import LoadResult, DumpResult, BaseResult
 from .exceptions import ValidationError
@@ -19,41 +20,17 @@ class CatalystPacker:
         if all_errors is not None:
             self.all_errors = all_errors
 
-    def _process_flow(
-            self,
-            name: str,
-            many: bool,
-            data: Sequence,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> BaseResult:
-        if name == 'dump':
-            ResultClass = DumpResult
-        elif name == 'load':
-            ResultClass = LoadResult
-        else:
-            raise ValueError("Argment 'name' must be 'dump' or 'load'.")
+        # make processors when initializing for shorter run time
+        self._do_dump = self._make_processor('dump', False)
+        self._do_load = self._make_processor('load', False)
+        self._do_dump_many = self._make_processor('dump', True)
+        self._do_load_many = self._make_processor('load', True)
 
-        if raise_error is None:
-            raise_error = self.raise_error
-        if all_errors is None:
-            all_errors = self.all_errors
-
-        if many:
-            valid_data, errors, invalid_data = self._process_many(name, data, all_errors)
-        else:
-            valid_data, errors, invalid_data = self._process_one(name, data, all_errors)
-
-        result = ResultClass(valid_data, errors, invalid_data)
-        if errors and raise_error:
-            raise ValidationError(result)
-        return result
-
-    def _process_one(self, name: str, data: Sequence, all_errors: bool):
+    @staticmethod
+    def _process_one(data: Sequence, all_errors: bool, processors: Sequence[Callable]):
         valid_data, errors, invalid_data = {}, {}, {}
-        for catalyst, item in zip(self.catalysts, data):
-            result = getattr(catalyst, name)(
-                item, raise_error=False, all_errors=all_errors)
+        for processor, item in zip(processors, data):
+            result = processor(item, raise_error=False, all_errors=all_errors)
             if result.is_valid:
                 valid_data.update(result.valid_data)
             else:
@@ -63,28 +40,51 @@ class CatalystPacker:
                     break
         return valid_data, errors, invalid_data
 
-    def _process_many(self, name: str, data: Sequence[Sequence], all_errors: bool):
+    @staticmethod
+    def _process_many(data: Sequence[Sequence], all_errors: bool, process_one: Callable):
         valid_data, errors, invalid_data = [], {}, {}
         for i, items in enumerate(zip(*data)):
-            temp_valid_data, temp_errors, temp_invalid_data = {}, {}, {}
-            for catalyst, item in zip(self.catalysts, items):
-                result = getattr(catalyst, name)(
-                    item, raise_error=False, all_errors=all_errors)
-                if result.is_valid:
-                    temp_valid_data.update(result.valid_data)
-                else:
-                    temp_errors.update(result.errors)
-                    temp_invalid_data.update(result.invalid_data)
-                    if not all_errors:
-                        break
-
-            valid_data.append(temp_valid_data)
-            if temp_errors:
-                errors[i] = temp_errors
-                invalid_data[i] = temp_invalid_data
+            result = process_one(items, raise_error=False, all_errors=all_errors)
+            valid_data.append(result.valid_data)
+            if not result.is_valid:
+                errors[i] = result.errors
+                invalid_data[i] = result.invalid_data
                 if not all_errors:
                     break
         return valid_data, errors, invalid_data
+
+    def _make_processor(self, name: str, many: bool) -> Callable:
+        if name == 'dump':
+            ResultClass = DumpResult
+        elif name == 'load':
+            ResultClass = LoadResult
+        else:
+            raise ValueError("Argment 'name' must be 'dump' or 'load'.")
+
+        if many:
+            process_one = getattr(self, name)
+            main_process = partial(self._process_many, process_one=process_one)
+        else:
+            processors = [getattr(catalyst, name) for catalyst in self.catalysts]
+            main_process = partial(self._process_one, processors=processors)
+
+        default_raise_error = self.raise_error
+        default_all_errors = self.all_errors
+
+        def integrated_process(data, raise_error, all_errors):
+            if raise_error is None:
+                raise_error = default_raise_error
+            if all_errors is None:
+                all_errors = default_all_errors
+
+            valid_data, errors, invalid_data = main_process(data, all_errors)
+
+            result = ResultClass(valid_data, errors, invalid_data)
+            if errors and raise_error:
+                raise ValidationError(result)
+            return result
+
+        return integrated_process
 
     def dump(
             self,
@@ -92,7 +92,7 @@ class CatalystPacker:
             raise_error: bool = None,
             all_errors: bool = None,
         ) -> DumpResult:
-        return self._process_flow('dump', False, data, raise_error, all_errors)
+        return self._do_dump(data, raise_error, all_errors)
 
     def load(
             self,
@@ -100,7 +100,7 @@ class CatalystPacker:
             raise_error: bool = None,
             all_errors: bool = None,
         ) -> LoadResult:
-        return self._process_flow('load', False, data, raise_error, all_errors)
+        return self._do_load(data, raise_error, all_errors)
 
     def dump_many(
             self,
@@ -108,7 +108,7 @@ class CatalystPacker:
             raise_error: bool = None,
             all_errors: bool = None,
         ) -> DumpResult:
-        return self._process_flow('dump', True, data, raise_error, all_errors)
+        return self._do_dump_many(data, raise_error, all_errors)
 
     def load_many(
             self,
@@ -116,4 +116,4 @@ class CatalystPacker:
             raise_error: bool = None,
             all_errors: bool = None,
         ) -> LoadResult:
-        return self._process_flow('load', True, data, raise_error, all_errors)
+        return self._do_load_many(data, raise_error, all_errors)

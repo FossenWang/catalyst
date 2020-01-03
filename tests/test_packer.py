@@ -57,7 +57,7 @@ class PackerTest(TestCase):
         self.assertEqual(set(result.errors), {'a', 'b', 'c'})
 
         with self.assertRaises(ValueError):
-            packer._process_flow('xxx', None, None)
+            packer._make_processor('xxx', False)
 
         # process many
         valid_data = [
