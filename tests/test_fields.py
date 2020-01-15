@@ -1,13 +1,13 @@
-import decimal
+from decimal import Decimal, ROUND_CEILING
 from unittest import TestCase
 from datetime import datetime, timedelta
 
 from catalyst import Catalyst
 from catalyst.fields import (
-    Field, String, Integer, Float,
-    Boolean, List, Method,
-    Datetime, Time, Date,
-    Nested, Decimal,
+    Field, StringField, IntegerField, FloatField,
+    BooleanField, ListField, CallableField,
+    DatetimeField, TimeField, DateField,
+    NestedField, DecimalField,
 )
 from catalyst.exceptions import ValidationError
 
@@ -86,7 +86,7 @@ class FieldTest(TestCase):
         self.assertEqual(ctx.exception.msg, '666')
 
     def test_string_field(self):
-        field = String(
+        field = StringField(
             name='string', key='string', min_length=2, max_length=12,
             error_messages={'too_small': 'Must >= {self.minimum}'})
 
@@ -117,7 +117,7 @@ class FieldTest(TestCase):
             field.load(None)
 
         # match regex
-        field = String(
+        field = StringField(
             regex='a',
             error_messages={'no_match': 'not match "{self.regex.pattern}"'})
         self.assertEqual(field.load('a'), 'a')
@@ -127,7 +127,7 @@ class FieldTest(TestCase):
         self.assertEqual(ctx.exception.msg, 'not match "a"')
 
     def test_int_field(self):
-        field = Integer(
+        field = IntegerField(
             name='integer', key='integer', minimum=-10, maximum=100,
             error_messages={'too_large': '{self.maximum}'})
 
@@ -153,7 +153,7 @@ class FieldTest(TestCase):
             field.load([])
 
     def test_float_field(self):
-        field = Float(name='float_', key='float', minimum=-11.1, maximum=111.1)
+        field = FloatField(name='float_', key='float', minimum=-11.1, maximum=111.1)
 
         # dump
         self.assertEqual(field.dump(5.5), 5.5)
@@ -178,7 +178,7 @@ class FieldTest(TestCase):
             field.load([])
 
     def test_decimal_field(self):
-        field = Decimal()
+        field = DecimalField()
 
         self.assertEqual(field.format(1), '1')
         self.assertEqual(field.format(1.1), '1.1')
@@ -186,13 +186,13 @@ class FieldTest(TestCase):
         self.assertEqual(field.format('nan'), 'NaN')
         self.assertEqual(field.format('inf'), 'Infinity')
 
-        self.assertEqual(field.parse(1), decimal.Decimal('1'))
-        self.assertEqual(field.parse(1.1), decimal.Decimal('1.1'))
-        self.assertEqual(field.parse('1.1'), decimal.Decimal('1.1'))
+        self.assertEqual(field.parse(1), Decimal('1'))
+        self.assertEqual(field.parse(1.1), Decimal('1.1'))
+        self.assertEqual(field.parse('1.1'), Decimal('1.1'))
         self.assertEqual(str(field.parse('nan')), 'NaN')
         self.assertEqual(str(field.parse('inf')), 'Infinity')
 
-        field = Decimal(dump_as=float, scale=2, rounding=decimal.ROUND_CEILING)
+        field = DecimalField(dump_as=float, scale=2, rounding=ROUND_CEILING)
         self.assertEqual(field.format(1.1), 1.1)
         self.assertEqual(field.format(1), 1.0)
         self.assertEqual(field.format('inf'), float('inf'))
@@ -200,10 +200,10 @@ class FieldTest(TestCase):
         self.assertEqual(field.format(-1.111), -1.11)
 
         with self.assertRaises(TypeError):
-            Decimal(dump_as=1)
+            DecimalField(dump_as=1)
 
     def test_bool_field(self):
-        field = Boolean()
+        field = BooleanField()
 
         # dump
         self.assertEqual(field.dump(True), True)
@@ -228,7 +228,7 @@ class FieldTest(TestCase):
         self.assertEqual(field.load(''), False)
 
     def test_list_field(self):
-        field = List(item_field=Float())
+        field = ListField(item_field=FloatField())
 
         # dump
         self.assertListEqual(field.dump([1.0, 2.0, 3.0]), [1.0, 2.0, 3.0])
@@ -254,7 +254,7 @@ class FieldTest(TestCase):
             field.load(None)
         self.assertEqual(ctx.exception.msg, field.error_messages['none'])
 
-        field = List(item_field=Float(), all_errors=False)
+        field = ListField(item_field=FloatField(), all_errors=False)
         with self.assertRaises(ValidationError) as ctx:
             field.load([1, 'a', 'b'])
         result = ctx.exception.msg
@@ -266,7 +266,7 @@ class FieldTest(TestCase):
             field._process_many('xxx', None)
 
     def test_callable_field(self):
-        field = Method(
+        field = CallableField(
             name='test_func', func_args=[1, 2], func_kwargs={'c': 3})
 
         def test_func(a, b, c=1):
@@ -280,18 +280,18 @@ class FieldTest(TestCase):
             field.dump(1)
 
         # init
-        Method()
+        CallableField()
         with self.assertRaises(TypeError):
-            Method(func_args=0)
+            CallableField(func_args=0)
         with self.assertRaises(TypeError):
-            Method(func_kwargs=0)
+            CallableField(func_kwargs=0)
 
     def test_datetime_field(self):
         dt = datetime(2019, 1, 1)
         invalid_dt = dt + timedelta(days=1, seconds=1)
-        self.base_test_datetime_field(dt, invalid_dt, Datetime, '%Y%m%d%H%M%S')
-        self.base_test_datetime_field(dt.time(), invalid_dt.time(), Time, '%H%M%S')
-        self.base_test_datetime_field(dt.date(), invalid_dt.date(), Date, '%Y%m%d')
+        self.base_test_datetime_field(dt, invalid_dt, DatetimeField, '%Y%m%d%H%M%S')
+        self.base_test_datetime_field(dt.time(), invalid_dt.time(), TimeField, '%H%M%S')
+        self.base_test_datetime_field(dt.date(), invalid_dt.date(), DateField, '%Y%m%d')
 
     def base_test_datetime_field(self, dt, invalid_dt, FieldClass, fmt):
         # dump
@@ -317,9 +317,9 @@ class FieldTest(TestCase):
 
     def test_nest_field(self):
         class ACatalyst(Catalyst):
-            name = String(max_length=3, load_required=True)
+            name = StringField(max_length=3, load_required=True)
         a_cata = ACatalyst()
-        field = Nested(a_cata, name='a', key='a')
+        field = NestedField(a_cata, name='a', key='a')
 
         self.assertEqual(field.dump({'name': '1'}), {'name': '1'})
         self.assertEqual(field.dump({'name': '1234'}), {'name': '1234'})

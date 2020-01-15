@@ -5,8 +5,8 @@ from catalyst.core import (
     CatalystMeta,
     Catalyst,
 )
-from catalyst.fields import Field, String, Integer, \
-    Float, Boolean, Method, List
+from catalyst.fields import Field, StringField, IntegerField, \
+    FloatField, BooleanField, CallableField, ListField
 from catalyst.exceptions import ValidationError
 from catalyst.utils import snake_to_camel
 
@@ -27,13 +27,13 @@ class TestData:
 
 
 class TestDataCatalyst(Catalyst):
-    string = String(min_length=2, max_length=12,
-                    dump_default='default', load_default='default')
-    integer = Integer(minimum=0, maximum=12, load_required=True)
-    float_field = Float(name='float_', key='float', minimum=-1.1, maximum=1.1)
-    bool_field = Boolean(name='bool_', key='bool')
-    func = Method(name='func', key='func', func_args=(1, 2, 3))
-    list_ = List(String())
+    string = StringField(
+        min_length=2, max_length=12, dump_default='default', load_default='default')
+    integer = IntegerField(minimum=0, maximum=12, load_required=True)
+    float_field = FloatField(name='float_', key='float', minimum=-1.1, maximum=1.1)
+    bool_field = BooleanField(name='bool_', key='bool')
+    func = CallableField(name='func', key='func', func_args=(1, 2, 3))
+    list_ = ListField(StringField())
 
 
 test_catalyst = TestDataCatalyst()
@@ -50,8 +50,8 @@ class CatalystTest(TestCase):
                 all_errors = False
 
         class B(A):
-            b = Integer()
-            c = Float()
+            b = IntegerField()
+            c = FloatField()
 
             class Options(A.Options):
                 raise_error = True
@@ -62,7 +62,7 @@ class CatalystTest(TestCase):
         self.assertEqual(set(a._field_dict), {'a', 'b'})
         self.assertEqual(set(b._field_dict), {'a', 'b', 'c'})
         self.assertIsInstance(a._field_dict['b'], Field)
-        self.assertIsInstance(b._field_dict['b'], Integer)
+        self.assertIsInstance(b._field_dict['b'], IntegerField)
 
         data = {'a': 'a', 'b': 'b'}
         self.assertDictEqual(a.dump(data).valid_data, data)
@@ -195,8 +195,8 @@ class CatalystTest(TestCase):
 
         # set fields from a non `Catalyst` class when instantiate
         class Schema:
-            a = String()
-            b = Float()
+            a = StringField()
+            b = FloatField()
 
             @staticmethod
             @b.set_formatter
@@ -221,8 +221,8 @@ class CatalystTest(TestCase):
 
         # inheritance works
         class Schema2:
-            a = String()
-            string = Float()
+            a = StringField()
+            string = FloatField()
         catalyst = TestDataCatalyst(Schema2)
         fields = catalyst._field_dict
         self.assertIs(fields['string'], Schema2.string)
@@ -361,7 +361,7 @@ class CatalystTest(TestCase):
     def test_field_args_for_dump_and_load(self):
         def create_catalyst(**kwargs):
             class C(Catalyst):
-                s = String(**kwargs)
+                s = StringField(**kwargs)
             return C()
 
         def assert_field_dump_args(data, expect=None, **kwargs):
@@ -439,14 +439,14 @@ class CatalystTest(TestCase):
 
     def test_pre_and_post_process(self):
         class C(Catalyst):
-            max_value = Integer()
-            min_value = Integer()
+            max_value = IntegerField()
+            min_value = IntegerField()
 
             def pre_dump(self, obj):
                 return self.pre_load(obj)
 
             def post_dump(self, data, original_data):
-                return self.post_load(data)
+                return self.post_load(data, original_data)
 
             def pre_load(self, data):
                 keys = {field.key for field in self._load_field_dict.values()}
@@ -468,7 +468,8 @@ class CatalystTest(TestCase):
 
         valid_data = {'max_value': 2, 'min_value': 1}
         # dump valid
-        c.dump(valid_data)
+        result = c.dump(valid_data)
+        self.assertTrue(result.is_valid)
 
         # pre_dump invalid
         redundant_data = {'max_value': 2, 'min_value': 1, 'xxx': 1}
@@ -486,13 +487,12 @@ class CatalystTest(TestCase):
         invalid_data = {'max_value': 1, 'min_value': 2}
         result = c.dump(invalid_data)
         self.assertFalse(result.is_valid)
-        self.assertTrue('post_dump' in result.errors)
-        with self.assertRaises(ValidationError):
-            c.dump(invalid_data, raise_error=True)
+        self.assertEqual({'post_dump'}, set(result.errors))
+
         c.opts.error_keys['post_dump'] = 'wrong_value'
         result = c.dump(invalid_data)
         self.assertFalse(result.is_valid)
-        self.assertTrue('wrong_value' in result.errors)
+        self.assertEqual({'wrong_value'}, set(result.errors))
 
         # load valid
         result = c.load(valid_data)
@@ -545,11 +545,11 @@ class CatalystTest(TestCase):
 
     def test_load_and_dump_args(self):
         class A(Catalyst):
-            a = Integer()
-            b = Integer()
-            args = List(Integer())
+            a = IntegerField()
+            b = IntegerField()
+            args = ListField(IntegerField())
             class kwargs(Catalyst):
-                c = Integer()
+                c = IntegerField()
 
         a = A()
 
@@ -582,7 +582,7 @@ class CatalystTest(TestCase):
 
     def test_load_and_dump_many(self):
         class C(Catalyst):
-            s = String(min_length=1, max_length=2)
+            s = StringField(min_length=1, max_length=2)
 
         c = C()
 
@@ -643,7 +643,7 @@ class CatalystTest(TestCase):
 
     def test_list_field(self):
         class C(Catalyst):
-            nums = List(Integer())
+            nums = ListField(IntegerField())
 
         c = C()
 
@@ -679,16 +679,16 @@ class CatalystTest(TestCase):
             }
         }
 
-        # Automatic wrap an object of Catalyst as Nested
+        # Automatic wrap an object of Catalyst as NestedField
         class User(Catalyst):
-            uid = Integer()
-            name = String()
+            uid = IntegerField()
+            name = StringField()
 
         user_catalyst = User()
 
         class Article1(Catalyst):
-            title = String()
-            content = String()
+            title = StringField()
+            content = StringField()
             author = user_catalyst
 
         catalyst = Article1()
@@ -698,14 +698,14 @@ class CatalystTest(TestCase):
         r = catalyst.load(data)
         self.assertEqual(data, r.valid_data)
 
-        # Automatic wrap a subclass of Catalyst as Nested
+        # Automatic wrap a subclass of Catalyst as NestedField
         class Article2(Catalyst):
-            title = String()
-            content = String()
+            title = StringField()
+            content = StringField()
 
             class author(Catalyst):
-                uid = Integer()
-                name = String()
+                uid = IntegerField()
+                name = StringField()
 
         catalyst = Article2()
 

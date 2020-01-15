@@ -3,7 +3,7 @@ from unittest import TestCase
 
 from catalyst.core import Catalyst
 from catalyst.packer import CatalystPacker
-from catalyst.fields import Float
+from catalyst.fields import FloatField
 from catalyst.exceptions import ValidationError
 
 
@@ -15,13 +15,13 @@ class PackerTest(TestCase):
         self.assertFalse(packer.all_errors)
 
         class A(Catalyst):
-            a = Float()
+            a = FloatField()
 
         class B(Catalyst):
-            b = Float()
+            b = FloatField()
 
         class C(Catalyst):
-            c = Float()
+            c = FloatField()
 
         a, b, c = A(), B(), C()
         packer = CatalystPacker((a, b, c))

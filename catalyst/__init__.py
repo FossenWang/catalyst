@@ -3,16 +3,16 @@ from .core import (
 )
 from .fields import (
     Field,
-    String,
-    Integer,
-    Float,
-    Boolean,
-    Datetime,
-    Date,
-    Time,
-    Method,
-    List,
-    Nested,
+    StringField,
+    IntegerField,
+    FloatField,
+    BooleanField,
+    DatetimeField,
+    DateField,
+    TimeField,
+    CallableField,
+    ListField,
+    NestedField,
 )
 from .utils import (
     LoadResult,

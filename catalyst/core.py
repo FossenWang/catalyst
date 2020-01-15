@@ -3,7 +3,7 @@ import inspect
 from typing import Dict, Iterable, Callable, Sequence, Any, Tuple, Mapping
 from functools import wraps, partial
 
-from .fields import Field, Nested
+from .fields import Field, NestedField
 from .exceptions import ValidationError
 from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,
@@ -274,7 +274,7 @@ class BaseCatalyst:
         """Decorator for handling args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
         If args are invalid, error will be raised. In general, `*args` should
-        be handled by List, and `**kwargs` should be handled by Nested.
+        be handled by `ListField`, and `**kwargs` should be handled by `NestedField`.
         """
         if func:
             sig = inspect.signature(func)
@@ -354,7 +354,7 @@ class CatalystMeta(type):
     """Metaclass for `Catalyst` class. Binds fields to `_field_dict` attribute."""
 
     def __new__(cls, name, bases, attrs):
-        new_cls = type.__new__(cls, name, bases, attrs)
+        new_cls = super().__new__(cls, name, bases, attrs)
         if not (isinstance(new_cls.Options, type) and issubclass(new_cls.Options, OptionBox)):
             raise TypeError('Class attribute `Options` must inherit from `OptionBox`.')
 
@@ -383,9 +383,9 @@ class Catalyst(BaseCatalyst, metaclass=CatalystMeta):
             # init calalyst object
             if isinstance(value, CatalystMeta):
                 value = value()
-            # wrap catalyst object as Nested
+            # wrap catalyst object as NestedField
             if isinstance(value, BaseCatalyst):
-                value = Nested(value)
+                value = NestedField(value)
             # automatic generate field name or key
             if isinstance(value, Field):
                 if value.name is None:

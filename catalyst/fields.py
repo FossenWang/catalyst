@@ -1,4 +1,4 @@
-import decimal
+from decimal import Decimal
 from types import MethodType
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable, Dict
 from datetime import datetime, time, date
@@ -166,7 +166,7 @@ class Field(ErrorMessageMixin):
         return default
 
 
-class String(Field):
+class StringField(Field):
     formatter = str
     parser = str
 
@@ -185,7 +185,7 @@ class String(Field):
                 RegexValidator(regex, self.error_messages))
 
 
-class Number(Field):
+class NumberField(Field):
     """Base class for number fields. Using RangeValidator for validating.
 
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
@@ -202,14 +202,14 @@ class Number(Field):
                 RangeValidator(minimum, maximum, error_messages=self.error_messages))
 
 
-class Float(Number):
+class FloatField(NumberField):
     """Float field.
 
     :param kwargs: Same as `Number` field.
     """
 
 
-class Integer(Number):
+class IntegerField(NumberField):
     """Integer field.
 
     :param kwargs: Same as `Number` field.
@@ -218,7 +218,7 @@ class Integer(Number):
     parser = int
 
 
-class Decimal(Number):
+class DecimalField(NumberField):
     """Decimal field.
 
     :param scale: The number of digits to the right of the decimal point.
@@ -228,7 +228,7 @@ class Decimal(Number):
     :param dump_as: Data type that the value is serialized to.
     :param kwargs: Same as `Number` field.
     """
-    class Options(Number.Options):
+    class Options(NumberField.Options):
         dump_as = str
         scale = None
         rounding = None
@@ -246,12 +246,12 @@ class Decimal(Number):
             raise TypeError('`dump_as` must be callable.')
         scale = self.opts.scale
         if scale is not None:
-            self.opts.exponent = decimal.Decimal((0, (), -int(scale)))
+            self.opts.exponent = Decimal((0, (), -int(scale)))
 
     def to_decimal(self, value):
         if isinstance(value, float):
             value = str(value)
-        value = decimal.Decimal(value)
+        value = Decimal(value)
         if self.opts.exponent is not None and value.is_finite():
             value = value.quantize(self.opts.exponent, rounding=self.opts.rounding)
         return value
@@ -263,7 +263,7 @@ class Decimal(Number):
     parser = to_decimal
 
 
-class Boolean(Field):
+class BooleanField(Field):
     """Boolean field.
 
     :param value_map: Values that will be onverted to `True` or `False`.
@@ -293,7 +293,7 @@ class Boolean(Field):
     parser = formatter
 
 
-class Datetime(Field):
+class DatetimeField(Field):
     class Options(Field.Options):
         type_ = datetime
         fmt = r'%Y-%m-%d %H:%M:%S.%f'
@@ -311,8 +311,8 @@ class Datetime(Field):
         return datetime.strptime(date_string, self.opts.fmt)
 
 
-class Time(Datetime):
-    class Options(Datetime.Options):
+class TimeField(DatetimeField):
+    class Options(DatetimeField.Options):
         type_ = time
         fmt = r'%H:%M:%S.%f'
 
@@ -320,8 +320,8 @@ class Time(Datetime):
         return datetime.strptime(date_string, self.opts.fmt).time()
 
 
-class Date(Datetime):
-    class Options(Datetime.Options):
+class DateField(DatetimeField):
+    class Options(DatetimeField.Options):
         type_ = date
         fmt = r'%Y-%m-%d'
 
@@ -329,7 +329,7 @@ class Date(Datetime):
         return datetime.strptime(date_string, self.opts.fmt).date()
 
 
-class Method(Field):
+class CallableField(Field):
     class Options(Field.Options):
         func_args = tuple()
         func_kwargs = {}
@@ -349,7 +349,7 @@ class Method(Field):
         return func(*self.opts.func_args, **self.opts.func_kwargs)
 
 
-class List(Field):
+class ListField(Field):
     class Options(Field.Options):
         item_field = None  # type: Field
         dump_method = 'format'
@@ -405,7 +405,7 @@ class List(Field):
         return valid_data
 
 
-class Nested(Field):
+class NestedField(Field):
     class Options(Field.Options):
         catalyst = None
 
