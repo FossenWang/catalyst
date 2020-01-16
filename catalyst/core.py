@@ -1,6 +1,6 @@
 import inspect
 
-from typing import Dict, Iterable, Callable, Sequence, Any, Tuple, Mapping
+from typing import Dict, Iterable, Callable, Sequence, Any, Mapping
 from functools import wraps, partial
 
 from .fields import Field, NestedField
@@ -15,6 +15,34 @@ FieldDict = Dict[str, Field]
 
 
 class BaseCatalyst:
+    """Base Catalyst class.
+
+    :param schema: A dict or instance or class which has fields. This is a
+        convenient way to avoid name clashes when fields are Python keywords
+        or conflict with other attributes.
+        ** It should be noted that "private" variables which prefixed with
+        an underscore (e.g. _spam) will not be considered when `schema` is
+        an instance or class. If an underscore prefixed name is necessary,
+        use dict `schema`.
+        Remmber that the attribute name of `Catalyst` object can be different
+        with "data" object. `Field.name` defines where to access value.
+
+    :param include: The fields to include in both dump and load fields.
+        If None, all fields are used.
+        If `dump_include` or `load_include` is passed, `include` will
+        not be used for dump or load fields.
+    :param exclude: The fields to exclude from both dump and load fields.
+        If a field appears in both `include` and `exclude`, it is not used.
+        If `dump_exclude` or `load_exclude` is passed, `exclude` will
+        not be used for dump or load fields.
+        The fields filtering works like set operation, for example:
+            used_fields = original_fields & include - exclude
+        `Field.no_dump` and `Field.no_load` are also used to filter fields.
+    :param dump_include: The fields to include in dump fields.
+    :param dump_exclude: The fields to exclude from dump fields.
+    :param load_include: The fields to include in load fields.
+    :param load_exclude: The fields to exclude from dump fields.
+    """
     _field_dict = {}  # type: FieldDict
 
     class Options(OptionBox):
@@ -55,13 +83,16 @@ class BaseCatalyst:
     def __init__(
             self,
             schema: Any = None,
-            fields: Iterable[str] = None,
+            include: Iterable[str] = None,
+            exclude: Iterable[str] = None,
             raise_error: bool = None,
             all_errors: bool = None,
             error_keys: Mapping[str, str] = None,
-            dump_fields: Iterable[str] = None,
+            dump_include: Iterable[str] = None,
+            dump_exclude: Iterable[str] = None,
             dump_method: str = None,
-            load_fields: Iterable[str] = None,
+            load_include: Iterable[str] = None,
+            load_exclude: Iterable[str] = None,
             load_method: str = None,
             **kwargs):
         self.opts = self.Options(
@@ -77,30 +108,47 @@ class BaseCatalyst:
         if self.opts.dump_method not in {'dump', 'format', 'validate'}:
             raise ValueError(
                 "Attribute `opts.dump_method` must be in ('dump', 'format', 'validate').")
-
         if self.opts.load_method not in {'load', 'parse', 'validate'}:
             raise ValueError(
-                "Attribute `opts.dump_method` must be in ('load', 'parse', 'validate').")
+                "Attribute `opts.load_method` must be in ('load', 'parse', 'validate').")
 
-        # set fields from a non `Catalyst` class, which can avoid override
+        # set fields from a dict or non `Catalyst` class
+        schema = self.opts.schema
         if schema:
-            attrs = ((attr, getattr(schema, attr)) for attr in dir(schema))
+            if isinstance(schema, Mapping):
+                attrs = schema
+            else:
+                attrs = {
+                    name: getattr(schema, name) for name in dir(schema)
+                    if not name.startswith('_')}  # ignore private variables
             self._set_fields(self, attrs)
 
-        if not fields:
-            fields = self._field_dict.keys()
-        if not dump_fields:
-            dump_fields = fields
-        if not load_fields:
-            load_fields = fields
+        # include fields
+        if include is None:
+            include = self._field_dict.keys()
+        if dump_include is None:
+            dump_include = include
+        if load_include is None:
+            load_include = include
 
-        self._dump_field_dict = self._copy_fields(
-            self._field_dict, dump_fields,
-            lambda k: not self._field_dict[k].opts.no_dump)
+        # exclude fields
+        exclude = set() if exclude is None else set(exclude)
+        dump_exclude = exclude if dump_exclude is None else set(dump_exclude)
+        load_exclude = exclude if load_exclude is None else set(load_exclude)
+        if dump_exclude:
+            dump_include = (field for field in dump_include if field not in dump_exclude)
+        if load_exclude:
+            load_include = (field for field in load_include if field not in load_exclude)
 
-        self._load_field_dict = self._copy_fields(
-            self._field_dict, load_fields,
-            lambda k: not self._field_dict[k].opts.no_load)
+        try:
+            self._dump_field_dict = self._copy_fields(
+                self._field_dict, dump_include,
+                lambda key: not self._field_dict[key].opts.no_dump)
+            self._load_field_dict = self._copy_fields(
+                self._field_dict, load_include,
+                lambda key: not self._field_dict[key].opts.no_load)
+        except KeyError as e:
+            raise ValueError(f"Field '{e.args[0]}' does not exist.")
 
         # make processors when initializing for shorter run time
         self._do_dump = self._make_processor('dump', False)
@@ -358,7 +406,7 @@ class CatalystMeta(type):
         if not (isinstance(new_cls.Options, type) and issubclass(new_cls.Options, OptionBox)):
             raise TypeError('Class attribute `Options` must inherit from `OptionBox`.')
 
-        new_cls._set_fields(new_cls, attrs.items())
+        new_cls._set_fields(new_cls, attrs)
         return new_cls
 
 
@@ -366,20 +414,19 @@ class Catalyst(BaseCatalyst, metaclass=CatalystMeta):
     __doc__ = BaseCatalyst.__doc__
 
     @staticmethod
-    def _set_fields(cls_or_obj: BaseCatalyst, attrs: Iterable[Tuple[str, Any]]):
+    def _set_fields(cls_or_obj: BaseCatalyst, attrs: FieldDict):
         """Set fields for `Catalyst` class or its instance.
         Fields are bond to `cls_or_obj._field_dict` which are set separately
         on class or its instance, which works like class inheritance.
 
         :param cls_or_obj: `Catalyst` class or its instance.
-        :param attrs: iterable which contains name, field pairs,
-            such as `[(name, Field), ...]`.
+        :param attrs: a dict that keys are name and values are `Field`.
         """
         fields = {}  # type: FieldDict
         # inherit fields
         fields.update(cls_or_obj._field_dict)
 
-        for attr, value in attrs:
+        for attr, value in attrs.items():
             # init calalyst object
             if isinstance(value, CatalystMeta):
                 value = value()

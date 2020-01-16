@@ -131,7 +131,7 @@ class CatalystTest(TestCase):
         self.assertIn('still_snake', result.valid_data)
 
     def test_init(self):
-        "Test initializing Catalyst."
+        """Test initializing `Catalyst`."""
 
         dump_data = TestData(
             string='xxx', integer=1, float_=1.1,
@@ -140,54 +140,78 @@ class CatalystTest(TestCase):
             'string': 'xxx', 'integer': 1, 'float': 1.1,
             'bool': True, 'list_': ['a', 'b']}
 
-        # Empty "fields" has no effect
-        catalyst = TestDataCatalyst(fields=[])
-        self.assertDictEqual(
-            catalyst._dump_field_dict, test_catalyst._dump_field_dict)
-        self.assertDictEqual(
-            catalyst._load_field_dict, test_catalyst._load_field_dict)
-        # if field.no_load is True, this field will be excluded from loading
-        self.assertNotIn('func', catalyst._load_field_dict.keys())
+        # Empty `include`
+        catalyst = TestDataCatalyst(include=[])
+        self.assertDictEqual(catalyst._dump_field_dict, {})
+        self.assertDictEqual(catalyst._load_field_dict, {})
 
-        # Specify "fields" for dumping and loading
-        catalyst = TestDataCatalyst(fields=['string'])
+        # if field.no_load is True, this field will be excluded from loading
+        self.assertNotIn('func', test_catalyst._load_field_dict.keys())
+
+        # Specify `include` for dumping and loading
+        catalyst = TestDataCatalyst(include=['string'])
         self.assertDictEqual(
             catalyst.dump(dump_data).valid_data, {'string': 'xxx'})
         self.assertDictEqual(
             catalyst.load(load_data).valid_data, {'string': 'xxx'})
 
-        # "dump_fields" takes precedence over "fields"
-        catalyst = TestDataCatalyst(fields=['string'], dump_fields=['bool_field'])
+        # `dump_include` takes precedence over `include`
+        catalyst = TestDataCatalyst(include=['string'], dump_include=['bool_field'])
         self.assertDictEqual(
             catalyst.dump(dump_data).valid_data, {'bool': True})
         self.assertDictEqual(
             catalyst.load(load_data).valid_data, {'string': 'xxx'})
 
-        # "load_fields" takes precedence over "fields"
-        catalyst = TestDataCatalyst(fields=['string'], load_fields=['bool_field'])
+        # `load_include` takes precedence over `include`
+        catalyst = TestDataCatalyst(include=['string'], load_include=['bool_field'])
         self.assertDictEqual(
             catalyst.dump(dump_data).valid_data, {'string': 'xxx'})
         self.assertDictEqual(
             catalyst.load(load_data).valid_data, {'bool_': True})
 
-        # When "dump_fields" and "load_fields" are given, fields is not used.
+        # When `dump_include` and `load_include` are given, `include` is not used.
         catalyst = TestDataCatalyst(
-            fields=['integer'], dump_fields=['string'], load_fields=['bool_field'])
+            include=['integer'], dump_include=['string'], load_include=['bool_field'])
         self.assertDictEqual(
             catalyst.dump(dump_data).valid_data, {'string': 'xxx'})
         self.assertDictEqual(
             catalyst.load(load_data).valid_data, {'bool_': True})
 
-        with self.assertRaises(KeyError):
-            TestDataCatalyst(fields=['wrong_name'])
+        # Specify `exclude` for dumping and loading
+        catalyst = TestDataCatalyst(exclude=['string'])
+        self.assertNotIn('string', catalyst._dump_field_dict)
+        self.assertNotIn('string', catalyst._load_field_dict)
 
-        with self.assertRaises(KeyError):
-            TestDataCatalyst(dump_fields=['wrong_name'])
+        # When `dump_exclude` and `load_exclude` are given, `exclude` is not used.
+        catalyst = TestDataCatalyst(
+            exclude=['integer'], dump_exclude=['string'], load_exclude=['bool_field'])
+        self.assertIn('integer', catalyst._dump_field_dict)
+        self.assertIn('integer', catalyst._dump_field_dict)
+        self.assertNotIn('string', catalyst._dump_field_dict)
+        self.assertNotIn('bool_field', catalyst._load_field_dict)
 
-        with self.assertRaises(KeyError):
-            TestDataCatalyst(load_fields=['wrong_name'])
+        # Specify `include` and `exclude` at one time
+        catalyst = TestDataCatalyst(include=['string', 'integer'], exclude=['string'])
+        self.assertIn('integer', catalyst._dump_field_dict)
+        self.assertNotIn('string', catalyst._dump_field_dict)
+        self.assertIn('integer', catalyst._load_field_dict)
+        self.assertNotIn('string', catalyst._load_field_dict)
 
-    def test_set_fields_by_non_class_inheritance(self):
+        # raise wrong `include`
+        with self.assertRaises(ValueError):
+            TestDataCatalyst(include=['wrong_name'])
+        with self.assertRaises(ValueError):
+            TestDataCatalyst(dump_include=['wrong_name'])
+        with self.assertRaises(ValueError):
+            TestDataCatalyst(load_include=['wrong_name'])
+
+        # ignore wrong `exclude`
+        TestDataCatalyst(exclude=['wrong_name'])
+        TestDataCatalyst(dump_exclude=['wrong_name'])
+        TestDataCatalyst(load_exclude=['wrong_name'])
+
+    def test_set_fields_by_schema(self):
+        """Set fields by non class inheritance."""
         # test fields from class inheritance
         self.assertNotIn('schema', repr(test_catalyst))
         self.assertIsNone(test_catalyst.opts.schema)
@@ -219,6 +243,10 @@ class CatalystTest(TestCase):
         self.assertIs(fields['a'], Schema.a)
         self.assertIs(fields['b'], Schema.b)
 
+        # set fields from FieldDict
+        catalyst = Catalyst({'a': Schema.a})
+        self.assertIs(catalyst._field_dict['a'], Schema.a)
+
         # inheritance works
         class Schema2:
             a = StringField()
@@ -227,12 +255,24 @@ class CatalystTest(TestCase):
         fields = catalyst._field_dict
         self.assertIs(fields['string'], Schema2.string)
         self.assertIsNot(fields['string'], TestDataCatalyst.string)
+        self.assertIs(fields['integer'], TestDataCatalyst.integer)
 
         with self.assertRaises(NotImplementedError):
             BaseCatalyst._set_fields(1, 1)
 
+        # private attributes
+        class X(Catalyst):
+            x = StringField()
+            _x = StringField()
+            __x = StringField()
+            __x__ = StringField()
+
+        catalyst = Catalyst(X)
+        self.assertEqual(set(X._field_dict), {'x', '__x__', '_X__x', '_x'})
+        self.assertEqual(set(catalyst._field_dict), {'x'})
+
     def test_base_dump_and_load(self):
-        "Test dumping and loading data."
+        """Test dumping and loading data."""
         # test dump
         dump_data = TestData(
             string='xxx', integer=1, float_=1.1,
