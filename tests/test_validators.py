@@ -17,7 +17,7 @@ class ValidationTest(TestCase):
             Validator()(None)
 
         class NewValidator(Validator):
-            default_error_messages = {'msg': 'default'}
+            error_messages = {'msg': 'default'}
             def __call__(self, value):
                 self.error('msg')
 
@@ -33,9 +33,9 @@ class ValidationTest(TestCase):
         self.assertEqual(str(c.exception), 'custom')
         self.assertEqual(repr(c.exception), "ValidationError('custom')")
 
-    @patch.dict('catalyst.validators.RangeValidator.default_error_messages')
+    @patch.dict('catalyst.validators.RangeValidator.error_messages')
     def test_range_validator(self):
-        RangeValidator.default_error_messages.update({'too_small': 'too_small'})
+        RangeValidator.error_messages.update({'too_small': 'too_small'})
         compare_integer = RangeValidator(0, 100, {'too_large': 'too_large'})
         compare_integer(1)
         compare_integer(0)
@@ -70,9 +70,9 @@ class ValidationTest(TestCase):
         with self.assertRaises(ValueError):
             RangeValidator(1, 0)
 
-    @patch.dict('catalyst.validators.LengthValidator.default_error_messages')
+    @patch.dict('catalyst.validators.LengthValidator.error_messages')
     def test_length_validator(self):
-        LengthValidator.default_error_messages.update({'too_small': 'too_small'})
+        LengthValidator.error_messages.update({'too_small': 'too_small'})
         validator = LengthValidator(2, 10, {'too_large': 'too_large'})
 
         validator('x' * 2)

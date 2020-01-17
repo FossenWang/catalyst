@@ -45,27 +45,28 @@ class LoadResult(BaseResult):
 
 
 UNKNOWN_ERROR_MESSAGE = (
-    'Error key `{key}` does not exist in the `error_messages` dict of `{self}`.'
+    'Exception raised by `{self}`, but error key `{key}` '
+    'does not exist in the `error_messages` dict.'
 )
 
 class ErrorMessageMixin:
     """A helper mixin for error messages management.
-    Class attribute `default_error_messages` stores default error messages.
+    Class attribute `cls.error_messages` stores default error messages.
     Error messages will be collect into `self.error_messages` in the order
     of class inheritance, and can be overrided by `error_messages` argument.
     """
-    default_error_messages = {}
+    error_messages = {}
 
     def collect_error_messages(self, error_messages: Dict[str, str] = None):
         """Collect default error messages from self and parent classes.
 
-        :param error_messages: Its keys are used to find message., values are
-        string which support format syntax, and always takes an argument
-        named `self` which is the instance.
+        :param error_messages: Its keys are used to find message, values are
+            string which support format syntax, and always takes an argument
+            named `self` which is the instance.
         """
         messages = {}
         for cls in reversed(self.__class__.__mro__):
-            messages.update(cls.__dict__.get('default_error_messages', {}))
+            messages.update(cls.__dict__.get('error_messages', {}))
         messages.update(error_messages or {})
         self.error_messages = messages
 
@@ -81,8 +82,9 @@ class ErrorMessageMixin:
         """
         try:
             msg = self.error_messages[error_key]
-        except KeyError:
-            raise AssertionError(UNKNOWN_ERROR_MESSAGE.format(self=self, key=error_key))
+        except KeyError as error:
+            msg = UNKNOWN_ERROR_MESSAGE.format(self=self, key=error_key)
+            raise AssertionError(msg) from error
 
         msg = str(msg).format(self=self, **kwargs)
         return ValidationError(msg)

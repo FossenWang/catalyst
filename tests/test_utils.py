@@ -17,13 +17,13 @@ class UtilsTest(TestCase):
         self.assertEqual(snake_to_camel(''), '')
         self.assertEqual(snake_to_camel('___'), '')
 
-    @patch.dict('catalyst.utils.ErrorMessageMixin.default_error_messages')
+    @patch.dict('catalyst.utils.ErrorMessageMixin.error_messages')
     def test_error_msg(self):
         class A(ErrorMessageMixin):
-            default_error_messages = {'a': 'a'}
+            error_messages = {'a': 'a'}
 
         class B(A):
-            default_error_messages = {'b': 'b'}
+            error_messages = {'b': 'b'}
 
         b = B()
         b.collect_error_messages({'c': 'c'})
@@ -35,27 +35,27 @@ class UtilsTest(TestCase):
 
         with self.assertRaises(AssertionError) as context:
             b.error('x')
-        self.assertTrue(str(context.exception).startswith(
-            'Error key `x` does not exist in the `error_messages` dict'))
+        self.assertTrue(str(context.exception).endswith(
+            'error key `x` does not exist in the `error_messages` dict.'))
 
         b.collect_error_messages({'b': 'bb'})
         with self.assertRaises(ValidationError) as context:
             b.error('b')
         self.assertEqual(str(context.exception), 'bb')
 
-        # test change default_error_messages
+        # test change default `error_messages`
         a = A()
 
-        ErrorMessageMixin.default_error_messages = {1: 1}
+        ErrorMessageMixin.error_messages = {1: 1}
         a.collect_error_messages()
         self.assertDictEqual(a.error_messages, {'a': 'a', 1: 1})
 
-        A.default_error_messages = {2: 2, 'a': 'aaaaa'}
+        A.error_messages = {2: 2, 'a': 'aaaaa'}
         a.collect_error_messages()
         self.assertDictEqual(a.error_messages, {'a': 'aaaaa', 1: 1, 2: 2})
 
-        del A.default_error_messages
-        del ErrorMessageMixin.default_error_messages
+        del A.error_messages
+        del ErrorMessageMixin.error_messages
         a.collect_error_messages()
         self.assertDictEqual(a.error_messages, {})
 

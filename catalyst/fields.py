@@ -23,7 +23,7 @@ MultiValidator = Union[ValidatorType, Iterable[ValidatorType]]
 
 
 class Field(ErrorMessageMixin):
-    default_error_messages = {
+    error_messages = {
         'required': 'Missing data for required field.',
         'none': 'Field may not be None.',
     }
