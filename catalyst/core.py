@@ -147,28 +147,14 @@ class BaseCatalyst:
             self._load_field_dict = self._copy_fields(
                 self._field_dict, load_include,
                 lambda key: not self._field_dict[key].opts.no_load)
-        except KeyError as e:
-            raise ValueError(f"Field '{e.args[0]}' does not exist.")
+        except KeyError as error:
+            raise ValueError(f"Field '{error.args[0]}' does not exist.") from error
 
         # make processors when initializing for shorter run time
         self._do_dump = self._make_processor('dump', False)
         self._do_load = self._make_processor('load', False)
         self._do_dump_many = self._make_processor('dump', True)
         self._do_load_many = self._make_processor('load', True)
-
-    def __repr__(self):
-        args = []
-        schema = self.opts.schema
-        if schema:
-            if isinstance(schema, type):
-                schema = self.opts.schema.__name__
-            else:
-                schema = self.opts.schema.__class__.__name__
-            args.append(f'schema={schema}')
-        args.append(f'raise_error={self.opts.raise_error}')
-        args.append(f'all_errors={self.opts.all_errors}')
-        args = ', '.join(args)
-        return f'{self.__class__.__name__}({args})'
 
     @staticmethod
     def _process_one(

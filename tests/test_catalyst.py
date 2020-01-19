@@ -229,7 +229,6 @@ class CatalystTest(TestCase):
 
         catalyst = Catalyst(Schema)
         fields = catalyst._field_dict
-        self.assertIn('schema', repr(catalyst))
         self.assertIs(fields['a'], Schema.a)
         self.assertIs(fields['b'], Schema.b)
         # setting opts of field works
@@ -239,7 +238,6 @@ class CatalystTest(TestCase):
         # instance also works
         catalyst = TestDataCatalyst(Schema())
         fields = catalyst._field_dict
-        self.assertIn('schema', repr(catalyst))
         self.assertIs(fields['a'], Schema.a)
         self.assertIs(fields['b'], Schema.b)
 
