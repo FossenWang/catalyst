@@ -1,11 +1,12 @@
 from decimal import Decimal
 from types import MethodType
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable, Dict
+from functools import wraps, partial
 from datetime import datetime, time, date
 
 from .utils import (
     DumpResult, LoadResult, ErrorMessageMixin,
-    missing, no_processing, OptionBox,
+    missing, no_processing, OptionBox, BaseResult
 )
 from .validators import (
     LengthValidator,
@@ -350,6 +351,14 @@ class CallableField(Field):
 
 
 class ListField(Field):
+    """List field, handle list elements with another `Field`.
+
+    :param item_field: A `Field` instance.
+    :param dump_method: Method name of `item_field` used to do dumping.
+    :param load_method: Method name of `item_field` used to do loading.
+    :param all_errors: Whether to collect errors for every list elements.
+    """
+
     class Options(Field.Options):
         item_field = None  # type: Field
         dump_method = 'format'
@@ -369,39 +378,35 @@ class ListField(Field):
             load_method=load_method,
             all_errors=all_errors,
             **kwargs)
-
-    def formatter(self, value: Iterable):
-        return self._process_many('dump', value)
-
-    def parser(self, value: Iterable):
-        return self._process_many('load', value)
-
-    def _process_many(self, name: str, data: Iterable):
-        if name == 'dump':
-            ResultClass = DumpResult
-            method_name = self.opts.dump_method
-        elif name == 'load':
-            ResultClass = LoadResult
-            method_name = self.opts.load_method
-        else:
-            raise ValueError("Argument `name` must be 'dump' or 'load'.")
-
-        handle = getattr(self.opts.item_field, method_name)
         all_errors = self.opts.all_errors
+        dump_func = getattr(self.opts.item_field, self.opts.dump_method)
+        load_func = getattr(self.opts.item_field, self.opts.load_method)
+        self.set_formatter(partial(
+            self._process_many,
+            all_errors=all_errors,
+            process_one=dump_func))
+        self.set_parser(partial(
+            self._process_many,
+            all_errors=all_errors,
+            process_one=load_func))
 
+    @staticmethod
+    def _process_many(
+            data: Iterable,
+            all_errors: bool,
+            process_one: Callable):
         valid_data, errors, invalid_data = [], {}, {}
         for i, item in enumerate(data):
             try:
-                result = handle(item)
+                result = process_one(item)
                 valid_data.append(result)
             except Exception as error:
                 errors[i] = error
                 invalid_data[i] = item
                 if not all_errors:
                     break
-
         if errors:
-            raise ValidationError(ResultClass(valid_data, errors, invalid_data))
+            raise ValidationError(BaseResult(valid_data, errors, invalid_data))
         return valid_data
 
 
