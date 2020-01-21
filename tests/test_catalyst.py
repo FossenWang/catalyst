@@ -2,7 +2,6 @@ from unittest import TestCase
 
 from catalyst.core import (
     BaseCatalyst,
-    CatalystMeta,
     Catalyst,
 )
 from catalyst.fields import Field, StringField, IntegerField, \
@@ -43,18 +42,16 @@ class CatalystTest(TestCase):
 
     def test_inherit(self):
         class A(Catalyst):
+            all_errors = False
+
             a = Field()
             b = Field()
 
-            class Options(Catalyst.Options):
-                all_errors = False
-
         class B(A):
+            raise_error = True
+
             b = IntegerField()
             c = FloatField()
-
-            class Options(A.Options):
-                raise_error = True
 
         a = A()
         b = B()
@@ -70,14 +67,10 @@ class CatalystTest(TestCase):
         data = {'a': 'a', 'b': 1, 'c': 1.0}
         self.assertDictEqual(b.dump(data).valid_data, data)
 
-        self.assertEqual(a.opts.all_errors, False)
-        self.assertEqual(a.opts.raise_error, False)
-        self.assertEqual(b.opts.all_errors, False)
-        self.assertEqual(b.opts.raise_error, True)
-
-        # wrong type for Options
-        with self.assertRaises(TypeError):
-            CatalystMeta('X', (object,), {'Options': object})
+        self.assertEqual(a.all_errors, False)
+        self.assertEqual(a.raise_error, False)
+        self.assertEqual(b.all_errors, False)
+        self.assertEqual(b.raise_error, True)
 
     def test_change_field_name_and_key_naming_style(self):
         # change field key naming style
@@ -214,7 +207,7 @@ class CatalystTest(TestCase):
         """Set fields by non class inheritance."""
         # test fields from class inheritance
         self.assertNotIn('schema', repr(test_catalyst))
-        self.assertIsNone(test_catalyst.opts.schema)
+        self.assertIsNone(test_catalyst.schema)
         self.assertIs(test_catalyst.integer, test_catalyst._field_dict['integer'])
 
         # set fields from a non `Catalyst` class when instantiate
@@ -314,11 +307,11 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {'load'})
 
         # test error_keys
-        test_catalyst.opts.error_keys['load'] = 'xxx'
+        test_catalyst.error_keys['load'] = 'xxx'
         result = test_catalyst.load(1)
         self.assertFalse(result.is_valid)
         self.assertEqual(set(result.errors), {'xxx'})
-        test_catalyst.opts.error_keys.clear()
+        test_catalyst.error_keys.clear()
 
         # test invalid data: validate errors
         invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
@@ -516,7 +509,7 @@ class CatalystTest(TestCase):
         self.assertTrue('pre_dump' in result.errors)
         with self.assertRaises(ValidationError):
             c.dump(redundant_data, raise_error=True)
-        c.opts.error_keys['pre_dump'] = 'not_allowed_keys'
+        c.error_keys['pre_dump'] = 'not_allowed_keys'
         result = c.dump(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
@@ -527,7 +520,7 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertEqual({'post_dump'}, set(result.errors))
 
-        c.opts.error_keys['post_dump'] = 'wrong_value'
+        c.error_keys['post_dump'] = 'wrong_value'
         result = c.dump(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertEqual({'wrong_value'}, set(result.errors))
@@ -541,7 +534,7 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertTrue('pre_load' in result.errors)
         # pre_load error_key
-        c.opts.error_keys['pre_load'] = 'not_allowed_keys'
+        c.error_keys['pre_load'] = 'not_allowed_keys'
         result = c.load(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
@@ -555,7 +548,7 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertTrue('post_load' in result.errors)
         # post_load error_key
-        c.opts.error_keys['post_load'] = 'wrong_value'
+        c.error_keys['post_load'] = 'wrong_value'
         result = c.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('wrong_value' in result.errors)
@@ -579,7 +572,7 @@ class CatalystTest(TestCase):
         self.assertTrue('pre_load_many' in result.errors)
         self.assertListEqual(result.invalid_data, [{}, {}, {}])
 
-        c.opts.error_keys.clear()
+        c.error_keys.clear()
 
     def test_load_and_dump_args(self):
         class A(Catalyst):
@@ -673,11 +666,11 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {0})
         self.assertEqual(set(result.errors[0]), {'load'})
 
-        c.opts.error_keys['load_many'] = 'xxx'
+        c.error_keys['load_many'] = 'xxx'
         result = c.load_many(1)
         self.assertFalse(result.is_valid)
         self.assertEqual(set(result.errors), {'xxx'})
-        test_catalyst.opts.error_keys.clear()
+        test_catalyst.error_keys.clear()
 
     def test_list_field(self):
         class C(Catalyst):

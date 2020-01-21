@@ -90,20 +90,11 @@ class ErrorMessageMixin:
         return ValidationError(msg)
 
 
-class OptionBox:
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            if value is not None:
-                setattr(self, key, value)
-
-    def get(self, **kwargs):
-        """Return not None value or instance attribute.
-        :param kwargs: Only accept a pair of kwargs.
-        """
-        for key, value in kwargs.items():
-            if value is None:
-                return getattr(self, key)
-            return value
+def bind_attrs(obj, **kwargs):
+    """Set not None attrbutes."""
+    for key, value in kwargs.items():
+        if value is not None:
+            setattr(obj, key, value)
 
 
 class _Missing:

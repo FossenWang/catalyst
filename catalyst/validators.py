@@ -24,7 +24,7 @@ class RangeValidator(Validator):
 
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys `{'too_small', 'too_large'}`
+    :param error_messages: Keys {'too_small', 'too_large'}.
     """
     error_messages = {
         'too_small': 'Value must >= {self.minimum}.',
@@ -54,7 +54,7 @@ class LengthValidator(RangeValidator):
 
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys `{'too_small', 'too_large'}`.
+    :param error_messages: Keys {'too_small', 'too_large'}.
     """
     error_messages = {
         'too_small': 'Length must >= {self.minimum}.',
@@ -69,7 +69,7 @@ class TypeValidator(Validator):
     """Check type of value.
 
     :param class_or_tuple: Same as `isinstance` function's argument.
-    :param error_messages: Keys `{'wrong_type'}`.
+    :param error_messages: Keys {'wrong_type'}.
     """
     error_messages = {
         'wrong_type': 'Type must be {self.class_or_tuple}.',
@@ -89,7 +89,7 @@ class RegexValidator(Validator):
     """Check if string match regex pattern.
 
     :param regex: Regex pattern.
-    :param error_messages: Keys `{'no_match'}`.
+    :param error_messages: Keys {'no_match'}.
     """
     error_messages = {
         'no_match': 'No match for pattern "{self.regex.pattern}".',

@@ -112,7 +112,7 @@ class FieldTest(TestCase):
             field.error_messages['too_small'],
             field.validators[0].error_messages['too_small'])
 
-        field.opts.allow_none = False
+        field.allow_none = False
         with self.assertRaises(ValidationError):
             field.load(None)
 
@@ -249,7 +249,7 @@ class FieldTest(TestCase):
         with self.assertRaises(TypeError):
             field.load(1)
         self.assertIsNone(field.load(None))
-        field.opts.allow_none = False
+        field.allow_none = False
         with self.assertRaises(ValidationError) as ctx:
             field.load(None)
         self.assertEqual(ctx.exception.msg, field.error_messages['none'])
@@ -294,7 +294,7 @@ class FieldTest(TestCase):
         # dump
         field = FieldClass()
         dt_str = field.dump(dt)
-        self.assertEqual(dt_str, dt.strftime(field.opts.fmt))
+        self.assertEqual(dt_str, dt.strftime(field.fmt))
 
         field = FieldClass(fmt=fmt)
         dt_str = field.dump(dt)

@@ -4,7 +4,7 @@ from unittest.mock import patch
 from catalyst.exceptions import ValidationError
 from catalyst.utils import (
     snake_to_camel, ErrorMessageMixin, BaseResult,
-    missing, OptionBox,
+    missing
 )
 
 
@@ -74,24 +74,6 @@ class UtilsTest(TestCase):
         self.assertEqual(repr(result), s)
         self.assertDictEqual(result.format_errors(), {'error': 'error'})
         self.assertEqual(str(result), "{'error': 'error'}")
-
-    def test_option_box(self):
-        opts = OptionBox()
-
-        class BaseOptions(OptionBox):
-            a = 1
-            b = 2
-
-        class Options(BaseOptions):
-            a = 1
-            b = 3
-            c = 4
-
-        opts = Options(c=5, d=6)
-        self.assertEqual(opts.a, 1)
-        self.assertEqual(opts.b, 3)
-        self.assertEqual(opts.c, 5)
-        self.assertEqual(opts.d, 6)
 
     def test_others(self):
         self.assertEqual(str(missing), '<catalyst.missing>')

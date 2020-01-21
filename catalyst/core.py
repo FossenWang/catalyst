@@ -7,7 +7,7 @@ from .fields import Field, NestedField
 from .exceptions import ValidationError
 from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,
-    LoadResult, DumpResult, BaseResult, OptionBox
+    LoadResult, DumpResult, BaseResult, bind_attrs
 )
 
 
@@ -43,16 +43,14 @@ class BaseCatalyst:
     :param load_include: The fields to include in load fields.
     :param load_exclude: The fields to exclude from dump fields.
     """
-    _field_dict = {}  # type: FieldDict
+    schema = None
+    dump_method = 'format'
+    load_method = 'load'
+    raise_error = False
+    all_errors = True
+    error_keys = {}  # error keys used for error process
 
-    class Options(OptionBox):
-        dump_method = 'format'
-        load_method = 'load'
-        raise_error = False
-        all_errors = True
-        schema = None
-        # error keys used for error process, be careful with attribute inheriting
-        error_keys = {}
+    _field_dict = {}  # type: FieldDict
 
     # assign getter for dumping & loading
     _assign_dump_getter = staticmethod(assign_attr_or_item_getter)
@@ -95,7 +93,8 @@ class BaseCatalyst:
             load_exclude: Iterable[str] = None,
             load_method: str = None,
             **kwargs):
-        self.opts = self.Options(
+        bind_attrs(
+            self,
             schema=schema,
             raise_error=raise_error,
             all_errors=all_errors,
@@ -105,15 +104,15 @@ class BaseCatalyst:
             **kwargs,
         )
 
-        if self.opts.dump_method not in {'dump', 'format', 'validate'}:
+        if self.dump_method not in {'dump', 'format', 'validate'}:
             raise ValueError(
-                "Attribute `opts.dump_method` must be in ('dump', 'format', 'validate').")
-        if self.opts.load_method not in {'load', 'parse', 'validate'}:
+                "Attribute `dump_method` must be in ('dump', 'format', 'validate').")
+        if self.load_method not in {'load', 'parse', 'validate'}:
             raise ValueError(
-                "Attribute `opts.load_method` must be in ('load', 'parse', 'validate').")
+                "Attribute `load_method` must be in ('load', 'parse', 'validate').")
 
         # set fields from a dict or non `Catalyst` class
-        schema = self.opts.schema
+        schema = self.schema
         if schema:
             if isinstance(schema, Mapping):
                 attrs = schema
@@ -143,10 +142,10 @@ class BaseCatalyst:
         try:
             self._dump_field_dict = self._copy_fields(
                 self._field_dict, dump_include,
-                lambda key: not self._field_dict[key].opts.no_dump)
+                lambda key: not self._field_dict[key].no_dump)
             self._load_field_dict = self._copy_fields(
                 self._field_dict, load_include,
-                lambda key: not self._field_dict[key].opts.no_load)
+                lambda key: not self._field_dict[key].no_load)
         except KeyError as error:
             raise ValueError(f"Field '{error.args[0]}' does not exist.") from error
 
@@ -175,8 +174,10 @@ class BaseCatalyst:
         for field in field_dict.values():
             source = getattr(field, source_attr)
             target = getattr(field, target_attr)
+            required = getattr(field, required_attr)
             default = getattr(field, default_attr)
-            required = getattr(field.opts, required_attr)
+            if callable(default):
+                default = default()
 
             raw_value = get_value(data, source, default)
             try:
@@ -242,7 +243,7 @@ class BaseCatalyst:
                     self._process_one,
                     assign_getter=self._assign_dump_getter,
                     field_dict=self._dump_field_dict,
-                    field_method=self.opts.dump_method,
+                    field_method=self.dump_method,
                     source_attr='name',
                     target_attr='key',
                     default_attr='dump_default',
@@ -252,7 +253,7 @@ class BaseCatalyst:
                     self._process_one,
                     assign_getter=self._assign_load_getter,
                     field_dict=self._load_field_dict,
-                    field_method=self.opts.load_method,
+                    field_method=self.load_method,
                     source_attr='key',
                     target_attr='name',
                     default_attr='load_default',
@@ -262,9 +263,9 @@ class BaseCatalyst:
         post_process_name = f'post_{method_name}'
         pre_process = getattr(self, pre_process_name)
         post_process = getattr(self, post_process_name)
-        error_keys = self.opts.error_keys
-        default_raise_error = self.opts.raise_error
-        default_all_errors = self.opts.all_errors
+        error_keys = self.error_keys
+        default_raise_error = self.raise_error
+        default_all_errors = self.all_errors
 
         def integrated_process(data, raise_error, all_errors):
             if raise_error is None:
@@ -389,9 +390,6 @@ class CatalystMeta(type):
 
     def __new__(cls, name, bases, attrs):
         new_cls = super().__new__(cls, name, bases, attrs)
-        if not (isinstance(new_cls.Options, type) and issubclass(new_cls.Options, OptionBox)):
-            raise TypeError('Class attribute `Options` must inherit from `OptionBox`.')
-
         new_cls._set_fields(new_cls, attrs)
         return new_cls
 

@@ -1,12 +1,12 @@
 from decimal import Decimal
 from types import MethodType
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable, Dict
-from functools import wraps, partial
+from functools import partial
 from datetime import datetime, time, date
 
 from .utils import (
-    DumpResult, LoadResult, ErrorMessageMixin,
-    missing, no_processing, OptionBox, BaseResult
+    BaseResult, ErrorMessageMixin,
+    missing, no_processing, bind_attrs,
 )
 from .validators import (
     LengthValidator,
@@ -24,26 +24,40 @@ MultiValidator = Union[ValidatorType, Iterable[ValidatorType]]
 
 
 class Field(ErrorMessageMixin):
+    """Basic field class.
+
+    :param name:
+    :param key:
+    :param formatter:
+    :param parser:
+    :param format_none:
+    :param parse_none:
+    :param dump_required:
+    :param load_required:
+    :param dump_default: If set, `dumo_required` has no effect.
+    :param load_default: same as `dump_default`
+    :param no_dump:
+    :param no_load:
+    :param validators:
+    :param allow_none:
+    :param error_messages: Keys {'required', 'none'}.
+    """
+    formatter = staticmethod(no_processing)
+    parser = staticmethod(no_processing)
+    format_none = False
+    parse_none = False
+    dump_required = True
+    load_required = False
+    dump_default = missing
+    load_default = missing
+    no_dump = False
+    no_load = False
+    validators = []
+    allow_none = True
     error_messages = {
         'required': 'Missing data for required field.',
         'none': 'Field may not be None.',
     }
-    formatter = staticmethod(no_processing)
-    parser = staticmethod(no_processing)
-    validators = []
-
-    class Options(OptionBox):
-        format_none = False
-        dump_required = True
-        dump_default = missing
-        no_dump = False
-
-        parse_none = False
-        load_required = False
-        load_default = missing
-        no_load = False
-
-        allow_none = True
 
     def __init__(
             self,
@@ -63,10 +77,10 @@ class Field(ErrorMessageMixin):
             allow_none: bool = None,
             error_messages: Dict[str, str] = None,
             **kwargs):
-        """if `default` is set, `required` has no effect."""
         self.name = name
         self.key = key
-        self.opts = self.Options(
+        bind_attrs(
+            self,
             format_none=format_none,
             dump_required=dump_required,
             no_dump=no_dump,
@@ -77,9 +91,9 @@ class Field(ErrorMessageMixin):
             **kwargs,
         )
         if dump_default is not missing:
-            self.opts.dump_default = dump_default
+            self.dump_default = dump_default
         if load_default is not missing:
-            self.opts.load_default = load_default
+            self.load_default = load_default
         if formatter is not None:
             self.set_formatter(formatter)
         if parser is not None:
@@ -123,7 +137,7 @@ class Field(ErrorMessageMixin):
 
     def validate(self, value):
         if value is None:
-            if self.opts.allow_none:
+            if self.allow_none:
                 return None
             self.error('none')
         for validator in self.validators:
@@ -131,7 +145,7 @@ class Field(ErrorMessageMixin):
         return value
 
     def format(self, value):
-        if value is None and not self.opts.format_none:
+        if value is None and not self.format_none:
             return None
         value = self.formatter(value)
         return value
@@ -142,7 +156,7 @@ class Field(ErrorMessageMixin):
         return value
 
     def parse(self, value):
-        if value is None and not self.opts.parse_none:
+        if value is None and not self.parse_none:
             return None
         value = self.parser(value)
         return value
@@ -151,20 +165,6 @@ class Field(ErrorMessageMixin):
         value = self.parse(value)
         self.validate(value)
         return value
-
-    @property
-    def dump_default(self):
-        default = self.opts.dump_default
-        if callable(default):
-            default = default()
-        return default
-
-    @property
-    def load_default(self):
-        default = self.opts.load_default
-        if callable(default):
-            default = default()
-        return default
 
 
 class StringField(Field):
@@ -191,7 +191,7 @@ class NumberField(Field):
 
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys `{'too_small', 'too_large'}`.
+    :param error_messages: Keys {'too_small', 'too_large', 'required', 'none'}.
     """
     formatter = float
     parser = float
@@ -229,11 +229,10 @@ class DecimalField(NumberField):
     :param dump_as: Data type that the value is serialized to.
     :param kwargs: Same as `Number` field.
     """
-    class Options(NumberField.Options):
-        dump_as = str
-        scale = None
-        rounding = None
-        exponent = None
+    dump_as = str
+    scale = None
+    rounding = None
+    exponent = None
 
     def __init__(
             self,
@@ -243,23 +242,23 @@ class DecimalField(NumberField):
             **kwargs):
         super().__init__(
             scale=scale, rounding=rounding, dump_as=dump_as, **kwargs)
-        if not callable(self.opts.dump_as):
+        if not callable(self.dump_as):
             raise TypeError('`dump_as` must be callable.')
-        scale = self.opts.scale
+        scale = self.scale
         if scale is not None:
-            self.opts.exponent = Decimal((0, (), -int(scale)))
+            self.exponent = Decimal((0, (), -int(scale)))
 
     def to_decimal(self, value):
         if isinstance(value, float):
             value = str(value)
         value = Decimal(value)
-        if self.opts.exponent is not None and value.is_finite():
-            value = value.quantize(self.opts.exponent, rounding=self.opts.rounding)
+        if self.exponent is not None and value.is_finite():
+            value = value.quantize(self.exponent, rounding=self.rounding)
         return value
 
     def formatter(self, value):
         num = self.to_decimal(value)
-        return self.opts.dump_as(num)
+        return self.dump_as(num)
 
     parser = to_decimal
 
@@ -270,24 +269,23 @@ class BooleanField(Field):
     :param value_map: Values that will be onverted to `True` or `False`.
         The keys are `True` and `False`, values are `Hashable`.
     """
-    class Options(Field.Options):
-        reverse_value_map = None  # type: dict
-        value_map = {
-            True: ('1', 'y', 'yes', 'true', 'True'),
-            False: ('0', 'n', 'no', 'false', 'False'),
-        }
+    reverse_value_map = None  # type: dict
+    value_map = {
+        True: ('1', 'y', 'yes', 'true', 'True'),
+        False: ('0', 'n', 'no', 'false', 'False'),
+    }
 
     def __init__(self, value_map: dict = None, **kwargs):
         super().__init__(value_map=value_map, **kwargs)
-        self.opts.reverse_value_map = {
+        self.reverse_value_map = {
             raw: parsed
-            for parsed, raw_values in self.opts.value_map.items()
+            for parsed, raw_values in self.value_map.items()
             for raw in raw_values
         }
 
     def formatter(self, value):
         if isinstance(value, Hashable):
-            value = self.opts.reverse_value_map.get(value, value)
+            value = self.reverse_value_map.get(value, value)
         value = bool(value)
         return value
 
@@ -295,9 +293,8 @@ class BooleanField(Field):
 
 
 class DatetimeField(Field):
-    class Options(Field.Options):
-        type_ = datetime
-        fmt = r'%Y-%m-%d %H:%M:%S.%f'
+    type_ = datetime
+    fmt = r'%Y-%m-%d %H:%M:%S.%f'
 
     def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
         super().__init__(fmt=fmt, **kwargs)
@@ -306,48 +303,47 @@ class DatetimeField(Field):
                 RangeValidator(min_time, max_time, self.error_messages))
 
     def formatter(self, dt):
-        return self.opts.type_.strftime(dt, self.opts.fmt)
+        return self.type_.strftime(dt, self.fmt)
 
     def parser(self, date_string: str):
-        return datetime.strptime(date_string, self.opts.fmt)
+        return datetime.strptime(date_string, self.fmt)
 
 
 class TimeField(DatetimeField):
-    class Options(DatetimeField.Options):
-        type_ = time
-        fmt = r'%H:%M:%S.%f'
+    type_ = time
+    fmt = r'%H:%M:%S.%f'
 
     def parser(self, date_string: str):
-        return datetime.strptime(date_string, self.opts.fmt).time()
+        return datetime.strptime(date_string, self.fmt).time()
 
 
 class DateField(DatetimeField):
-    class Options(DatetimeField.Options):
-        type_ = date
-        fmt = r'%Y-%m-%d'
+    type_ = date
+    fmt = r'%Y-%m-%d'
 
     def parser(self, date_string: str):
-        return datetime.strptime(date_string, self.opts.fmt).date()
+        return datetime.strptime(date_string, self.fmt).date()
 
 
 class CallableField(Field):
-    class Options(Field.Options):
-        func_args = tuple()
-        func_kwargs = {}
+    func_args = tuple()
+    func_kwargs = {}
 
     def __init__(self, func_args: Iterable = None, func_kwargs: Mapping = None, **kwargs):
         kwargs.pop('no_load', None)
         super().__init__(no_load=True, **kwargs)
-        func_args = self.opts.get(func_kwargs=func_args)
-        func_kwargs = self.opts.get(func_kwargs=func_kwargs)
+        if func_args is None:
+            func_args = self.func_args
+        if func_kwargs is None:
+            func_kwargs = self.func_kwargs
         self.set_args(*func_args, **func_kwargs)
 
     def set_args(self, *args, **kwargs):
-        self.opts.func_args = args
-        self.opts.func_kwargs = kwargs
+        self.func_args = args
+        self.func_kwargs = kwargs
 
     def formatter(self, func: Callable):
-        return func(*self.opts.func_args, **self.opts.func_kwargs)
+        return func(*self.func_args, **self.func_kwargs)
 
 
 class ListField(Field):
@@ -358,12 +354,10 @@ class ListField(Field):
     :param load_method: Method name of `item_field` used to do loading.
     :param all_errors: Whether to collect errors for every list elements.
     """
-
-    class Options(Field.Options):
-        item_field = None  # type: Field
-        dump_method = 'format'
-        load_method = 'load'
-        all_errors = True
+    item_field = None  # type: Field
+    dump_method = 'format'
+    load_method = 'load'
+    all_errors = True
 
     def __init__(
             self,
@@ -378,9 +372,9 @@ class ListField(Field):
             load_method=load_method,
             all_errors=all_errors,
             **kwargs)
-        all_errors = self.opts.all_errors
-        dump_func = getattr(self.opts.item_field, self.opts.dump_method)
-        load_func = getattr(self.opts.item_field, self.opts.load_method)
+        all_errors = self.all_errors
+        dump_func = getattr(self.item_field, self.dump_method)
+        load_func = getattr(self.item_field, self.load_method)
         self.set_formatter(partial(
             self._process_many,
             all_errors=all_errors,
@@ -411,14 +405,13 @@ class ListField(Field):
 
 
 class NestedField(Field):
-    class Options(Field.Options):
-        catalyst = None
+    catalyst = None
 
     def __init__(self, catalyst, **kwargs):
         super().__init__(catalyst=catalyst, **kwargs)
 
     def formatter(self, value):
-        return self.opts.catalyst.dump(value, True).valid_data
+        return self.catalyst.dump(value, True).valid_data
 
     def parser(self, value):
-        return self.opts.catalyst.load(value, True).valid_data
+        return self.catalyst.load(value, True).valid_data
