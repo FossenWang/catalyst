@@ -1,5 +1,4 @@
 from decimal import Decimal
-from types import MethodType
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable, Dict
 from functools import partial
 from datetime import datetime, time, date
@@ -104,13 +103,13 @@ class Field(ErrorMessageMixin):
     def set_formatter(self, formatter: FormatterType):
         if not callable(formatter):
             raise TypeError('Argument `formatter` must be Callable.')
-        self.formatter = formatter  # type: MethodType
+        setattr(self, 'formatter', formatter)
         return formatter
 
     def set_parser(self, parser: ParserType):
         if not callable(parser):
             raise TypeError('Argument `parser` must be Callable.')
-        self.parser = parser  # type: MethodType
+        setattr(self, 'parser', parser)
         return parser
 
     @staticmethod
