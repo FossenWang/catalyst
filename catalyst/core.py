@@ -181,8 +181,8 @@ class BaseCatalyst:
 
             raw_value = get_value(data, source, default)
             try:
-                # if the field's value is missing
-                # raise error if required otherwise skip
+                # when the field's value is missing
+                # if required, raise error, otherwise skip
                 if raw_value is missing:
                     if required:
                         errors[source] = field.get_error('required')
@@ -210,7 +210,7 @@ class BaseCatalyst:
     def _process_many(data: Sequence, all_errors: bool, process_one: Callable):
         valid_data, errors, invalid_data = [], {}, {}
         for i, item in enumerate(data):
-            result = process_one(item, raise_error=False, all_errors=all_errors)
+            result = process_one(item, raise_error=False)
             valid_data.append(result.valid_data)
             if not result.is_valid:
                 errors[i] = result.errors
@@ -232,15 +232,19 @@ class BaseCatalyst:
         else:
             raise ValueError("Argument `name` must be 'dump' or 'load'.")
 
+        all_errors = self.all_errors
         if many:
-            process_one = getattr(self, name)
-            main_process = partial(self._process_many, process_one=process_one)
+            main_process = partial(
+                self._process_many,
+                all_errors=all_errors,
+                process_one=getattr(self, name))
             method_name = name + '_many'
         else:
             method_name = name
             if name == 'dump':
                 main_process = partial(
                     self._process_one,
+                    all_errors=all_errors,
                     assign_getter=self._assign_dump_getter,
                     field_dict=self._dump_field_dict,
                     field_method=self.dump_method,
@@ -251,6 +255,7 @@ class BaseCatalyst:
             else:
                 main_process = partial(
                     self._process_one,
+                    all_errors=all_errors,
                     assign_getter=self._assign_load_getter,
                     field_dict=self._load_field_dict,
                     field_method=self.load_method,
@@ -265,13 +270,10 @@ class BaseCatalyst:
         post_process = getattr(self, post_process_name)
         error_keys = self.error_keys
         default_raise_error = self.raise_error
-        default_all_errors = self.all_errors
 
-        def integrated_process(data, raise_error, all_errors):
+        def integrated_process(data, raise_error):
             if raise_error is None:
                 raise_error = default_raise_error
-            if all_errors is None:
-                all_errors = default_all_errors
 
             try:
                 # pre process
@@ -280,7 +282,7 @@ class BaseCatalyst:
 
                 # main process
                 process_name = method_name
-                valid_data, errors, invalid_data = main_process(valid_data, all_errors=all_errors)
+                valid_data, errors, invalid_data = main_process(valid_data)
 
                 # post process
                 if not errors:
@@ -303,62 +305,38 @@ class BaseCatalyst:
 
         return integrated_process
 
-    def _process_args(
-            self, func: Callable = None, processor: Callable = None, all_errors: bool = None,
-        ) -> Callable:
+    def _process_args(self, func: Callable, processor: Callable) -> Callable:
         """Decorator for handling args by catalyst before function is called.
         The wrapper function takes args as same as args of the raw function.
         If args are invalid, error will be raised. In general, `*args` should
         be handled by `ListField`, and `**kwargs` should be handled by `NestedField`.
         """
-        if func:
-            sig = inspect.signature(func)
-            @wraps(func)
-            def wrapper(*args, **kwargs):
-                ba = sig.bind(*args, **kwargs)
-                result = processor(ba.arguments, raise_error=True, all_errors=all_errors)
-                ba.arguments.update(result.valid_data)
-                return func(*ba.args, **ba.kwargs)
-            return wrapper
-        return partial(self._process_args, processor=processor, all_errors=all_errors)
+        sig = inspect.signature(func)
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            ba = sig.bind(*args, **kwargs)
+            result = processor(ba.arguments, raise_error=True)
+            ba.arguments.update(result.valid_data)
+            return func(*ba.args, **ba.kwargs)
+        return wrapper
 
-    def dump(
-            self,
-            data: Any,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> DumpResult:
-        return self._do_dump(data, raise_error, all_errors)
+    def dump(self, data: Any, raise_error: bool = None) -> DumpResult:
+        return self._do_dump(data, raise_error)
 
-    def load(
-            self,
-            data: Any,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> LoadResult:
-        return self._do_load(data, raise_error, all_errors)
+    def load(self, data: Any, raise_error: bool = None) -> LoadResult:
+        return self._do_load(data, raise_error)
 
-    def dump_many(
-            self,
-            data: Sequence,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> DumpResult:
-        return self._do_dump_many(data, raise_error, all_errors)
+    def dump_many(self, data: Sequence, raise_error: bool = None) -> DumpResult:
+        return self._do_dump_many(data, raise_error)
 
-    def load_many(
-            self,
-            data: Sequence,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> LoadResult:
-        return self._do_load_many(data, raise_error, all_errors)
+    def load_many(self, data: Sequence, raise_error: bool = None) -> LoadResult:
+        return self._do_load_many(data, raise_error)
 
-    def dump_args(self, func: Callable = None, all_errors: bool = None) -> Callable:
-        return self._process_args(func, self.dump, all_errors)
+    def dump_args(self, func: Callable) -> Callable:
+        return self._process_args(func, self.dump)
 
-    def load_args(self, func: Callable = None, all_errors: bool = None) -> Callable:
-        return self._process_args(func, self.load, all_errors)
+    def load_args(self, func: Callable = None) -> Callable:
+        return self._process_args(func, self.load)
 
     def pre_dump(self, data):
         return data

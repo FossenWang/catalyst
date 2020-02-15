@@ -1,11 +1,12 @@
 from typing import Sequence, Callable
 from functools import partial
 
-from .utils import LoadResult, DumpResult, BaseResult
+from .utils import LoadResult, DumpResult, bind_attrs
 from .exceptions import ValidationError
 
 
 class CatalystPacker:
+    catalysts = []
     raise_error = False
     all_errors = True
 
@@ -14,11 +15,12 @@ class CatalystPacker:
             catalysts: Sequence = None,
             raise_error: bool = None,
             all_errors: bool = None):
-        self.catalysts = [] if catalysts is None else catalysts
-        if raise_error is not None:
-            self.raise_error = raise_error
-        if all_errors is not None:
-            self.all_errors = all_errors
+        bind_attrs(
+            self,
+            catalysts=catalysts,
+            raise_error=raise_error,
+            all_errors=all_errors,
+        )
 
         # make processors when initializing for shorter run time
         self._do_dump = self._make_processor('dump', False)
@@ -30,7 +32,7 @@ class CatalystPacker:
     def _process_one(data: Sequence, all_errors: bool, processors: Sequence[Callable]):
         valid_data, errors, invalid_data = {}, {}, {}
         for processor, item in zip(processors, data):
-            result = processor(item, raise_error=False, all_errors=all_errors)
+            result = processor(item, raise_error=False)
             if result.is_valid:
                 valid_data.update(result.valid_data)
             else:
@@ -44,7 +46,7 @@ class CatalystPacker:
     def _process_many(data: Sequence[Sequence], all_errors: bool, process_one: Callable):
         valid_data, errors, invalid_data = [], {}, {}
         for i, items in enumerate(zip(*data)):
-            result = process_one(items, raise_error=False, all_errors=all_errors)
+            result = process_one(items, raise_error=False)
             valid_data.append(result.valid_data)
             if not result.is_valid:
                 errors[i] = result.errors
@@ -61,23 +63,27 @@ class CatalystPacker:
         else:
             raise ValueError("Argment 'name' must be 'dump' or 'load'.")
 
+        all_errors = self.all_errors
         if many:
             process_one = getattr(self, name)
-            main_process = partial(self._process_many, process_one=process_one)
+            main_process = partial(
+                self._process_many,
+                all_errors=all_errors,
+                process_one=process_one)
         else:
             processors = [getattr(catalyst, name) for catalyst in self.catalysts]
-            main_process = partial(self._process_one, processors=processors)
+            main_process = partial(
+                self._process_one,
+                all_errors=all_errors,
+                processors=processors)
 
         default_raise_error = self.raise_error
-        default_all_errors = self.all_errors
 
-        def integrated_process(data, raise_error, all_errors):
+        def integrated_process(data, raise_error):
             if raise_error is None:
                 raise_error = default_raise_error
-            if all_errors is None:
-                all_errors = default_all_errors
 
-            valid_data, errors, invalid_data = main_process(data, all_errors)
+            valid_data, errors, invalid_data = main_process(data)
 
             result = ResultClass(valid_data, errors, invalid_data)
             if errors and raise_error:
@@ -86,34 +92,14 @@ class CatalystPacker:
 
         return integrated_process
 
-    def dump(
-            self,
-            data: Sequence,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> DumpResult:
-        return self._do_dump(data, raise_error, all_errors)
+    def dump(self, data: Sequence, raise_error: bool = None) -> DumpResult:
+        return self._do_dump(data, raise_error)
 
-    def load(
-            self,
-            data: Sequence,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> LoadResult:
-        return self._do_load(data, raise_error, all_errors)
+    def load(self, data: Sequence, raise_error: bool = None) -> LoadResult:
+        return self._do_load(data, raise_error)
 
-    def dump_many(
-            self,
-            data: Sequence,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> DumpResult:
-        return self._do_dump_many(data, raise_error, all_errors)
+    def dump_many(self, data: Sequence, raise_error: bool = None) -> DumpResult:
+        return self._do_dump_many(data, raise_error)
 
-    def load_many(
-            self,
-            data: Sequence,
-            raise_error: bool = None,
-            all_errors: bool = None,
-        ) -> LoadResult:
-        return self._do_load_many(data, raise_error, all_errors)
+    def load_many(self, data: Sequence, raise_error: bool = None) -> LoadResult:
+        return self._do_load_many(data, raise_error)

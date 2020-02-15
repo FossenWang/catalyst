@@ -25,6 +25,7 @@ class PackerTest(TestCase):
 
         a, b, c = A(), B(), C()
         packer = CatalystPacker((a, b, c))
+        packer_2 = CatalystPacker((a, b, c), all_errors=False)
 
         valid_data = ({'a': 0.0}, {'b': 1.0}, {'c': 2.0})
         valid_result = {'a': 0.0, 'b': 1.0, 'c': 2.0}
@@ -43,7 +44,7 @@ class PackerTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertEqual(set(result.errors), {'b', 'c', 'a'})
 
-        result = packer.dump(invalid_data, all_errors=False)
+        result = packer_2.dump(invalid_data)
         self.assertEqual(set(result.errors), {'a'})
 
         with self.assertRaises(ValidationError) as ctx:
@@ -94,13 +95,13 @@ class PackerTest(TestCase):
             {'a': 2.0, 'b': 2.0, 'c': 2.0}
         ])
 
-        result = packer.load_many(invalid_data, all_errors=False)
+        result = packer_2.load_many(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, {0: {'c': 'c'}})
         self.assertListEqual(result.valid_data, [{'a': 0.0, 'b': 0.0}])
 
         with self.assertRaises(ValidationError) as ctx:
-            packer.load_many(invalid_data, raise_error=True, all_errors=False)
+            packer_2.load_many(invalid_data, raise_error=True)
         result = ctx.exception.msg
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, {0: {'c': 'c'}})
