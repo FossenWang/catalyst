@@ -262,6 +262,9 @@ class FieldTest(TestCase):
         self.assertEqual(result.invalid_data[1], 'a')
         self.assertEqual(result.valid_data, [1.0])
 
+        with self.assertRaises(TypeError):
+            ListField(FloatField)
+
     def test_callable_field(self):
         field = CallableField(
             name='test_func', func_args=[1, 2], func_kwargs={'c': 3})

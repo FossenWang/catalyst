@@ -1,6 +1,5 @@
 from decimal import Decimal
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable, Dict
-from functools import partial
 from datetime import datetime, time, date
 
 from .utils import (
@@ -34,7 +33,7 @@ class Field(ErrorMessageMixin):
     :param dump_required:
     :param load_required:
     :param dump_default: If set, `dumo_required` has no effect.
-    :param load_default: same as `dump_default`
+    :param load_default: Similar to `dump_default`
     :param no_dump:
     :param no_load:
     :param validators:
@@ -348,9 +347,10 @@ class CallableField(Field):
 class ListField(Field):
     """List field, handle list elements with another `Field`.
 
-    :param item_field: A `Field` instance.
-    :param dump_method: Method name of `item_field` used to do dumping.
-    :param load_method: Method name of `item_field` used to do loading.
+    :param item_field: A `Field` instance. Its `dump_method` is used to
+        format each list item, and `load_method` is used to parse item.
+    :param dump_method: Method name of `item_field`.
+    :param load_method: Same as `dump_method`.
     :param all_errors: Whether to collect errors for every list elements.
     """
     item_field = None  # type: Field
@@ -371,17 +371,16 @@ class ListField(Field):
             load_method=load_method,
             all_errors=all_errors,
             **kwargs)
-        all_errors = self.all_errors
-        dump_func = getattr(self.item_field, self.dump_method)
-        load_func = getattr(self.item_field, self.load_method)
-        self.set_formatter(partial(
-            self._process_many,
-            all_errors=all_errors,
-            process_one=dump_func))
-        self.set_parser(partial(
-            self._process_many,
-            all_errors=all_errors,
-            process_one=load_func))
+        if not isinstance(item_field, Field):
+            raise TypeError('Argument `item_field` must be a `Field` instance')
+        self.format_item = getattr(self.item_field, self.dump_method)
+        self.parse_item = getattr(self.item_field, self.load_method)
+
+    def formatter(self, value):
+        return self._process_many(value, self.all_errors, self.format_item)
+
+    def parser(self, value):
+        return self._process_many(value, self.all_errors, self.parse_item)
 
     @staticmethod
     def _process_many(
@@ -404,6 +403,10 @@ class ListField(Field):
 
 
 class NestedField(Field):
+    """Nested field, handle object with `Catalyst`.
+
+    :param catalyst: A `Catalyst` instance.
+    """
     catalyst = None
 
     def __init__(self, catalyst, **kwargs):
