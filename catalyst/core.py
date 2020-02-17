@@ -160,22 +160,13 @@ class BaseCatalyst:
             data: Any,
             all_errors: bool,
             assign_getter: Callable,
-            field_dict: FieldDict,
-            field_method: str,
-            source_attr: str,
-            target_attr: str,
-            default_attr: str,
-            required_attr: str):
+            partial_fields: Iterable[tuple]):
         # According to the type of `data`, assign a function to get field value from `data`
         get_value = assign_getter(data)
 
         valid_data, errors, invalid_data = {}, {}, {}
 
-        for field in field_dict.values():
-            source = getattr(field, source_attr)
-            target = getattr(field, target_attr)
-            required = getattr(field, required_attr)
-            default = getattr(field, default_attr)
+        for field, source, target, required, default, field_handle in partial_fields:
             if callable(default):
                 default = default()
 
@@ -190,7 +181,7 @@ class BaseCatalyst:
                             break
                     continue
 
-                valid_data[target] = getattr(field, field_method)(raw_value)
+                valid_data[target] = field_handle(raw_value)
             except Exception as e:
                 # collect errors and invalid data
                 if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
@@ -221,8 +212,8 @@ class BaseCatalyst:
 
     def _make_processor(self, name: str, many: bool) -> Callable:
         """Create processor for dumping and loading processes. And wrap basic
-        main process with pre and post processes. To avoid assigning params
-        every time a processor is called, the params are stored in the closure.
+        main process with pre and post processes. Determine parameters for
+        different processes in advance to reduce processing time.
         """
         # assign params as closure variables for processor
         if name == 'dump':
@@ -242,27 +233,35 @@ class BaseCatalyst:
         else:
             method_name = name
             if name == 'dump':
-                main_process = partial(
-                    self._process_one,
-                    all_errors=all_errors,
-                    assign_getter=self._assign_dump_getter,
-                    field_dict=self._dump_field_dict,
-                    field_method=self.dump_method,
-                    source_attr='name',
-                    target_attr='key',
-                    default_attr='dump_default',
-                    required_attr='dump_required')
+                assign_getter = self._assign_dump_getter
+                field_dict = self._dump_field_dict
+                field_method = self.dump_method
+                source_attr = 'name'
+                target_attr = 'key'
+                default_attr = 'dump_default'
+                required_attr = 'dump_required'
             else:
-                main_process = partial(
-                    self._process_one,
-                    all_errors=all_errors,
-                    assign_getter=self._assign_load_getter,
-                    field_dict=self._load_field_dict,
-                    field_method=self.load_method,
-                    source_attr='key',
-                    target_attr='name',
-                    default_attr='load_default',
-                    required_attr='load_required')
+                assign_getter = self._assign_load_getter
+                field_dict = self._load_field_dict
+                field_method = self.load_method
+                source_attr = 'key'
+                target_attr = 'name'
+                default_attr = 'load_default'
+                required_attr = 'load_required'
+
+            partial_fields = []
+            for field in field_dict.values():
+                source = getattr(field, source_attr)
+                target = getattr(field, target_attr)
+                required = getattr(field, required_attr)
+                default = getattr(field, default_attr)
+                field_handle = getattr(field, field_method)
+                partial_fields.append((field, source, target, required, default, field_handle))
+            main_process = partial(
+                self._process_one,
+                all_errors=all_errors,
+                assign_getter=assign_getter,
+                partial_fields=partial_fields)
 
         pre_process_name = f'pre_{method_name}'
         post_process_name = f'post_{method_name}'
