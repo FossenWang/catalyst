@@ -267,7 +267,6 @@ class BooleanField(Field):
     :param value_map: Values that will be onverted to `True` or `False`.
         The keys are `True` and `False`, values are `Hashable`.
     """
-    reverse_value_map = None  # type: dict
     value_map = {
         True: ('1', 'y', 'yes', 'true', 'True'),
         False: ('0', 'n', 'no', 'false', 'False'),
@@ -353,14 +352,14 @@ class ListField(Field):
     :param load_method: Same as `dump_method`.
     :param all_errors: Whether to collect errors for every list elements.
     """
-    item_field = None  # type: Field
+    item_field: Field = None
     dump_method = 'format'
     load_method = 'load'
     all_errors = True
 
     def __init__(
             self,
-            item_field: Field,
+            item_field: Field = None,
             dump_method: str = None,
             load_method: str = None,
             all_errors: bool = None,
@@ -371,7 +370,7 @@ class ListField(Field):
             load_method=load_method,
             all_errors=all_errors,
             **kwargs)
-        if not isinstance(item_field, Field):
+        if not isinstance(self.item_field, Field):
             raise TypeError('Argument `item_field` must be a `Field` instance')
         self.format_item = getattr(self.item_field, self.dump_method)
         self.parse_item = getattr(self.item_field, self.load_method)

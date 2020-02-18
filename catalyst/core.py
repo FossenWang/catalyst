@@ -1,6 +1,6 @@
 import inspect
 
-from typing import Dict, Iterable, Callable, Sequence, Any, Mapping
+from typing import Dict, Iterable, Callable, Sequence, Any, Mapping, Union, Type, Tuple
 from functools import wraps, partial
 
 from .fields import Field, NestedField
@@ -12,6 +12,8 @@ from .utils import (
 
 
 FieldDict = Dict[str, Field]
+
+ExceptionType = Union[Type[Exception], Tuple[Type[Exception]]]
 
 
 class BaseCatalyst:
@@ -49,8 +51,9 @@ class BaseCatalyst:
     raise_error = False
     all_errors = True
     error_keys = {}  # error keys used for error process
+    except_exception: ExceptionType = Exception
 
-    _field_dict = {}  # type: FieldDict
+    _field_dict: FieldDict = {}
 
     # assign getter for dumping & loading
     _assign_dump_getter = staticmethod(assign_attr_or_item_getter)
@@ -68,7 +71,7 @@ class BaseCatalyst:
     def _copy_fields(
             fields: FieldDict, keys: Iterable[str],
             is_copying: Callable[[str], bool]) -> FieldDict:
-        new_fields = {}  # type: FieldDict
+        new_fields = {}
         for key in keys:
             if is_copying(key):
                 new_fields[key] = fields[key]
@@ -83,24 +86,26 @@ class BaseCatalyst:
             schema: Any = None,
             include: Iterable[str] = None,
             exclude: Iterable[str] = None,
+            dump_method: str = None,
+            load_method: str = None,
             raise_error: bool = None,
             all_errors: bool = None,
             error_keys: Mapping[str, str] = None,
+            except_exception: ExceptionType = None,
             dump_include: Iterable[str] = None,
             dump_exclude: Iterable[str] = None,
-            dump_method: str = None,
             load_include: Iterable[str] = None,
             load_exclude: Iterable[str] = None,
-            load_method: str = None,
             **kwargs):
         bind_attrs(
             self,
             schema=schema,
+            dump_method=dump_method,
+            load_method=load_method,
             raise_error=raise_error,
             all_errors=all_errors,
             error_keys=error_keys,
-            dump_method=dump_method,
-            load_method=load_method,
+            except_exception=except_exception,
             **kwargs,
         )
 
@@ -160,29 +165,27 @@ class BaseCatalyst:
             data: Any,
             all_errors: bool,
             assign_getter: Callable,
-            partial_fields: Iterable[tuple]):
+            partial_fields: Iterable[tuple],
+            except_exception: ExceptionType):
         # According to the type of `data`, assign a function to get field value from `data`
         get_value = assign_getter(data)
 
         valid_data, errors, invalid_data = {}, {}, {}
 
         for field, source, target, required, default, field_handle in partial_fields:
-            if callable(default):
-                default = default()
-
-            raw_value = get_value(data, source, default)
+            raw_value = missing
             try:
-                # when the field's value is missing
-                # if required, raise error, otherwise skip
+                if callable(default):
+                    default = default()
+                raw_value = get_value(data, source, default)
                 if raw_value is missing:
                     if required:
-                        errors[source] = field.get_error('required')
-                        if not all_errors:
-                            break
-                    continue
+                        field.error('required')
+                    else:
+                        continue
 
                 valid_data[target] = field_handle(raw_value)
-            except Exception as e:
+            except except_exception as e:
                 # collect errors and invalid data
                 if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
                     # distribute nested data in BaseResult
@@ -191,7 +194,8 @@ class BaseCatalyst:
                     invalid_data[source] = e.msg.invalid_data
                 else:
                     errors[source] = e
-                    invalid_data[source] = raw_value
+                    if raw_value is not missing:
+                        invalid_data[source] = raw_value
                 if not all_errors:
                     break
 
@@ -224,6 +228,7 @@ class BaseCatalyst:
             raise ValueError("Argument `name` must be 'dump' or 'load'.")
 
         all_errors = self.all_errors
+        except_exception = self.except_exception
         if many:
             main_process = partial(
                 self._process_many,
@@ -261,7 +266,8 @@ class BaseCatalyst:
                 self._process_one,
                 all_errors=all_errors,
                 assign_getter=assign_getter,
-                partial_fields=partial_fields)
+                partial_fields=partial_fields,
+                except_exception=except_exception)
 
         pre_process_name = f'pre_{method_name}'
         post_process_name = f'post_{method_name}'
@@ -287,7 +293,7 @@ class BaseCatalyst:
                 if not errors:
                     process_name = post_process_name
                     valid_data = post_process(valid_data, original_data=data)
-            except Exception as e:
+            except except_exception as e:
                 # handle error which raised during processing
                 error_key = error_keys.get(process_name, process_name)
                 errors = {error_key: e}
@@ -383,7 +389,7 @@ class Catalyst(BaseCatalyst, metaclass=CatalystMeta):
         :param cls_or_obj: `Catalyst` class or its instance.
         :param attrs: a dict that keys are name and values are `Field`.
         """
-        fields = {}  # type: FieldDict
+        fields = {}
         # inherit fields
         fields.update(cls_or_obj._field_dict)
 

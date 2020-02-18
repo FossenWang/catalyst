@@ -752,3 +752,22 @@ class CatalystTest(TestCase):
         self.assertDictEqual(r.valid_data, {'author': {'name': 'x'}, 'content': 'x', 'title': 'x'})
         self.assertDictEqual(r.invalid_data, {'author': {'uid': 'x'}})
         self.assertEqual(set(r.errors['author']), {'uid'})
+
+    def test_except_exception(self):
+        catalyst = Catalyst(
+            schema={'a': IntegerField(minimum=0)},
+            except_exception=(ValueError, ValidationError))
+
+        result = catalyst.load({'a': 'x'})
+        self.assertFalse(result.is_valid)
+        self.assertIsInstance(result.errors['a'], ValueError)
+
+        result = catalyst.load({'a': -1})
+        self.assertFalse(result.is_valid)
+        self.assertIsInstance(result.errors['a'], ValidationError)
+
+        with self.assertRaises(TypeError):
+            catalyst.load(1)
+
+        with self.assertRaises(TypeError):
+            catalyst.load({'a': []})
