@@ -306,12 +306,12 @@ class CatalystTest(TestCase):
         self.assertEqual(result.invalid_data, 1)
         self.assertEqual(set(result.errors), {'load'})
 
-        # test error_keys
-        test_catalyst.error_keys['load'] = 'xxx'
+        # test process_aliases
+        test_catalyst.process_aliases['load'] = 'xxx'
         result = test_catalyst.load(1)
         self.assertFalse(result.is_valid)
         self.assertEqual(set(result.errors), {'xxx'})
-        test_catalyst.error_keys.clear()
+        test_catalyst.process_aliases.clear()
 
         # test invalid data: validate errors
         invalid_data = {'string': 'xxx' * 20, 'integer': 100, 'float': 2}
@@ -504,7 +504,7 @@ class CatalystTest(TestCase):
         self.assertTrue('pre_dump' in result.errors)
         with self.assertRaises(ValidationError):
             c.dump(redundant_data, raise_error=True)
-        c.error_keys['pre_dump'] = 'not_allowed_keys'
+        c.process_aliases['pre_dump'] = 'not_allowed_keys'
         result = c.dump(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
@@ -515,7 +515,7 @@ class CatalystTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertEqual({'post_dump'}, set(result.errors))
 
-        c.error_keys['post_dump'] = 'wrong_value'
+        c.process_aliases['post_dump'] = 'wrong_value'
         result = c.dump(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertEqual({'wrong_value'}, set(result.errors))
@@ -528,8 +528,8 @@ class CatalystTest(TestCase):
         result = c.load(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('pre_load' in result.errors)
-        # pre_load error_key
-        c.error_keys['pre_load'] = 'not_allowed_keys'
+        # pre_load error key
+        c.process_aliases['pre_load'] = 'not_allowed_keys'
         result = c.load(redundant_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('not_allowed_keys' in result.errors)
@@ -542,8 +542,8 @@ class CatalystTest(TestCase):
         result = c.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('post_load' in result.errors)
-        # post_load error_key
-        c.error_keys['post_load'] = 'wrong_value'
+        # post_load error key
+        c.process_aliases['post_load'] = 'wrong_value'
         result = c.load(invalid_data)
         self.assertFalse(result.is_valid)
         self.assertTrue('wrong_value' in result.errors)
@@ -567,7 +567,7 @@ class CatalystTest(TestCase):
         self.assertTrue('pre_load_many' in result.errors)
         self.assertListEqual(result.invalid_data, [{}, {}, {}])
 
-        c.error_keys.clear()
+        c.process_aliases.clear()
 
     def test_load_and_dump_args(self):
         class A(Catalyst):
@@ -661,11 +661,11 @@ class CatalystTest(TestCase):
         self.assertEqual(set(result.errors), {0})
         self.assertEqual(set(result.errors[0]), {'load'})
 
-        c.error_keys['load_many'] = 'xxx'
+        c.process_aliases['load_many'] = 'xxx'
         result = c.load_many(1)
         self.assertFalse(result.is_valid)
         self.assertEqual(set(result.errors), {'xxx'})
-        test_catalyst.error_keys.clear()
+        test_catalyst.process_aliases.clear()
 
     def test_list_field(self):
         class C(Catalyst):

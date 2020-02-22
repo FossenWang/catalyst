@@ -346,9 +346,9 @@ class CallableField(Field):
 class ListField(Field):
     """List field, handle list elements with another `Field`.
 
-    :param item_field: A `Field` instance. Its `dump_method` is used to
-        format each list item, and `load_method` is used to parse item.
-    :param dump_method: Method name of `item_field`.
+    :param item_field: A `Field` instance. Its "dump_method" is used to
+        format each list item, and "load_method" is used to parse item.
+    :param dump_method: The method name of `item_field`.
     :param load_method: Same as `dump_method`.
     :param all_errors: Whether to collect errors for every list elements.
     """

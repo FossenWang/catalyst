@@ -19,16 +19,36 @@ ExceptionType = Union[Type[Exception], Tuple[Type[Exception]]]
 class BaseCatalyst:
     """Base Catalyst class.
 
-    :param schema: A dict or instance or class which has fields. This is a
-        convenient way to avoid name clashes when fields are Python keywords
-        or conflict with other attributes.
+    Some class variables are default values for params of
+    `__init__` function. The available params are `schema`, `dump_method`,
+    `load_method`, `raise_error`, `all_errors`, `except_exception` and
+    `process_aliases`.
+
+    :param schema: A dict or instance or class which contains fields. This
+        is a convenient way to avoid name clashes when fields are Python
+        keywords or conflict with other attributes.
         ** It should be noted that "private" variables which prefixed with
         an underscore (e.g. _spam) will not be considered when `schema` is
         an instance or class. If an underscore prefixed name is necessary,
         use dict `schema`.
-        Remmber that the attribute name of `Catalyst` object can be different
-        with "data" object. `Field.name` defines where to access value.
-
+    :param dump_method: The method name of `Field`. The method is used to
+        handle each field value when dumping data.
+        Available values are 'dump', 'format' and 'validate'.
+    :param load_method: Similar to `dump_method`.
+        Available values are 'load', 'parse' and 'validate'.
+    :param raise_error: Whether to raise error if error occurs when
+        processing data. Errors are collected into a error dict, which key
+        is field name, index of item of iterable or process name.
+    :param all_errors: Whether to collect every errors of data and
+        errors of process.
+    :param except_exception: Which types of errors should be collected
+        into process result. Usage is the same as `try/except` statement.
+    :param process_aliases: A dict which key is process name, and value
+        is process alias. When the process goes wrong, if its process name
+        is in `process_aliases` dcit, the process alias will be a key
+        in error dict with a value whict is the error.
+        Available process names are 'pre_dump', 'dump', 'post_dump',
+        'pre_dump_many', 'dump_many', 'post_dump_many', 'load', etc.
     :param include: The fields to include in both dump and load fields.
         If None, all fields are used.
         If `dump_include` or `load_include` is passed, `include` will
@@ -50,8 +70,8 @@ class BaseCatalyst:
     load_method = 'load'
     raise_error = False
     all_errors = True
-    error_keys = {}  # error keys used for error process
     except_exception: ExceptionType = Exception
+    process_aliases = {}
 
     _field_dict: FieldDict = {}
 
@@ -84,14 +104,14 @@ class BaseCatalyst:
     def __init__(
             self,
             schema: Any = None,
-            include: Iterable[str] = None,
-            exclude: Iterable[str] = None,
             dump_method: str = None,
             load_method: str = None,
             raise_error: bool = None,
             all_errors: bool = None,
-            error_keys: Mapping[str, str] = None,
             except_exception: ExceptionType = None,
+            process_aliases: Mapping[str, str] = None,
+            include: Iterable[str] = None,
+            exclude: Iterable[str] = None,
             dump_include: Iterable[str] = None,
             dump_exclude: Iterable[str] = None,
             load_include: Iterable[str] = None,
@@ -104,7 +124,7 @@ class BaseCatalyst:
             load_method=load_method,
             raise_error=raise_error,
             all_errors=all_errors,
-            error_keys=error_keys,
+            process_aliases=process_aliases,
             except_exception=except_exception,
             **kwargs,
         )
@@ -273,7 +293,7 @@ class BaseCatalyst:
         post_process_name = f'post_{method_name}'
         pre_process = getattr(self, pre_process_name)
         post_process = getattr(self, post_process_name)
-        error_keys = self.error_keys
+        process_aliases = self.process_aliases
         default_raise_error = self.raise_error
 
         def integrated_process(data, raise_error):
@@ -295,8 +315,8 @@ class BaseCatalyst:
                     valid_data = post_process(valid_data, original_data=data)
             except except_exception as e:
                 # handle error which raised during processing
-                error_key = error_keys.get(process_name, process_name)
-                errors = {error_key: e}
+                key = process_aliases.get(process_name, process_name)
+                errors = {key: e}
                 invalid_data = data
                 if many:
                     valid_data = []
