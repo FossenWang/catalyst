@@ -17,7 +17,8 @@ ExceptionType = Union[Type[Exception], Tuple[Type[Exception]]]
 
 
 class BaseCatalyst:
-    """Base Catalyst class.
+    """Base Catalyst class for converting complex datatypes to and from
+    native Python datatypes.
 
     Some class variables are default values for params of
     `__init__` function. The available params are `schema`, `dump_method`,
@@ -27,10 +28,6 @@ class BaseCatalyst:
     :param schema: A dict or instance or class which contains fields. This
         is a convenient way to avoid name clashes when fields are Python
         keywords or conflict with other attributes.
-        ** It should be noted that "private" variables which prefixed with
-        an underscore (e.g. _spam) will not be considered when `schema` is
-        an instance or class. If an underscore prefixed name is necessary,
-        use dict `schema`.
     :param dump_method: The method name of `Field`. The method is used to
         handle each field value when dumping data.
         Available values are 'dump', 'format' and 'validate'.
@@ -136,7 +133,7 @@ class BaseCatalyst:
             raise ValueError(
                 "Attribute `load_method` must be in ('load', 'parse', 'validate').")
 
-        # set fields from a dict or non `Catalyst` class
+        # set fields from a dict or instance or class
         schema = self.schema
         if schema:
             if isinstance(schema, Mapping):
@@ -144,7 +141,7 @@ class BaseCatalyst:
             else:
                 attrs = {
                     name: getattr(schema, name) for name in dir(schema)
-                    if not name.startswith('_')}  # ignore private variables
+                    if name != '__class__'}
             self._set_fields(self, attrs)
 
         # include fields

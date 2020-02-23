@@ -251,16 +251,20 @@ class CatalystTest(TestCase):
         with self.assertRaises(NotImplementedError):
             BaseCatalyst._set_fields(1, 1)
 
-        # private attributes
+        # special attributes
         class X(Catalyst):
             x = StringField()
             _x = StringField()
             __x = StringField()
             __x__ = StringField()
 
-        catalyst = Catalyst(X)
-        self.assertEqual(set(X._field_dict), {'x', '__x__', '_X__x', '_x'})
-        self.assertEqual(set(catalyst._field_dict), {'x'})
+        x = X()
+        keys = {'x', '__x__', '_X__x', '_x'}
+        self.assertEqual(set(X._field_dict), keys)
+        self.assertEqual(set(x._field_dict), keys)
+        self.assertEqual(set(Catalyst(X)._field_dict), keys)
+        # `x.__class__` can not be converted to `NestedField`
+        self.assertEqual(set(Catalyst(x)._field_dict), keys)
 
     def test_base_dump_and_load(self):
         """Test dumping and loading data."""
