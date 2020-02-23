@@ -20,10 +20,9 @@ class BaseCatalyst:
     """Base Catalyst class for converting complex datatypes to and from
     native Python datatypes.
 
-    Some class variables are default values for params of
-    `__init__` function. The available params are `schema`, `dump_method`,
-    `load_method`, `raise_error`, `all_errors`, `except_exception` and
-    `process_aliases`.
+    Some instantiation params can set default values by class variables.
+    The available params are `schema`, `dump_method`, `load_method`,
+    `raise_error`, `all_errors`, `except_exception` and `process_aliases`.
 
     :param schema: A dict or instance or class which contains fields. This
         is a convenient way to avoid name clashes when fields are Python

@@ -307,7 +307,7 @@ class FieldTest(TestCase):
             field.dump(1)
 
         # load & dump
-        field = FieldClass(max_time=dt)
+        field = FieldClass(maximum=dt)
         dt_str = field.dump(dt)
         self.assertEqual(field.load(dt_str), dt)
         with self.assertRaises(ValueError):

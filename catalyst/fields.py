@@ -22,7 +22,9 @@ MultiValidator = Union[ValidatorType, Iterable[ValidatorType]]
 
 
 class Field(ErrorMessageMixin):
-    """Basic field class.
+    """Basic field class for converting objects.
+
+    Instantiation params can set default values by class variables.
 
     :param name:
     :param key:
@@ -166,13 +168,21 @@ class Field(ErrorMessageMixin):
 
 
 class StringField(Field):
+    """String Field.
+
+    :param min_length: The minimum length of the value.
+    :param max_length: The maximum length of the value.
+    :param regex: The regular expression that the value must match.
+    :param error_messages: Keys {'too_small', 'too_large', 'no_match',
+        'required', 'none'}.
+    """
     formatter = str
     parser = str
 
     def __init__(
             self,
-            max_length: int = None,
             min_length: int = None,
+            max_length: int = None,
             regex: str = None,
             **kwargs):
         super().__init__(**kwargs)
@@ -218,7 +228,7 @@ class IntegerField(NumberField):
 
 
 class DecimalField(NumberField):
-    """Decimal field.
+    """Field for converting `decimal.Decimal` object.
 
     :param scale: The number of digits to the right of the decimal point.
         If `None`, does not quantize the value.
@@ -290,49 +300,71 @@ class BooleanField(Field):
 
 
 class DatetimeField(Field):
+    """Field for converting `datetime.datetime` object.
+
+    :param fmt: Format of the value. See `datetime` module for details.
+    :param minimum: The minimum value.
+    :param maximum: The maximum value.
+    :param error_messages: Keys {'too_small', 'too_large', 'required', 'none'}.
+    """
     type_ = datetime
     fmt = r'%Y-%m-%d %H:%M:%S.%f'
 
-    def __init__(self, fmt: str = None, min_time=None, max_time=None, **kwargs):
+    def __init__(self, fmt: str = None, minimum=None, maximum=None, **kwargs):
         super().__init__(fmt=fmt, **kwargs)
-        if min_time is not None or max_time is not None:
+        if minimum is not None or maximum is not None:
             self.add_validator(
-                RangeValidator(min_time, max_time, self.error_messages))
+                RangeValidator(minimum, maximum, self.error_messages))
 
     def formatter(self, dt):
         return self.type_.strftime(dt, self.fmt)
 
-    def parser(self, date_string: str):
-        return datetime.strptime(date_string, self.fmt)
+    def parser(self, value: str):
+        return datetime.strptime(value, self.fmt)
 
 
 class TimeField(DatetimeField):
+    """Field for converting `datetime.time` object.
+
+    :param kwargs: Same as `DatetimeField` field.
+    """
     type_ = time
     fmt = r'%H:%M:%S.%f'
 
-    def parser(self, date_string: str):
-        return datetime.strptime(date_string, self.fmt).time()
+    def parser(self, value: str):
+        return datetime.strptime(value, self.fmt).time()
 
 
 class DateField(DatetimeField):
+    """Field for converting `datetime.date` object.
+
+    :param kwargs: Same as `DatetimeField` field.
+    """
     type_ = date
     fmt = r'%Y-%m-%d'
 
-    def parser(self, date_string: str):
-        return datetime.strptime(date_string, self.fmt).date()
+    def parser(self, value: str):
+        return datetime.strptime(value, self.fmt).date()
 
 
 class CallableField(Field):
+    """Field to dump the result of a callable, such as object method.
+    This field dose not participate in the loading process by default.
+
+    :param func_args: Arguments passed to callable.
+    :param func_kwargs: Keyword arguments passed to callable.
+    """
+    no_load = True
     func_args = tuple()
     func_kwargs = {}
 
     def __init__(self, func_args: Iterable = None, func_kwargs: Mapping = None, **kwargs):
-        kwargs.pop('no_load', None)
-        super().__init__(no_load=True, **kwargs)
+        super().__init__(**kwargs)
         if func_args is None:
             func_args = self.func_args
         if func_kwargs is None:
             func_kwargs = self.func_kwargs
+        # set and check params
         self.set_args(*func_args, **func_kwargs)
 
     def set_args(self, *args, **kwargs):
