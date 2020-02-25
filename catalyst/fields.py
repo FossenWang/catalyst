@@ -11,7 +11,7 @@ from .validators import (
     RangeValidator,
     RegexValidator,
 )
-from .exceptions import ValidationError
+from .exceptions import ValidationError, ExceptionType
 
 
 FormatterType = ParserType = Callable[[Any], Any]
@@ -64,14 +64,14 @@ class Field(ErrorMessageMixin):
             name: str = None,
             key: str = None,
             formatter: FormatterType = None,
-            format_none: bool = None,
-            dump_required: bool = None,
-            dump_default: Any = missing,
-            no_dump: bool = None,
             parser: ParserType = None,
+            format_none: bool = None,
             parse_none: bool = None,
+            dump_required: bool = None,
             load_required: bool = None,
+            dump_default: Any = missing,
             load_default: Any = missing,
+            no_dump: bool = None,
             no_load: bool = None,
             validators: MultiValidator = None,
             allow_none: bool = None,
@@ -82,10 +82,10 @@ class Field(ErrorMessageMixin):
         bind_attrs(
             self,
             format_none=format_none,
-            dump_required=dump_required,
-            no_dump=no_dump,
             parse_none=parse_none,
+            dump_required=dump_required,
             load_required=load_required,
+            no_dump=no_dump,
             no_load=no_load,
             allow_none=allow_none,
             **kwargs,
@@ -377,17 +377,23 @@ class CallableField(Field):
 
 class ListField(Field):
     """List field, handle list elements with another `Field`.
+    In order to ensure proper data structure, `format_none` and `parse_none`
+    are set to True by default.
 
     :param item_field: A `Field` instance. Its "dump_method" is used to
         format each list item, and "load_method" is used to parse item.
     :param dump_method: The method name of `item_field`.
     :param load_method: Same as `dump_method`.
     :param all_errors: Whether to collect errors for every list elements.
+    :param except_exception: Which types of errors should be collected.
     """
     item_field: Field = None
     dump_method = 'format'
     load_method = 'load'
     all_errors = True
+    except_exception = Exception
+    format_none = True
+    parse_none = True
 
     def __init__(
             self,
@@ -408,24 +414,33 @@ class ListField(Field):
         self.parse_item = getattr(self.item_field, self.load_method)
 
     def formatter(self, value):
-        return self._process_many(value, self.all_errors, self.format_item)
+        return self._process_many(
+            value, self.all_errors, self.format_item, self.except_exception)
 
     def parser(self, value):
-        return self._process_many(value, self.all_errors, self.parse_item)
+        return self._process_many(
+            value, self.all_errors, self.parse_item, self.except_exception)
 
     @staticmethod
     def _process_many(
             data: Iterable,
             all_errors: bool,
-            process_one: Callable):
+            process_one: Callable,
+            except_exception: ExceptionType):
         valid_data, errors, invalid_data = [], {}, {}
         for i, item in enumerate(data):
             try:
                 result = process_one(item)
                 valid_data.append(result)
-            except Exception as error:
-                errors[i] = error
-                invalid_data[i] = item
+            except except_exception as e:
+                if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
+                    # distribute nested data in BaseResult
+                    valid_data.append(e.msg.valid_data)
+                    errors[i] = e.msg.errors
+                    invalid_data[i] = e.msg.invalid_data
+                else:
+                    errors[i] = e
+                    invalid_data[i] = item
                 if not all_errors:
                     break
         if errors:
@@ -434,17 +449,29 @@ class ListField(Field):
 
 
 class NestedField(Field):
-    """Nested field, handle object with `Catalyst`.
+    """Nested field, handle one or more objects with `Catalyst`.
+    In order to ensure proper data structure, `format_none` and `parse_none`
+    are set to True by default.
 
     :param catalyst: A `Catalyst` instance.
+    :param many: Whether to use load_many/dump_many.
     """
     catalyst = None
+    many = False
+    format_none = True
+    parse_none = True
 
-    def __init__(self, catalyst, **kwargs):
-        super().__init__(catalyst=catalyst, **kwargs)
+    def __init__(self, catalyst=None, many: bool = None, **kwargs):
+        super().__init__(catalyst=catalyst, many=many, **kwargs)
+        if self.many:
+            self._do_dump = self.catalyst.dump_many
+            self._do_load = self.catalyst.load_many
+        else:
+            self._do_dump = self.catalyst.dump
+            self._do_load = self.catalyst.load
 
     def formatter(self, value):
-        return self.catalyst.dump(value, True).valid_data
+        return self._do_dump(value, raise_error=True).valid_data
 
     def parser(self, value):
-        return self.catalyst.load(value, True).valid_data
+        return self._do_load(value, raise_error=True).valid_data

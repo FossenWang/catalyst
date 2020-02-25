@@ -1,3 +1,9 @@
+from typing import Union, Type, Tuple
+
+
+ExceptionType = Union[Type[Exception], Tuple[Type[Exception]]]
+
+
 class ValidationError(Exception):
     def __init__(self, msg, *args):
         self.msg = msg

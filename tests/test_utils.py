@@ -64,7 +64,6 @@ class UtilsTest(TestCase):
         self.assertTrue(result.is_valid)
         s = 'BaseResult(valid_data={}, errors={}, invalid_data={})'
         self.assertEqual(repr(result), s)
-        self.assertEqual(str(result), '{}')
 
         result = BaseResult(
             valid_data={}, errors={'error': ValidationError('error')}, invalid_data={0: 0})
@@ -73,7 +72,6 @@ class UtilsTest(TestCase):
              "errors={'error': ValidationError('error')}, invalid_data={0: 0})")
         self.assertEqual(repr(result), s)
         self.assertDictEqual(result.format_errors(), {'error': 'error'})
-        self.assertEqual(str(result), "{'error': 'error'}")
 
     def test_others(self):
         self.assertEqual(str(missing), '<catalyst.missing>')

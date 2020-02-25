@@ -1,10 +1,10 @@
 import inspect
 
-from typing import Dict, Iterable, Callable, Sequence, Any, Mapping, Union, Type, Tuple
+from typing import Dict, Iterable, Callable, Sequence, Any, Mapping
 from functools import wraps, partial
 
 from .fields import Field, NestedField
-from .exceptions import ValidationError
+from .exceptions import ValidationError, ExceptionType
 from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,
     LoadResult, DumpResult, BaseResult, bind_attrs
@@ -12,8 +12,6 @@ from .utils import (
 
 
 FieldDict = Dict[str, Field]
-
-ExceptionType = Union[Type[Exception], Tuple[Type[Exception]]]
 
 
 class BaseCatalyst:

@@ -636,8 +636,6 @@ class CatalystTest(TestCase):
         data[3]['s'] = 'sss'
 
         result = c.load_many(data)
-        s = "{2: {'s': 'Length must >= 1.'}, 3: {'s': 'Length must <= 2.'}}"
-        self.assertEqual(str(result), s)
         self.assertEqual(set(result.errors), {2, 3})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
 

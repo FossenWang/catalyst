@@ -17,11 +17,6 @@ class BaseResult:
             f'invalid_data={self.invalid_data})'
         )
 
-    def __str__(self):
-        if self.is_valid:
-            return str(self.valid_data)
-        return str(self.format_errors())
-
     @classmethod
     def _format_errors(cls, errors):
         if isinstance(errors, Mapping):
