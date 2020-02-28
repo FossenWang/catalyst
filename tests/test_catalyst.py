@@ -1,9 +1,7 @@
 from unittest import TestCase
 
-from catalyst.core import (
-    BaseCatalyst,
-    Catalyst,
-)
+from catalyst.base import CatalystABC
+from catalyst.core import Catalyst
 from catalyst.fields import Field, StringField, IntegerField, \
     FloatField, BooleanField, CallableField, ListField
 from catalyst.exceptions import ValidationError
@@ -39,6 +37,16 @@ test_catalyst = TestDataCatalyst()
 
 
 class CatalystTest(TestCase):
+    def test_abstract_catalyst(self):
+        abstract_catalyst = CatalystABC()
+        with self.assertRaises(NotImplementedError):
+            abstract_catalyst.dump(None)
+        with self.assertRaises(NotImplementedError):
+            abstract_catalyst.load(None)
+        with self.assertRaises(NotImplementedError):
+            abstract_catalyst.dump_many(None)
+        with self.assertRaises(NotImplementedError):
+            abstract_catalyst.load_many(None)
 
     def test_inherit(self):
         class A(Catalyst):
@@ -247,9 +255,6 @@ class CatalystTest(TestCase):
         self.assertIs(fields['string'], Schema2.string)
         self.assertIsNot(fields['string'], TestDataCatalyst.string)
         self.assertIs(fields['integer'], TestDataCatalyst.integer)
-
-        with self.assertRaises(NotImplementedError):
-            BaseCatalyst._set_fields(1, 1)
 
         # special attributes
         class X(Catalyst):

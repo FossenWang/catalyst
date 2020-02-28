@@ -1,7 +1,10 @@
+"""Field classes for various types of data."""
+
 from decimal import Decimal
 from typing import Callable, Any, Iterable, Union, Mapping, Hashable, Dict
 from datetime import datetime, time, date
 
+from .base import CatalystABC
 from .utils import (
     BaseResult, ErrorMessageMixin,
     missing, no_processing, bind_attrs,
@@ -380,7 +383,7 @@ class ListField(Field):
     In order to ensure proper data structure, `format_none` and `parse_none`
     are set to True by default.
 
-    :param item_field: A `Field` instance. Its "dump_method" is used to
+    :param item_field: A `Field` class or instance. Its "dump_method" is used to
         format each list item, and "load_method" is used to parse item.
     :param dump_method: The method name of `item_field`.
     :param load_method: Same as `dump_method`.
@@ -408,10 +411,14 @@ class ListField(Field):
             load_method=load_method,
             all_errors=all_errors,
             **kwargs)
-        if not isinstance(self.item_field, Field):
-            raise TypeError('Argument `item_field` must be a `Field` instance')
-        self.format_item = getattr(self.item_field, self.dump_method)
-        self.parse_item = getattr(self.item_field, self.load_method)
+        item_field = self.item_field
+        if isinstance(item_field, type) and issubclass(item_field, Field):
+            item_field = item_field()
+            setattr(self, 'item_field', item_field)
+        elif not isinstance(item_field, Field):
+            raise TypeError('Argument `item_field` must be a `Field` class or instance')
+        self.format_item = getattr(item_field, self.dump_method)
+        self.parse_item = getattr(item_field, self.load_method)
 
     def formatter(self, value):
         return self._process_many(
@@ -453,22 +460,28 @@ class NestedField(Field):
     In order to ensure proper data structure, `format_none` and `parse_none`
     are set to True by default.
 
-    :param catalyst: A `Catalyst` instance.
-    :param many: Whether to use load_many/dump_many.
+    :param catalyst: A `Catalyst` class or instance.
+    :param many: Whether to process multiple objects.
     """
-    catalyst = None
+    catalyst: CatalystABC = None
     many = False
     format_none = True
     parse_none = True
 
     def __init__(self, catalyst=None, many: bool = None, **kwargs):
         super().__init__(catalyst=catalyst, many=many, **kwargs)
+        catalyst = self.catalyst
+        if isinstance(catalyst, type) and issubclass(catalyst, CatalystABC):
+            catalyst = catalyst()
+            setattr(self, 'catalyst', catalyst)
+        elif not isinstance(catalyst, CatalystABC):
+            raise TypeError('Argument `catalyst` must be a `Catalyst` class or instance')
         if self.many:
-            self._do_dump = self.catalyst.dump_many
-            self._do_load = self.catalyst.load_many
+            self._do_dump = catalyst.dump_many
+            self._do_load = catalyst.load_many
         else:
-            self._do_dump = self.catalyst.dump
-            self._do_load = self.catalyst.load
+            self._do_dump = catalyst.dump
+            self._do_load = catalyst.load
 
     def formatter(self, value):
         return self._do_dump(value, raise_error=True).valid_data

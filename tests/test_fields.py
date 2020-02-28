@@ -277,9 +277,13 @@ class FieldTest(TestCase):
         with self.assertRaises(ValidationError):
             field.dump(invalid_dt)
 
-    def test_list_field(self):        
+    def test_list_field(self):
         with self.assertRaises(TypeError):
-            ListField(FloatField)
+            ListField(None)
+
+        # init Field class
+        field = ListField(FloatField)
+        self.assertIsInstance(field.item_field, FloatField)
 
         field = ListField(item_field=FloatField())
 
@@ -352,10 +356,15 @@ class FieldTest(TestCase):
         self.assertIsInstance(result.errors[1]['load'], TypeError)
 
     def test_nest_field(self):
-        class ACatalyst(Catalyst):
-            name = StringField(max_length=3, load_required=True)
-        a_cata = ACatalyst()
-        field = NestedField(a_cata, name='a', key='a')
+        with self.assertRaises(TypeError):
+            NestedField(1)
+
+        # init Catalyst class
+        field = NestedField(Catalyst)
+        self.assertIsInstance(field.catalyst, Catalyst)
+
+        fields = {'name': StringField(max_length=3, load_required=True)}
+        field = NestedField(Catalyst(fields), name='a', key='a')
 
         self.assertEqual(field.dump({'name': '1'}), {'name': '1'})
         self.assertEqual(field.dump({'name': '1234'}), {'name': '1234'})

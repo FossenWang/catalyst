@@ -1,20 +1,32 @@
+"""Catalyst class and its metaclass."""
+
 import inspect
 
 from typing import Dict, Iterable, Callable, Sequence, Any, Mapping
 from functools import wraps, partial
 
+from .base import CatalystABC
 from .fields import Field, NestedField
 from .exceptions import ValidationError, ExceptionType
 from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,
-    LoadResult, DumpResult, BaseResult, bind_attrs
+    LoadResult, DumpResult, BaseResult, bind_attrs, no_processing
 )
 
 
 FieldDict = Dict[str, Field]
 
 
-class BaseCatalyst:
+class CatalystMeta(type):
+    """Metaclass for `Catalyst` class. Binds fields to `_field_dict` attribute."""
+
+    def __new__(cls, name, bases, attrs):
+        new_cls = super().__new__(cls, name, bases, attrs)
+        new_cls._set_fields(new_cls, attrs)
+        return new_cls
+
+
+class Catalyst(CatalystABC, metaclass=CatalystMeta):
     """Base Catalyst class for converting complex datatypes to and from
     native Python datatypes.
 
@@ -59,7 +71,7 @@ class BaseCatalyst:
     :param load_include: The fields to include in load fields.
     :param load_exclude: The fields to exclude from dump fields.
     """
-    schema = None
+    schema: Any = None
     dump_method = 'format'
     load_method = 'load'
     raise_error = False
@@ -73,27 +85,9 @@ class BaseCatalyst:
     _assign_dump_getter = staticmethod(assign_attr_or_item_getter)
     _assign_load_getter = staticmethod(assign_item_getter)
 
-    @staticmethod
-    def _format_field_key(key):
-        return key
-
-    @staticmethod
-    def _format_field_name(name):
-        return name
-
-    @staticmethod
-    def _copy_fields(
-            fields: FieldDict, keys: Iterable[str],
-            is_copying: Callable[[str], bool]) -> FieldDict:
-        new_fields = {}
-        for key in keys:
-            if is_copying(key):
-                new_fields[key] = fields[key]
-        return new_fields
-
-    @staticmethod
-    def _set_fields(cls_or_obj, attrs):
-        raise NotImplementedError()
+    # generate field name and key and custom naming style
+    _format_field_key = staticmethod(no_processing)
+    _format_field_name = staticmethod(no_processing)
 
     def __init__(
             self,
@@ -175,12 +169,45 @@ class BaseCatalyst:
         self._do_load_many = self._make_processor('load', True)
 
     @staticmethod
+    def _copy_fields(
+            fields: FieldDict, keys: Iterable[str],
+            is_copying: Callable[[str], bool]) -> FieldDict:
+        new_fields = {}
+        for key in keys:
+            if is_copying(key):
+                new_fields[key] = fields[key]
+        return new_fields
+
+    @staticmethod
+    def _set_fields(cls_or_obj, attrs: FieldDict):
+        """Set fields for `Catalyst` class or its instance.
+        Fields are bond to `cls_or_obj._field_dict` which are set separately
+        on class or its instance, which works like class inheritance.
+        """
+        fields = {}
+        fields.update(cls_or_obj._field_dict)  # inherit fields
+        for attr, value in attrs.items():
+            # wrap catalyst as NestedField
+            if isinstance(value, type) and issubclass(value, CatalystABC) \
+                or isinstance(value, CatalystABC):
+                value = NestedField(value)
+            # automatic generate field name or key
+            if isinstance(value, Field):
+                if value.name is None:
+                    value.name = cls_or_obj._format_field_name(attr)
+                if value.key is None:
+                    value.key = cls_or_obj._format_field_key(attr)
+                fields[attr] = value
+        cls_or_obj._field_dict = fields
+
+    @staticmethod
     def _process_one(
             data: Any,
             all_errors: bool,
             assign_getter: Callable,
             partial_fields: Iterable[tuple],
             except_exception: ExceptionType):
+        """Process one object using fields and catalyst options."""
         # According to the type of `data`, assign a function to get field value from `data`
         get_value = assign_getter(data)
 
@@ -217,6 +244,7 @@ class BaseCatalyst:
 
     @staticmethod
     def _process_many(data: Sequence, all_errors: bool, process_one: Callable):
+        """Process multiple objects using fields and catalyst options."""
         valid_data, errors, invalid_data = [], {}, {}
         for i, item in enumerate(data):
             result = process_one(item, raise_error=False)
@@ -233,7 +261,6 @@ class BaseCatalyst:
         main process with pre and post processes. Determine parameters for
         different processes in advance to reduce processing time.
         """
-        # assign params as closure variables for processor
         if name == 'dump':
             ResultClass = DumpResult
         elif name == 'load':
@@ -283,6 +310,7 @@ class BaseCatalyst:
                 partial_fields=partial_fields,
                 except_exception=except_exception)
 
+        # assign params as closure variables for processor
         pre_process_name = f'pre_{method_name}'
         post_process_name = f'post_{method_name}'
         pre_process = getattr(self, pre_process_name)
@@ -357,6 +385,7 @@ class BaseCatalyst:
     def load_args(self, func: Callable = None) -> Callable:
         return self._process_args(func, self.load)
 
+    # pre and post processes
     def pre_dump(self, data):
         return data
 
@@ -380,47 +409,3 @@ class BaseCatalyst:
 
     def post_load_many(self, data, original_data):
         return data
-
-
-class CatalystMeta(type):
-    """Metaclass for `Catalyst` class. Binds fields to `_field_dict` attribute."""
-
-    def __new__(cls, name, bases, attrs):
-        new_cls = super().__new__(cls, name, bases, attrs)
-        new_cls._set_fields(new_cls, attrs)
-        return new_cls
-
-
-class Catalyst(BaseCatalyst, metaclass=CatalystMeta):
-    __doc__ = BaseCatalyst.__doc__
-
-    @staticmethod
-    def _set_fields(cls_or_obj: BaseCatalyst, attrs: FieldDict):
-        """Set fields for `Catalyst` class or its instance.
-        Fields are bond to `cls_or_obj._field_dict` which are set separately
-        on class or its instance, which works like class inheritance.
-
-        :param cls_or_obj: `Catalyst` class or its instance.
-        :param attrs: a dict that keys are name and values are `Field`.
-        """
-        fields = {}
-        # inherit fields
-        fields.update(cls_or_obj._field_dict)
-
-        for attr, value in attrs.items():
-            # init calalyst object
-            if isinstance(value, CatalystMeta):
-                value = value()
-            # wrap catalyst object as NestedField
-            if isinstance(value, BaseCatalyst):
-                value = NestedField(value)
-            # automatic generate field name or key
-            if isinstance(value, Field):
-                if value.name is None:
-                    value.name = cls_or_obj._format_field_name(attr)
-                if value.key is None:
-                    value.key = cls_or_obj._format_field_key(attr)
-
-                fields[attr] = value
-
-        cls_or_obj._field_dict = fields
