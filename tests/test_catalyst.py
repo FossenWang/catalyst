@@ -3,7 +3,7 @@ from unittest import TestCase
 from catalyst.base import CatalystABC
 from catalyst.core import Catalyst
 from catalyst.fields import Field, StringField, IntegerField, \
-    FloatField, BooleanField, CallableField, ListField
+    FloatField, BooleanField, CallableField, ListField, NestedField
 from catalyst.exceptions import ValidationError
 from catalyst.utils import snake_to_camel
 
@@ -268,8 +268,11 @@ class CatalystTest(TestCase):
         self.assertEqual(set(X._field_dict), keys)
         self.assertEqual(set(x._field_dict), keys)
         self.assertEqual(set(Catalyst(X)._field_dict), keys)
-        # `x.__class__` can not be converted to `NestedField`
         self.assertEqual(set(Catalyst(x)._field_dict), keys)
+
+        # wrong type
+        with self.assertRaises(TypeError):
+            Catalyst({'x': Field})
 
     def test_base_dump_and_load(self):
         """Test dumping and loading data."""
@@ -579,12 +582,13 @@ class CatalystTest(TestCase):
         c.process_aliases.clear()
 
     def test_load_and_dump_args(self):
+        class Kwargs(Catalyst):
+            c = IntegerField()
         class A(Catalyst):
             a = IntegerField()
             b = IntegerField()
             args = ListField(IntegerField())
-            class kwargs(Catalyst):
-                c = IntegerField()
+            kwargs = NestedField(Kwargs())
 
         a = A()
 
@@ -703,6 +707,19 @@ class CatalystTest(TestCase):
         self.assertIsInstance(result.errors['nums'][1], ValueError)
 
     def test_nested_field(self):
+        class User(Catalyst):
+            uid = IntegerField()
+            name = StringField()
+
+        user_catalyst = User()
+
+        class Article(Catalyst):
+            title = StringField()
+            content = StringField()
+            author = NestedField(user_catalyst)
+
+        catalyst = Article()
+
         data = {
             'title': 'x',
             'content': 'x',
@@ -711,37 +728,6 @@ class CatalystTest(TestCase):
                 'name': 'x'
             }
         }
-
-        # Automatic wrap an object of Catalyst as NestedField
-        class User(Catalyst):
-            uid = IntegerField()
-            name = StringField()
-
-        user_catalyst = User()
-
-        class Article1(Catalyst):
-            title = StringField()
-            content = StringField()
-            author = user_catalyst
-
-        catalyst = Article1()
-
-        r = catalyst.dump(data)
-        self.assertEqual(data, r.valid_data)
-        r = catalyst.load(data)
-        self.assertEqual(data, r.valid_data)
-
-        # Automatic wrap a subclass of Catalyst as NestedField
-        class Article2(Catalyst):
-            title = StringField()
-            content = StringField()
-
-            class author(Catalyst):
-                uid = IntegerField()
-                name = StringField()
-
-        catalyst = Article2()
-
         r = catalyst.dump(data)
         self.assertEqual(data, r.valid_data)
         r = catalyst.load(data)

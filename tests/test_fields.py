@@ -279,11 +279,10 @@ class FieldTest(TestCase):
 
     def test_list_field(self):
         with self.assertRaises(TypeError):
-            ListField(None)
+            ListField()
 
-        # init Field class
-        field = ListField(FloatField)
-        self.assertIsInstance(field.item_field, FloatField)
+        with self.assertRaises(TypeError):
+            field = ListField(FloatField)
 
         field = ListField(item_field=FloatField())
 
@@ -357,11 +356,10 @@ class FieldTest(TestCase):
 
     def test_nest_field(self):
         with self.assertRaises(TypeError):
-            NestedField(1)
+            NestedField()
 
-        # init Catalyst class
-        field = NestedField(Catalyst)
-        self.assertIsInstance(field.catalyst, Catalyst)
+        with self.assertRaises(TypeError):
+            field = NestedField(Catalyst)
 
         fields = {'name': StringField(max_length=3, load_required=True)}
         field = NestedField(Catalyst(fields), name='a', key='a')

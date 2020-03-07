@@ -130,9 +130,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             if isinstance(schema, Mapping):
                 attrs = schema
             else:
-                attrs = {
-                    name: getattr(schema, name) for name in dir(schema)
-                    if name != '__class__'}
+                attrs = {name: getattr(schema, name) for name in dir(schema)}
             self._set_fields(self, attrs)
 
         # include fields
@@ -187,10 +185,10 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         fields = {}
         fields.update(cls_or_obj._field_dict)  # inherit fields
         for attr, value in attrs.items():
-            # wrap catalyst as NestedField
-            if isinstance(value, type) and issubclass(value, CatalystABC) \
-                or isinstance(value, CatalystABC):
-                value = NestedField(value)
+            if isinstance(value, type) and issubclass(value, Field):
+                raise TypeError(
+                    f'Field for "{attr}" must be declared as a Field instance, '
+                    f'not a class. Did you mean "{value.__name__}()"?')
             # automatic generate field name or key
             if isinstance(value, Field):
                 if value.name is None:

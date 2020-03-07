@@ -50,7 +50,7 @@ class ErrorMessageMixin:
     Error messages will be collect into `self.error_messages` in the order
     of class inheritance, and can be overrided by `error_messages` argument.
     """
-    error_messages = {}
+    error_messages: Dict[str, str] = {}
 
     def collect_error_messages(self, error_messages: Dict[str, str] = None):
         """Collect default error messages from self and parent classes.
@@ -63,7 +63,7 @@ class ErrorMessageMixin:
         for cls in reversed(self.__class__.__mro__):
             messages.update(cls.__dict__.get('error_messages', {}))
         messages.update(error_messages or {})
-        self.error_messages = messages
+        self.error_messages: Dict[str, str] = messages
 
     def error(self, error_key: str, **kwargs):
         """Raise `Exception` with message by key."""

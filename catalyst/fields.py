@@ -412,11 +412,9 @@ class ListField(Field):
             all_errors=all_errors,
             **kwargs)
         item_field = self.item_field
-        if isinstance(item_field, type) and issubclass(item_field, Field):
-            item_field = item_field()
-            setattr(self, 'item_field', item_field)
-        elif not isinstance(item_field, Field):
-            raise TypeError('Argument `item_field` must be a `Field` class or instance')
+        if not isinstance(item_field, Field):
+            raise TypeError(
+                f'Argument `item_field` must be a `Field` instance, not {item_field}.')
         self.format_item = getattr(item_field, self.dump_method)
         self.parse_item = getattr(item_field, self.load_method)
 
@@ -468,14 +466,11 @@ class NestedField(Field):
     format_none = True
     parse_none = True
 
-    def __init__(self, catalyst=None, many: bool = None, **kwargs):
+    def __init__(self, catalyst: CatalystABC = None, many: bool = None, **kwargs):
         super().__init__(catalyst=catalyst, many=many, **kwargs)
         catalyst = self.catalyst
-        if isinstance(catalyst, type) and issubclass(catalyst, CatalystABC):
-            catalyst = catalyst()
-            setattr(self, 'catalyst', catalyst)
-        elif not isinstance(catalyst, CatalystABC):
-            raise TypeError('Argument `catalyst` must be a `Catalyst` class or instance')
+        if not isinstance(catalyst, CatalystABC):
+            raise TypeError(f'Argument `catalyst` must be a `Catalyst` instance, not {catalyst}.')
         if self.many:
             self._do_dump = catalyst.dump_many
             self._do_load = catalyst.load_many
