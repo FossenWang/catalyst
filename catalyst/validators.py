@@ -81,8 +81,7 @@ class TypeValidator(Validator):
 
     def __call__(self, value):
         if not isinstance(value, self.class_or_tuple):
-            error = self.get_error('wrong_type')
-            raise TypeError(error.msg)
+            raise TypeError(self.get_error_message('wrong_type'))
 
 
 class RegexValidator(Validator):
@@ -104,3 +103,10 @@ class RegexValidator(Validator):
         if not match:
             self.error('no_match')
         return match
+
+
+# Aliases
+Range = RangeValidator
+Length = LengthValidator
+Type = TypeValidator
+Regex = RegexValidator

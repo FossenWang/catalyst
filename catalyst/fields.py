@@ -1,7 +1,10 @@
 """Field classes for various types of data."""
 
-from decimal import Decimal
-from typing import Callable, Any, Iterable, Union, Mapping, Hashable, Dict
+import decimal
+from typing import (
+    Any, Iterable, Union, Mapping, Hashable, Dict,
+    Callable as CallableType,
+)
 from datetime import datetime, time, date
 
 from .base import CatalystABC
@@ -17,9 +20,9 @@ from .validators import (
 from .exceptions import ValidationError, ExceptionType
 
 
-FormatterType = ParserType = Callable[[Any], Any]
+FormatterType = ParserType = CallableType[[Any], Any]
 
-ValidatorType = Callable[[Any], None]
+ValidatorType = CallableType[[Any], None]
 
 MultiValidator = Union[ValidatorType, Iterable[ValidatorType]]
 
@@ -257,12 +260,12 @@ class DecimalField(NumberField):
             raise TypeError('`dump_as` must be callable.')
         scale = self.scale
         if scale is not None:
-            self.exponent = Decimal((0, (), -int(scale)))
+            self.exponent = decimal.Decimal((0, (), -int(scale)))
 
     def to_decimal(self, value):
         if isinstance(value, float):
             value = str(value)
-        value = Decimal(value)
+        value = decimal.Decimal(value)
         if self.exponent is not None and value.is_finite():
             value = value.quantize(self.exponent, rounding=self.rounding)
         return value
@@ -374,7 +377,7 @@ class CallableField(Field):
         self.func_args = args
         self.func_kwargs = kwargs
 
-    def formatter(self, func: Callable):
+    def formatter(self, func: CallableType):
         return func(*self.func_args, **self.func_kwargs)
 
 
@@ -430,7 +433,7 @@ class ListField(Field):
     def _process_many(
             data: Iterable,
             all_errors: bool,
-            process_one: Callable,
+            process_one: CallableType,
             except_exception: ExceptionType):
         valid_data, errors, invalid_data = [], {}, {}
         for i, item in enumerate(data):
@@ -483,3 +486,18 @@ class NestedField(Field):
 
     def parser(self, value):
         return self._do_load(value, raise_error=True).valid_data
+
+
+# Aliases
+Str = String = StringField
+Bool = Boolean = BooleanField
+Int = Integer = IntegerField
+Float = FloatField
+Decimal = DecimalField
+Number = NumberField
+Datetime = DatetimeField
+Date = DateField
+Time = TimeField
+Callable = CallableField
+List = ListField
+Nested = NestedField

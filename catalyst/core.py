@@ -6,7 +6,7 @@ from typing import Dict, Iterable, Callable, Sequence, Any, Mapping
 from functools import wraps, partial
 
 from .base import CatalystABC
-from .fields import Field, NestedField
+from .fields import Field
 from .exceptions import ValidationError, ExceptionType
 from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,

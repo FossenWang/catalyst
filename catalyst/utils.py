@@ -65,12 +65,8 @@ class ErrorMessageMixin:
         messages.update(error_messages or {})
         self.error_messages: Dict[str, str] = messages
 
-    def error(self, error_key: str, **kwargs):
-        """Raise `Exception` with message by key."""
-        raise self.get_error(error_key, **kwargs)
-
-    def get_error(self, error_key: str, **kwargs):
-        """Get formated message by key and return it as `Exception`.
+    def get_error_message(self, error_key: str, **kwargs):
+        """Get formated error message by key.
 
         :param error_key: Key of `self.error_messages`.
         :param kwargs: Passed to `str.format` method.
@@ -80,9 +76,11 @@ class ErrorMessageMixin:
         except KeyError as error:
             msg = UNKNOWN_ERROR_MESSAGE.format(self=self, key=error_key)
             raise AssertionError(msg) from error
+        return str(msg).format(self=self, **kwargs)
 
-        msg = str(msg).format(self=self, **kwargs)
-        return ValidationError(msg)
+    def error(self, error_key: str, **kwargs):
+        """Raise `ValidationError` with message by key."""
+        raise ValidationError(self.get_error_message(error_key, **kwargs))
 
 
 def bind_attrs(obj, **kwargs):
