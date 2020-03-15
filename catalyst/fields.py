@@ -9,7 +9,7 @@ from datetime import datetime, time, date
 
 from .base import CatalystABC
 from .utils import (
-    BaseResult, ErrorMessageMixin,
+    BaseResult, ErrorMessageMixin, copy_keys,
     missing, no_processing, bind_attrs,
 )
 from .validators import (
@@ -179,8 +179,8 @@ class StringField(Field):
     :param min_length: The minimum length of the value.
     :param max_length: The maximum length of the value.
     :param regex: The regular expression that the value must match.
-    :param error_messages: Keys {'too_small', 'too_large', 'no_match',
-        'required', 'none'}.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
+        'no_match', 'required', 'none'}.
     """
     formatter = str
     parser = str
@@ -193,19 +193,20 @@ class StringField(Field):
             **kwargs):
         super().__init__(**kwargs)
         if min_length is not None or max_length is not None:
-            self.add_validator(
-                LengthValidator(min_length, max_length, self.error_messages))
+            msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
+            self.add_validator(LengthValidator(min_length, max_length, msg_dict))
         if regex:
-            self.add_validator(
-                RegexValidator(regex, self.error_messages))
+            msg = self.error_messages.get('no_match')
+            self.add_validator(RegexValidator(regex, msg))
 
 
 class NumberField(Field):
-    """Base class for number fields. Using RangeValidator for validating.
+    """Base class for number fields.
 
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys {'too_small', 'too_large', 'required', 'none'}.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
+        'required', 'none'}.
     """
     formatter = float
     parser = float
@@ -213,8 +214,8 @@ class NumberField(Field):
     def __init__(self, minimum=None, maximum=None, **kwargs):
         super().__init__(**kwargs)
         if minimum is not None or maximum is not None:
-            self.add_validator(
-                RangeValidator(minimum, maximum, error_messages=self.error_messages))
+            msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
+            self.add_validator(RangeValidator(minimum, maximum, msg_dict))
 
 
 class FloatField(NumberField):
@@ -293,8 +294,7 @@ class BooleanField(Field):
         self.reverse_value_map = {
             raw: parsed
             for parsed, raw_values in self.value_map.items()
-            for raw in raw_values
-        }
+            for raw in raw_values}
 
     def formatter(self, value):
         if isinstance(value, Hashable):
@@ -311,7 +311,8 @@ class DatetimeField(Field):
     :param fmt: Format of the value. See `datetime` module for details.
     :param minimum: The minimum value.
     :param maximum: The maximum value.
-    :param error_messages: Keys {'too_small', 'too_large', 'required', 'none'}.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
+        'required', 'none'}.
     """
     type_ = datetime
     fmt = r'%Y-%m-%d %H:%M:%S.%f'
@@ -319,8 +320,8 @@ class DatetimeField(Field):
     def __init__(self, fmt: str = None, minimum=None, maximum=None, **kwargs):
         super().__init__(fmt=fmt, **kwargs)
         if minimum is not None or maximum is not None:
-            self.add_validator(
-                RangeValidator(minimum, maximum, self.error_messages))
+            msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
+            self.add_validator(RangeValidator(minimum, maximum, msg_dict))
 
     def formatter(self, dt):
         return self.type_.strftime(dt, self.fmt)

@@ -8,83 +8,71 @@ from catalyst.validators import (
     RangeValidator,
     TypeValidator,
     RegexValidator,
+    MemberValidator,
+    NonMemberValidator,
 )
 
 
 class ValidationTest(TestCase):
     def test_base_validator(self):
-        with self.assertRaises(NotImplementedError):
-            Validator()(None)
+        validator = Validator()
+        validator(True)
+        with self.assertRaises(ValidationError):
+            validator(False)
 
-        class NewValidator(Validator):
-            error_messages = {'msg': 'default'}
-            def __call__(self, value):
-                self.error('msg')
-
-        # test alterable error messages
-        default_validator = NewValidator()
-        custom_msg_validator = NewValidator(error_messages={'msg': 'custom'})
-
-        with self.assertRaises(ValidationError) as c:
-            default_validator(0)
-        self.assertEqual(str(c.exception), 'default')
-        with self.assertRaises(ValidationError) as c:
-            custom_msg_validator(0)
-        self.assertEqual(str(c.exception), 'custom')
-        self.assertEqual(repr(c.exception), "ValidationError('custom')")
+        # test validate and error_message
+        validator = Validator(validate=lambda x: x == 1, error_message='wrong')
+        validator(1)
+        with self.assertRaises(ValidationError) as cm:
+            validator(0)
+        self.assertEqual(str(cm.exception), 'wrong')
 
     @patch.dict('catalyst.validators.RangeValidator.error_messages')
     def test_range_validator(self):
+        validator = RangeValidator()
+        validator(None)
+
+        validator = RangeValidator(maximum=1)
+        validator(0)
+        validator(1)
+        with self.assertRaises(ValidationError):
+            validator(2)
+
         RangeValidator.error_messages.update({'too_small': 'too_small'})
-        compare_integer = RangeValidator(0, 100, {'too_large': 'too_large'})
-        compare_integer(1)
-        compare_integer(0)
-        compare_integer(100)
-        with self.assertRaises(ValidationError) as c:
-            compare_integer(-1)
-        self.assertEqual(str(c.exception), 'too_small')
-        with self.assertRaises(ValidationError) as c:
-            compare_integer(101)
-        self.assertEqual(str(c.exception), 'too_large')
-        with self.assertRaises(TypeError):
-            compare_integer('1')
-        with self.assertRaises(TypeError):
-            compare_integer([1])
+        validator = RangeValidator(0)
+        with self.assertRaises(ValidationError) as cm:
+            validator(-1)
+        self.assertEqual(str(cm.exception), 'too_small')
 
-        compare_integer_float = RangeValidator(-1.1, 1.1)
-
-        compare_integer_float(1)
-        compare_integer_float(0)
-        compare_integer_float(0.1)
-        compare_integer_float(1.1)
-        compare_integer_float(-1.1)
-        with self.assertRaises(ValidationError):
-            compare_integer_float(-2)
-        with self.assertRaises(ValidationError):
-            compare_integer_float(2)
+        validator = RangeValidator(0, 100, error_messages={'not_between': 'not_between'})
+        validator(1)
+        validator(0)
+        validator(100)
+        with self.assertRaises(ValidationError) as cm:
+            validator(101)
+        self.assertEqual(str(cm.exception), 'not_between')
         with self.assertRaises(TypeError):
-            compare_integer_float('1.1')
+            validator('1')
         with self.assertRaises(TypeError):
-            compare_integer_float([1.1])
-
-        with self.assertRaises(ValueError):
-            RangeValidator(1, 0)
+            validator([1])
 
     @patch.dict('catalyst.validators.LengthValidator.error_messages')
     def test_length_validator(self):
         LengthValidator.error_messages.update({'too_small': 'too_small'})
-        validator = LengthValidator(2, 10, {'too_large': 'too_large'})
+        validator = LengthValidator(2)
+        with self.assertRaises(ValidationError) as cm:
+            validator('x')
+        self.assertEqual(str(cm.exception), 'too_small')
+
+        validator = LengthValidator(2, 10, error_messages={'not_between': 'not_between'})
 
         validator('x' * 2)
         validator('x' * 5)
         validator('x' * 10)
         validator(['xzc', 1])
-        with self.assertRaises(ValidationError) as c:
-            validator('x')
-        self.assertEqual(str(c.exception), 'too_small')
-        with self.assertRaises(ValidationError) as c:
+        with self.assertRaises(ValidationError) as cm:
             validator('x' * 11)
-        self.assertEqual(str(c.exception), 'too_large')
+        self.assertEqual(str(cm.exception), 'not_between')
         with self.assertRaises(ValidationError):
             validator('')
         with self.assertRaises(TypeError):
@@ -131,3 +119,16 @@ class ValidationTest(TestCase):
 
         with self.assertRaises(TypeError):
             validator = RegexValidator(None)
+
+    def test_member_validator(self):
+        choices = {1, 2, 3}
+
+        validator = MemberValidator(choices)
+        validator(1)
+        with self.assertRaises(ValidationError):
+            validator(0)
+
+        validator = NonMemberValidator(choices)
+        validator(0)
+        with self.assertRaises(ValidationError):
+            validator(1)

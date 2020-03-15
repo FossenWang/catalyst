@@ -50,6 +50,7 @@ class ErrorMessageMixin:
     Error messages will be collect into `self.error_messages` in the order
     of class inheritance, and can be overrided by `error_messages` argument.
     """
+    error_cls = ValidationError
     error_messages: Dict[str, str] = {}
 
     def collect_error_messages(self, error_messages: Dict[str, str] = None):
@@ -67,6 +68,7 @@ class ErrorMessageMixin:
 
     def get_error_message(self, error_key: str, **kwargs):
         """Get formated error message by key.
+        Can be interpolated with `{self}` and other kwargs.
 
         :param error_key: Key of `self.error_messages`.
         :param kwargs: Passed to `str.format` method.
@@ -76,11 +78,11 @@ class ErrorMessageMixin:
         except KeyError as error:
             msg = UNKNOWN_ERROR_MESSAGE.format(self=self, key=error_key)
             raise AssertionError(msg) from error
-        return str(msg).format(self=self, **kwargs)
+        return msg.format(self=self, **kwargs)
 
     def error(self, error_key: str, **kwargs):
         """Raise `ValidationError` with message by key."""
-        raise ValidationError(self.get_error_message(error_key, **kwargs))
+        raise self.error_cls(self.get_error_message(error_key, **kwargs))
 
 
 def bind_attrs(obj, **kwargs):
@@ -122,3 +124,8 @@ def snake_to_camel(snake: str) -> str:
     if camel:
         camel = camel[0].lower() + camel[1:]
     return camel
+
+
+def copy_keys(mapping: Mapping, keys: Iterable) -> dict:
+    """Copy values from mapping by keys."""
+    return {key: mapping[key] for key in keys if key in mapping}

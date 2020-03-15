@@ -88,7 +88,7 @@ class FieldTest(TestCase):
     def test_string_field(self):
         field = StringField(
             name='string', key='string', min_length=2, max_length=12,
-            error_messages={'too_small': 'Must >= {self.minimum}'})
+            error_messages={'not_between': 'Must >= {self.minimum}'})
 
         # dump
         self.assertEqual(field.dump('xxx'), 'xxx')
@@ -109,8 +109,8 @@ class FieldTest(TestCase):
         # change validator's error message
         self.assertEqual(cm.exception.msg, 'Must >= 2')
         self.assertEqual(
-            field.error_messages['too_small'],
-            field.validators[0].error_messages['too_small'])
+            field.error_messages['not_between'],
+            field.validators[0].error_messages['not_between'])
 
         field.allow_none = False
         with self.assertRaises(ValidationError):
@@ -129,7 +129,7 @@ class FieldTest(TestCase):
     def test_int_field(self):
         field = IntegerField(
             name='integer', key='integer', minimum=-10, maximum=100,
-            error_messages={'too_large': '{self.maximum}'})
+            error_messages={'not_between': '{self.maximum}'})
 
         # dump
         self.assertEqual(field.dump(1), 1)

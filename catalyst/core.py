@@ -79,6 +79,9 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     except_exception: ExceptionType = Exception
     process_aliases = {}
 
+    DumpResult = DumpResult
+    LoadResult = LoadResult
+
     _field_dict: FieldDict = {}
 
     # assign getter for dumping & loading
@@ -260,9 +263,9 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         different processes in advance to reduce processing time.
         """
         if name == 'dump':
-            ResultClass = DumpResult
+            ResultClass = self.DumpResult
         elif name == 'load':
-            ResultClass = LoadResult
+            ResultClass = self.LoadResult
         else:
             raise ValueError("Argument `name` must be 'dump' or 'load'.")
 
