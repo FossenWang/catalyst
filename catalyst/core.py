@@ -17,12 +17,61 @@ from .utils import (
 FieldDict = Dict[str, Field]
 
 
+def _get_fields(fields: dict):
+    """Collect fields from dict."""
+    new_fields: FieldDict = {}
+    for name, field in fields.items():
+        if isinstance(field, type) and issubclass(field, Field):
+            raise TypeError(
+                f'Field for "{name}" must be declared as a Field instance, '
+                f'not a class. Did you mean "{field.__name__}()"?')
+
+        if isinstance(field, Field):
+            new_fields[name] = field
+    return new_fields
+
+
+def _get_fields_from_bases(*bases):
+    """Collect fields from base classes, following method resolution order."""
+    fields = {}
+    for base in reversed(bases):
+        if issubclass(base, CatalystABC):
+            fields.update(_get_fields(base.fields))
+        else:
+            for kls in base.mro()[-2::-1]:
+                fields.update(_get_fields(kls.__dict__))
+    return fields
+
+
+def _get_fields_from_instance(obj):
+    """Collect fields from instance."""
+    if isinstance(obj, CatalystABC):
+        fields = obj.fields
+    else:
+        fields = {attr: getattr(obj, attr) for attr in dir(obj)}
+    return _get_fields(fields)
+
+
+def _set_fields(cls_or_obj, fields: FieldDict):
+    """Set fields for `Catalyst` class or its instance.
+    Generate "field.name" or "field.key" if it is None.
+    """
+    for attr, field in fields.items():
+        if field.name is None:
+            field.name = cls_or_obj._format_field_name(attr)
+        if field.key is None:
+            field.key = cls_or_obj._format_field_key(attr)
+    cls_or_obj.fields = fields
+
+
 class CatalystMeta(type):
-    """Metaclass for `Catalyst` class. Binds fields to `_field_dict` attribute."""
+    """Metaclass for `Catalyst` class. Binds fields to `fields` attribute."""
 
     def __new__(cls, name, bases, attrs):
         new_cls = super().__new__(cls, name, bases, attrs)
-        new_cls._set_fields(new_cls, attrs)
+        fields = _get_fields_from_bases(*bases)
+        fields.update(_get_fields(attrs))
+        _set_fields(new_cls, fields)
         return new_cls
 
 
@@ -82,7 +131,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     DumpResult = DumpResult
     LoadResult = LoadResult
 
-    _field_dict: FieldDict = {}
+    fields: FieldDict = {}
 
     # assign getter for dumping & loading
     _assign_dump_getter = staticmethod(assign_attr_or_item_getter)
@@ -130,15 +179,19 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         # set fields from a dict or instance or class
         schema = self.schema
         if schema:
+            fields = self.fields.copy()
             if isinstance(schema, Mapping):
-                attrs = schema
+                new_fields = _get_fields(schema)
+            elif isinstance(schema, type):
+                new_fields = _get_fields_from_bases(schema)
             else:
-                attrs = {name: getattr(schema, name) for name in dir(schema)}
-            self._set_fields(self, attrs)
+                new_fields = _get_fields_from_instance(schema)
+            fields.update(new_fields)
+            _set_fields(self, fields)
 
         # include fields
         if include is None:
-            include = self._field_dict.keys()
+            include = self.fields.keys()
         if dump_include is None:
             dump_include = include
         if load_include is None:
@@ -154,12 +207,12 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             load_include = (field for field in load_include if field not in load_exclude)
 
         try:
-            self._dump_field_dict = self._copy_fields(
-                self._field_dict, dump_include,
-                lambda key: not self._field_dict[key].no_dump)
-            self._load_field_dict = self._copy_fields(
-                self._field_dict, load_include,
-                lambda key: not self._field_dict[key].no_load)
+            self._dump_fields = self._copy_fields(
+                self.fields, dump_include,
+                lambda key: not self.fields[key].no_dump)
+            self._load_fields = self._copy_fields(
+                self.fields, load_include,
+                lambda key: not self.fields[key].no_load)
         except KeyError as error:
             raise ValueError(f"Field '{error.args[0]}' does not exist.") from error
 
@@ -178,28 +231,6 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             if is_copying(key):
                 new_fields[key] = fields[key]
         return new_fields
-
-    @staticmethod
-    def _set_fields(cls_or_obj, attrs: FieldDict):
-        """Set fields for `Catalyst` class or its instance.
-        Fields are bond to `cls_or_obj._field_dict` which are set separately
-        on class or its instance, which works like class inheritance.
-        """
-        fields = {}
-        fields.update(cls_or_obj._field_dict)  # inherit fields
-        for attr, value in attrs.items():
-            if isinstance(value, type) and issubclass(value, Field):
-                raise TypeError(
-                    f'Field for "{attr}" must be declared as a Field instance, '
-                    f'not a class. Did you mean "{value.__name__}()"?')
-            # automatic generate field name or key
-            if isinstance(value, Field):
-                if value.name is None:
-                    value.name = cls_or_obj._format_field_name(attr)
-                if value.key is None:
-                    value.key = cls_or_obj._format_field_key(attr)
-                fields[attr] = value
-        cls_or_obj._field_dict = fields
 
     @staticmethod
     def _process_one(
@@ -281,7 +312,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             method_name = name
             if name == 'dump':
                 assign_getter = self._assign_dump_getter
-                field_dict = self._dump_field_dict
+                field_dict = self._dump_fields
                 field_method = self.dump_method
                 source_attr = 'name'
                 target_attr = 'key'
@@ -289,7 +320,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                 required_attr = 'dump_required'
             else:
                 assign_getter = self._assign_load_getter
-                field_dict = self._load_field_dict
+                field_dict = self._load_fields
                 field_method = self.load_method
                 source_attr = 'key'
                 target_attr = 'name'

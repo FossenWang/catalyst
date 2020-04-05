@@ -64,10 +64,10 @@ class CatalystTest(TestCase):
         a = A()
         b = B()
 
-        self.assertEqual(set(a._field_dict), {'a', 'b'})
-        self.assertEqual(set(b._field_dict), {'a', 'b', 'c'})
-        self.assertIsInstance(a._field_dict['b'], Field)
-        self.assertIsInstance(b._field_dict['b'], IntegerField)
+        self.assertListEqual(list(a.fields), ['a', 'b'])
+        self.assertListEqual(list(b.fields), ['a', 'b', 'c'])
+        self.assertIsInstance(a.fields['b'], Field)
+        self.assertIsInstance(b.fields['b'], IntegerField)
 
         data = {'a': 'a', 'b': 'b'}
         self.assertDictEqual(a.dump(data).valid_data, data)
@@ -79,6 +79,38 @@ class CatalystTest(TestCase):
         self.assertEqual(a.raise_error, False)
         self.assertEqual(b.all_errors, False)
         self.assertEqual(b.raise_error, True)
+
+        class C:
+            c = StringField()
+
+        class CB(C, B):
+            pass
+
+        self.assertListEqual(list(CB.fields), ['a', 'b', 'c'])
+        self.assertIsInstance(CB.fields['c'], StringField)
+
+        class BC(B, C):
+            pass
+
+        self.assertListEqual(list(BC.fields), ['c', 'a', 'b'])
+        self.assertIsInstance(BC.fields['c'], FloatField)
+
+        class D(C):
+            d = FloatField()
+
+        class DB(D, B):
+            pass
+
+        self.assertListEqual(list(DB.fields), ['a', 'b', 'c', 'd'])
+        self.assertIsInstance(DB.fields['c'], StringField)
+        self.assertIsInstance(DB.fields['d'], FloatField)
+
+        class BD(B, D):
+            pass
+
+        self.assertListEqual(list(BD.fields), ['c', 'd', 'a', 'b'])
+        self.assertIsInstance(BD.fields['c'], FloatField)
+        self.assertIsInstance(BD.fields['d'], FloatField)
 
     def test_change_field_name_and_key_naming_style(self):
         # change field key naming style
@@ -143,11 +175,11 @@ class CatalystTest(TestCase):
 
         # Empty `include`
         catalyst = TestDataCatalyst(include=[])
-        self.assertDictEqual(catalyst._dump_field_dict, {})
-        self.assertDictEqual(catalyst._load_field_dict, {})
+        self.assertDictEqual(catalyst._dump_fields, {})
+        self.assertDictEqual(catalyst._load_fields, {})
 
         # if field.no_load is True, this field will be excluded from loading
-        self.assertNotIn('func', test_catalyst._load_field_dict.keys())
+        self.assertNotIn('func', test_catalyst._load_fields.keys())
 
         # Specify `include` for dumping and loading
         catalyst = TestDataCatalyst(include=['string'])
@@ -180,23 +212,23 @@ class CatalystTest(TestCase):
 
         # Specify `exclude` for dumping and loading
         catalyst = TestDataCatalyst(exclude=['string'])
-        self.assertNotIn('string', catalyst._dump_field_dict)
-        self.assertNotIn('string', catalyst._load_field_dict)
+        self.assertNotIn('string', catalyst._dump_fields)
+        self.assertNotIn('string', catalyst._load_fields)
 
         # When `dump_exclude` and `load_exclude` are given, `exclude` is not used.
         catalyst = TestDataCatalyst(
             exclude=['integer'], dump_exclude=['string'], load_exclude=['bool_field'])
-        self.assertIn('integer', catalyst._dump_field_dict)
-        self.assertIn('integer', catalyst._dump_field_dict)
-        self.assertNotIn('string', catalyst._dump_field_dict)
-        self.assertNotIn('bool_field', catalyst._load_field_dict)
+        self.assertIn('integer', catalyst._dump_fields)
+        self.assertIn('integer', catalyst._dump_fields)
+        self.assertNotIn('string', catalyst._dump_fields)
+        self.assertNotIn('bool_field', catalyst._load_fields)
 
         # Specify `include` and `exclude` at one time
         catalyst = TestDataCatalyst(include=['string', 'integer'], exclude=['string'])
-        self.assertIn('integer', catalyst._dump_field_dict)
-        self.assertNotIn('string', catalyst._dump_field_dict)
-        self.assertIn('integer', catalyst._load_field_dict)
-        self.assertNotIn('string', catalyst._load_field_dict)
+        self.assertIn('integer', catalyst._dump_fields)
+        self.assertNotIn('string', catalyst._dump_fields)
+        self.assertIn('integer', catalyst._load_fields)
+        self.assertNotIn('string', catalyst._load_fields)
 
         # raise wrong `include`
         with self.assertRaises(ValueError):
@@ -213,66 +245,81 @@ class CatalystTest(TestCase):
 
     def test_set_fields_by_schema(self):
         """Set fields by non class inheritance."""
-        # test fields from class inheritance
-        self.assertNotIn('schema', repr(test_catalyst))
-        self.assertIsNone(test_catalyst.schema)
-        self.assertIs(test_catalyst.integer, test_catalyst._field_dict['integer'])
-
-        # set fields from a non `Catalyst` class when instantiate
-        class Schema:
-            a = StringField()
-            b = FloatField()
-
-            @staticmethod
-            @b.set_formatter
-            def test(value):
-                return value + 1
-
-        catalyst = Catalyst(Schema)
-        fields = catalyst._field_dict
-        self.assertIs(fields['a'], Schema.a)
-        self.assertIs(fields['b'], Schema.b)
-        # setting opts of field works
-        self.assertEqual(Schema.b.dump(1), 2)
-        self.assertIs(Schema.b.formatter, Schema.test)
-
-        # instance also works
-        catalyst = TestDataCatalyst(Schema())
-        fields = catalyst._field_dict
-        self.assertIs(fields['a'], Schema.a)
-        self.assertIs(fields['b'], Schema.b)
-
-        # set fields from FieldDict
-        catalyst = Catalyst({'a': Schema.a})
-        self.assertIs(catalyst._field_dict['a'], Schema.a)
-
-        # inheritance works
-        class Schema2:
-            a = StringField()
-            string = FloatField()
-        catalyst = TestDataCatalyst(Schema2)
-        fields = catalyst._field_dict
-        self.assertIs(fields['string'], Schema2.string)
-        self.assertIsNot(fields['string'], TestDataCatalyst.string)
-        self.assertIs(fields['integer'], TestDataCatalyst.integer)
-
-        # special attributes
-        class X(Catalyst):
-            x = StringField()
-            _x = StringField()
-            __x = StringField()
-            __x__ = StringField()
-
-        x = X()
-        keys = {'x', '__x__', '_X__x', '_x'}
-        self.assertEqual(set(X._field_dict), keys)
-        self.assertEqual(set(x._field_dict), keys)
-        self.assertEqual(set(Catalyst(X)._field_dict), keys)
-        self.assertEqual(set(Catalyst(x)._field_dict), keys)
-
         # wrong type
         with self.assertRaises(TypeError):
             Catalyst({'x': Field})
+
+        class A:
+            a = FloatField()
+
+            @staticmethod
+            @a.set_formatter
+            def test(value):
+                return value + 1
+
+        # set fields from schema which is non Catalyst class
+        catalyst = Catalyst(A)
+        self.assertIs(catalyst.fields['a'], A.a)
+        # setting opts of field works
+        self.assertEqual(A.a.dump(1), 2)
+        self.assertIs(A.a.formatter, A.test)
+
+        # set fields from FieldDict
+        catalyst = Catalyst({'a': A.a})
+        self.assertIs(catalyst.fields['a'], A.a)
+
+        # class inheritance, fields following method resolution order
+        class B:
+            base = IntegerField()
+            a = IntegerField()
+            b = IntegerField()
+
+        class AB(A, B):
+            pass
+
+        catalyst = Catalyst(AB)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'a', 'b'])
+        self.assertIsInstance(fields['a'], FloatField)
+
+        class BA(B, A):
+            pass
+
+        catalyst = Catalyst(BA)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['a', 'base', 'b'])
+        self.assertIsInstance(fields['a'], IntegerField)
+
+        # fields of schema override fields of Catalyst class
+        class Base(Catalyst):
+            base = Field()
+
+        catalyst = Base(BA)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'a', 'b'])
+        self.assertIsInstance(fields['base'], IntegerField)
+
+        # set fields from schema which is Catalyst class
+        class BABase(BA, Base):
+            pass
+
+        catalyst = Catalyst(BABase)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'a', 'b'])
+        self.assertIsInstance(fields['base'], IntegerField)
+
+        # set fields from schema which is Catalyst instance
+        catalyst = Catalyst(BABase())
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'a', 'b'])
+        self.assertIsInstance(fields['base'], IntegerField)
+
+        # set fields from schema which is non Catalyst instance
+        catalyst = Catalyst(BA())
+        fields = catalyst.fields
+        # fields following alphabetic order
+        self.assertListEqual(list(fields), ['a', 'b', 'base'])
+        self.assertIsInstance(fields['a'], IntegerField)
 
     def test_base_dump_and_load(self):
         """Test dumping and loading data."""
@@ -487,7 +534,7 @@ class CatalystTest(TestCase):
                 return self.post_load(data, original_data)
 
             def pre_load(self, data):
-                keys = {field.key for field in self._load_field_dict.values()}
+                keys = {field.key for field in self._load_fields.values()}
                 extra_keys = set(data.keys()) - keys
                 if extra_keys:
                     raise ValidationError(f'This keys should not be present: {extra_keys}.')
