@@ -31,15 +31,15 @@ def _get_fields(fields: dict):
     return new_fields
 
 
-def _get_fields_from_bases(*bases):
+def _get_fields_from_classes(classes: Iterable[type]):
     """Collect fields from base classes, following method resolution order."""
     fields = {}
-    for base in reversed(bases):
-        if issubclass(base, CatalystABC):
-            fields.update(_get_fields(base.fields))
+    for klass in reversed(classes):
+        if issubclass(klass, CatalystABC):
+            fields.update(_get_fields(klass.fields))
         else:
-            for kls in base.mro()[-2::-1]:
-                fields.update(_get_fields(kls.__dict__))
+            for base in klass.mro()[-2::-1]:
+                fields.update(_get_fields(base.__dict__))
     return fields
 
 
@@ -69,7 +69,7 @@ class CatalystMeta(type):
 
     def __new__(cls, name, bases, attrs):
         new_cls = super().__new__(cls, name, bases, attrs)
-        fields = _get_fields_from_bases(*bases)
+        fields = _get_fields_from_classes(bases)
         fields.update(_get_fields(attrs))
         _set_fields(new_cls, fields)
         return new_cls
@@ -183,7 +183,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             if isinstance(schema, Mapping):
                 new_fields = _get_fields(schema)
             elif isinstance(schema, type):
-                new_fields = _get_fields_from_bases(schema)
+                new_fields = _get_fields_from_classes([schema])
             else:
                 new_fields = _get_fields_from_instance(schema)
             fields.update(new_fields)

@@ -5,7 +5,6 @@ from catalyst.core import Catalyst
 from catalyst.fields import Field, StringField, IntegerField, \
     FloatField, BooleanField, CallableField, ListField, NestedField
 from catalyst.exceptions import ValidationError
-from catalyst.utils import snake_to_camel
 
 
 class TestData:
@@ -112,60 +111,84 @@ class CatalystTest(TestCase):
         self.assertIsInstance(BD.fields['c'], FloatField)
         self.assertIsInstance(BD.fields['d'], FloatField)
 
-    def test_change_field_name_and_key_naming_style(self):
-        # change field key naming style
-        class A(Catalyst):
-            _format_field_key = staticmethod(snake_to_camel)
-            snake_to_camel = Field()
+    def test_set_fields_by_schema(self):
+        # wrong type
+        with self.assertRaises(TypeError):
+            Catalyst({'x': Field})
 
-        self.assertEqual(A.snake_to_camel.name, 'snake_to_camel')
-        self.assertEqual(A.snake_to_camel.key, 'snakeToCamel')
+        class A:
+            a = FloatField()
 
-        a = A()
-        result = a.dump({'snake_to_camel': 'snake'})
-        self.assertIn('snakeToCamel', result.valid_data)
-        result = a.load({'snakeToCamel': 'snake'})
-        self.assertIn('snake_to_camel', result.valid_data)
+            @staticmethod
+            @a.set_formatter
+            def test(value):
+                return value + 1
 
-        # change field name naming style
-        class B(Catalyst):
-            _format_field_name = staticmethod(snake_to_camel)
-            snake_to_camel = Field()
+        # set fields from schema which is non Catalyst class
+        catalyst = Catalyst(A)
+        self.assertIs(catalyst.fields['a'], A.a)
+        # setting opts of field works
+        self.assertEqual(A.a.dump(1), 2)
+        self.assertIs(A.a.formatter, A.test)
 
-        self.assertEqual(B.snake_to_camel.name, 'snakeToCamel')
-        self.assertEqual(B.snake_to_camel.key, 'snake_to_camel')
+        # set fields from FieldDict
+        catalyst = Catalyst({'a': A.a})
+        self.assertIs(catalyst.fields['a'], A.a)
 
-        b = B()
-        result = b.dump({'snakeToCamel': 'snake'})
-        self.assertIn('snake_to_camel', result.valid_data)
-        result = b.load({'snake_to_camel': 'snake'})
-        self.assertIn('snakeToCamel', result.valid_data)
+        # class inheritance, fields following method resolution order
+        class B:
+            base = IntegerField()
+            a = IntegerField()
+            b = IntegerField()
 
-        # change field name and key naming style
-        class C(Catalyst):
-            _format_field_name = staticmethod(snake_to_camel)
-            _format_field_key = staticmethod(snake_to_camel)
-            snake_to_camel = Field()
-            still_snake = Field(name='still_snake', key='still_snake')
+        class AB(A, B):
+            pass
 
-        self.assertEqual(C.snake_to_camel.name, 'snakeToCamel')
-        self.assertEqual(C.snake_to_camel.key, 'snakeToCamel')
-        self.assertEqual(C.still_snake.name, 'still_snake')
-        self.assertEqual(C.still_snake.key, 'still_snake')
+        catalyst = Catalyst(AB)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'a', 'b'])
+        self.assertIsInstance(fields['a'], FloatField)
 
-        c = C()
-        self.assertIs(c._format_field_key, snake_to_camel)
-        self.assertIs(c._format_field_name, snake_to_camel)
-        result = c.dump({'snakeToCamel': None, 'still_snake': None})
-        self.assertIn('snakeToCamel', result.valid_data)
-        self.assertIn('still_snake', result.valid_data)
-        result = c.load({'snakeToCamel': None, 'still_snake': None})
-        self.assertIn('snakeToCamel', result.valid_data)
-        self.assertIn('still_snake', result.valid_data)
+        class BA(B, A):
+            pass
+
+        catalyst = Catalyst(BA)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['a', 'base', 'b'])
+        self.assertIsInstance(fields['a'], IntegerField)
+
+        # fields of schema override fields of Catalyst class
+        class Base(Catalyst):
+            base = Field()
+
+        catalyst = Base(BA)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'a', 'b'])
+        self.assertIsInstance(fields['base'], IntegerField)
+
+        # set fields from schema which is Catalyst class
+        class BABase(BA, Base):
+            pass
+
+        catalyst = Catalyst(BABase)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'a', 'b'])
+        self.assertIsInstance(fields['base'], IntegerField)
+
+        # set fields from schema which is Catalyst instance
+        catalyst = Catalyst(BABase())
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'a', 'b'])
+        self.assertIsInstance(fields['base'], IntegerField)
+
+        # set fields from schema which is non Catalyst instance
+        catalyst = Catalyst(BA())
+        fields = catalyst.fields
+        # fields following alphabetic order
+        self.assertListEqual(list(fields), ['a', 'b', 'base'])
+        self.assertIsInstance(fields['a'], IntegerField)
 
     def test_init(self):
-        """Test initializing `Catalyst`."""
-
         dump_data = TestData(
             string='xxx', integer=1, float_=1.1,
             bool_=True, list_=['a', 'b'])
@@ -243,86 +266,7 @@ class CatalystTest(TestCase):
         TestDataCatalyst(dump_exclude=['wrong_name'])
         TestDataCatalyst(load_exclude=['wrong_name'])
 
-    def test_set_fields_by_schema(self):
-        """Set fields by non class inheritance."""
-        # wrong type
-        with self.assertRaises(TypeError):
-            Catalyst({'x': Field})
-
-        class A:
-            a = FloatField()
-
-            @staticmethod
-            @a.set_formatter
-            def test(value):
-                return value + 1
-
-        # set fields from schema which is non Catalyst class
-        catalyst = Catalyst(A)
-        self.assertIs(catalyst.fields['a'], A.a)
-        # setting opts of field works
-        self.assertEqual(A.a.dump(1), 2)
-        self.assertIs(A.a.formatter, A.test)
-
-        # set fields from FieldDict
-        catalyst = Catalyst({'a': A.a})
-        self.assertIs(catalyst.fields['a'], A.a)
-
-        # class inheritance, fields following method resolution order
-        class B:
-            base = IntegerField()
-            a = IntegerField()
-            b = IntegerField()
-
-        class AB(A, B):
-            pass
-
-        catalyst = Catalyst(AB)
-        fields = catalyst.fields
-        self.assertListEqual(list(fields), ['base', 'a', 'b'])
-        self.assertIsInstance(fields['a'], FloatField)
-
-        class BA(B, A):
-            pass
-
-        catalyst = Catalyst(BA)
-        fields = catalyst.fields
-        self.assertListEqual(list(fields), ['a', 'base', 'b'])
-        self.assertIsInstance(fields['a'], IntegerField)
-
-        # fields of schema override fields of Catalyst class
-        class Base(Catalyst):
-            base = Field()
-
-        catalyst = Base(BA)
-        fields = catalyst.fields
-        self.assertListEqual(list(fields), ['base', 'a', 'b'])
-        self.assertIsInstance(fields['base'], IntegerField)
-
-        # set fields from schema which is Catalyst class
-        class BABase(BA, Base):
-            pass
-
-        catalyst = Catalyst(BABase)
-        fields = catalyst.fields
-        self.assertListEqual(list(fields), ['base', 'a', 'b'])
-        self.assertIsInstance(fields['base'], IntegerField)
-
-        # set fields from schema which is Catalyst instance
-        catalyst = Catalyst(BABase())
-        fields = catalyst.fields
-        self.assertListEqual(list(fields), ['base', 'a', 'b'])
-        self.assertIsInstance(fields['base'], IntegerField)
-
-        # set fields from schema which is non Catalyst instance
-        catalyst = Catalyst(BA())
-        fields = catalyst.fields
-        # fields following alphabetic order
-        self.assertListEqual(list(fields), ['a', 'b', 'base'])
-        self.assertIsInstance(fields['a'], IntegerField)
-
-    def test_base_dump_and_load(self):
-        """Test dumping and loading data."""
+    def test_dump_and_load(self):
         # test dump
         dump_data = TestData(
             string='xxx', integer=1, float_=1.1,
@@ -445,82 +389,102 @@ class CatalystTest(TestCase):
         with self.assertRaises(ValueError):
             test_catalyst._make_processor(1, False)
 
-    def test_field_args_for_dump_and_load(self):
-        def create_catalyst(**kwargs):
-            class C(Catalyst):
-                s = StringField(**kwargs)
-            return C()
+    def test_load_and_dump_args(self):
+        class Kwargs(Catalyst):
+            c = IntegerField()
+        class A(Catalyst):
+            a = IntegerField()
+            b = IntegerField()
+            args = ListField(IntegerField())
+            kwargs = NestedField(Kwargs())
 
-        def assert_field_dump_args(data, expect=None, **kwargs):
-            catalyst = create_catalyst(**kwargs)
-            self.assertEqual(catalyst.dump(data, True).valid_data, expect)
+        a = A()
 
-        # default dump behavior
-        # missing field will raise error
-        catalyst = create_catalyst()
-        with self.assertRaises(ValidationError):
-            catalyst.dump(None, True)
-        with self.assertRaises(ValidationError):
-            catalyst.dump({}, True)
-        # allow None
-        assert_field_dump_args({'s': None}, {'s': None})
+        @a.load_args
+        def func_1(a, *args, b=1, **kwargs):
+            return a + sum(args) + b + kwargs['c']
 
-        # ignore missing field
-        assert_field_dump_args({}, {}, dump_required=False)
-        assert_field_dump_args(None, {}, dump_required=False)
+        self.assertEqual(func_1('1', '2', b='3', c='4'), 10)
+        # raise error if kwargs are invalid
+        with self.assertRaises(ValidationError) as ctx:
+            func_1('x', 'x', b='3', c='x')
+        self.assertEqual(set(ctx.exception.msg.errors), {'a', 'args', 'kwargs'})
 
-        # default value for missing field
-        assert_field_dump_args({}, {'s': 'default'}, dump_default='default')
-        assert_field_dump_args({'s': '1'}, {'s': '1'}, dump_default='default')
-        assert_field_dump_args({}, {'s': None}, dump_default=None)
-        # callable default
-        assert_field_dump_args({}, {'s': '1'}, dump_default=lambda: '1')
+        @a.dump_args
+        def func_3(a, *args, b=1, **kwargs):
+            return a + sum(args) + b + kwargs['c']
 
-        # dump_required has no effect if dump_default is set
-        assert_field_dump_args({}, {'s': None}, dump_required=True, dump_default=None)
+        self.assertEqual(func_3(1, 2, b=3, c=4), 10)
+        self.assertEqual(func_3('1', 2, b=3, c=4), 10)
 
-        # pass None to formatter
-        assert_field_dump_args({'s': None}, {'s': 'None'}, format_none=True)
-        assert_field_dump_args({}, {'s': 'None'}, format_none=True, dump_default=None)
-        assert_field_dump_args({'s': None}, {'s': 'None'}, format_none=True, allow_none=False)
+        a_2 = A(all_errors=False)
+        @a_2.load_args
+        def func_2(a, *args, b=1, **kwargs):
+            return a + sum(args) + b + kwargs['c']
 
-        # no_dump means ignore this field
-        assert_field_dump_args({'s': 1}, {}, no_dump=True)
+        self.assertEqual(func_2(1, 2, b=3, c=4), 10)
+        # don't collect error
+        with self.assertRaises(ValidationError) as ctx:
+            func_2('x', 'x', b='3', c='x')
+        self.assertEqual(len(ctx.exception.msg.errors), 1)
 
-        def assert_field_load_args(data, expect=None, **kwargs):
-            catalyst = create_catalyst(**kwargs)
-            self.assertEqual(catalyst.load(data, True).valid_data, expect)
+    def test_load_and_dump_many(self):
+        class C(Catalyst):
+            s = StringField(min_length=1, max_length=2)
 
-        # default load behavior
-        # missing field will be excluded
-        assert_field_load_args({}, {})
-        # allow None
-        assert_field_load_args({'s': None}, {'s': None})
+        c = C()
 
-        # default value for missing field
-        assert_field_load_args({}, {'s': None}, load_default=None)
-        assert_field_load_args({}, {'s': '1'}, load_default=1)
-        # callable default
-        assert_field_load_args({}, {'s': '1'}, load_default=lambda: 1)
+        data = [{'s': 's'} for _ in range(5)]
+        result = c.dump_many(data)
+        self.assertListEqual(result.valid_data, data)
+        result = c.dump_many(data, raise_error=True)
+        self.assertTrue(result.is_valid)
 
-        # invalid when required field is missing
-        with self.assertRaises(ValidationError):
-            assert_field_load_args({}, load_required=True)
+        result = c.load_many(data)
+        self.assertTrue(result.is_valid)
+        self.assertEqual(result.valid_data, data)
+        self.assertFalse(result.errors)
+        self.assertFalse(result.invalid_data)
 
-        # load_required has no effect if load_default is set
-        assert_field_load_args({}, {'s': None}, load_required=True, load_default=None)
+        result = c.load_many(data, raise_error=True)
+        self.assertTrue(result.is_valid)
 
-        # pass None to parser and validators
-        assert_field_load_args({'s': None}, {'s': 'None'}, parse_none=True)
-        assert_field_load_args({}, {'s': 'None'}, parse_none=True, load_default=None)
-        assert_field_load_args({'s': None}, {'s': 'None'}, parse_none=True, allow_none=False)
+        data[2]['s'] = ''
+        data[3]['s'] = 'sss'
 
-        # always invalid if load_default is None and allow_none is False
-        with self.assertRaises(ValidationError):
-            assert_field_load_args({}, allow_none=False, load_default=None)
+        result = c.load_many(data)
+        self.assertEqual(set(result.errors), {2, 3})
+        self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
 
-        # no_load means ignore this field
-        assert_field_load_args({'s': 1}, {}, no_load=True)
+        with self.assertRaises(ValidationError) as ctx:
+            c.load_many(data, raise_error=True)
+        result = ctx.exception.msg
+        self.assertEqual(set(result.errors), {2, 3})
+        self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
+
+        c_2 = C(all_errors=False)
+        result = c_2.load_many(data)
+        self.assertEqual(set(result.errors), {2})
+        self.assertDictEqual(result.invalid_data, {2: {'s': ''}})
+
+        result = c.load_many(1)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(result.valid_data, [])
+        self.assertEqual(result.invalid_data, 1)
+        self.assertEqual(set(result.errors), {'load_many'})
+
+        result = c.load_many([1, {}])
+        self.assertFalse(result.is_valid)
+        self.assertEqual(result.valid_data, [{}, {}])
+        self.assertEqual(result.invalid_data, {0: 1})
+        self.assertEqual(set(result.errors), {0})
+        self.assertEqual(set(result.errors[0]), {'load'})
+
+
+        c = C(process_aliases={'load_many': 'xxx'})
+        result = c.load_many(1)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(set(result.errors), {'xxx'})
 
     def test_pre_and_post_process(self):
         class C(Catalyst):
@@ -627,171 +591,6 @@ class CatalystTest(TestCase):
         self.assertListEqual(result.invalid_data, [{}, {}, {}])
 
         c.process_aliases.clear()
-
-    def test_load_and_dump_args(self):
-        class Kwargs(Catalyst):
-            c = IntegerField()
-        class A(Catalyst):
-            a = IntegerField()
-            b = IntegerField()
-            args = ListField(IntegerField())
-            kwargs = NestedField(Kwargs())
-
-        a = A()
-
-        @a.load_args
-        def func_1(a, *args, b=1, **kwargs):
-            return a + sum(args) + b + kwargs['c']
-
-        self.assertEqual(func_1('1', '2', b='3', c='4'), 10)
-        # raise error if kwargs are invalid
-        with self.assertRaises(ValidationError) as ctx:
-            func_1('x', 'x', b='3', c='x')
-        self.assertEqual(set(ctx.exception.msg.errors), {'a', 'args', 'kwargs'})
-
-        @a.dump_args
-        def func_3(a, *args, b=1, **kwargs):
-            return a + sum(args) + b + kwargs['c']
-
-        self.assertEqual(func_3(1, 2, b=3, c=4), 10)
-        self.assertEqual(func_3('1', 2, b=3, c=4), 10)
-
-        a_2 = A(all_errors=False)
-        @a_2.load_args
-        def func_2(a, *args, b=1, **kwargs):
-            return a + sum(args) + b + kwargs['c']
-
-        self.assertEqual(func_2(1, 2, b=3, c=4), 10)
-        # don't collect error
-        with self.assertRaises(ValidationError) as ctx:
-            func_2('x', 'x', b='3', c='x')
-        self.assertEqual(len(ctx.exception.msg.errors), 1)
-
-    def test_load_and_dump_many(self):
-        class C(Catalyst):
-            s = StringField(min_length=1, max_length=2)
-
-        c = C()
-
-        data = [{'s': 's'} for _ in range(5)]
-        result = c.dump_many(data)
-        self.assertListEqual(result.valid_data, data)
-        result = c.dump_many(data, raise_error=True)
-        self.assertTrue(result.is_valid)
-
-        result = c.load_many(data)
-        self.assertTrue(result.is_valid)
-        self.assertEqual(result.valid_data, data)
-        self.assertFalse(result.errors)
-        self.assertFalse(result.invalid_data)
-
-        result = c.load_many(data, raise_error=True)
-        self.assertTrue(result.is_valid)
-
-        data[2]['s'] = ''
-        data[3]['s'] = 'sss'
-
-        result = c.load_many(data)
-        self.assertEqual(set(result.errors), {2, 3})
-        self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
-
-        with self.assertRaises(ValidationError) as ctx:
-            c.load_many(data, raise_error=True)
-        result = ctx.exception.msg
-        self.assertEqual(set(result.errors), {2, 3})
-        self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
-
-        c_2 = C(all_errors=False)
-        result = c_2.load_many(data)
-        self.assertEqual(set(result.errors), {2})
-        self.assertDictEqual(result.invalid_data, {2: {'s': ''}})
-
-        result = c.load_many(1)
-        self.assertFalse(result.is_valid)
-        self.assertEqual(result.valid_data, [])
-        self.assertEqual(result.invalid_data, 1)
-        self.assertEqual(set(result.errors), {'load_many'})
-
-        result = c.load_many([1, {}])
-        self.assertFalse(result.is_valid)
-        self.assertEqual(result.valid_data, [{}, {}])
-        self.assertEqual(result.invalid_data, {0: 1})
-        self.assertEqual(set(result.errors), {0})
-        self.assertEqual(set(result.errors[0]), {'load'})
-
-        c.process_aliases['load_many'] = 'xxx'
-        result = c.load_many(1)
-        self.assertFalse(result.is_valid)
-        self.assertEqual(set(result.errors), {'xxx'})
-        test_catalyst.process_aliases.clear()
-
-    def test_list_field(self):
-        class C(Catalyst):
-            nums = ListField(IntegerField())
-
-        c = C()
-
-        data = {'nums': [1, '2', 3.0]}
-
-        result = c.dump(data)
-        self.assertEqual(result.valid_data['nums'], [1, 2, 3])
-
-        result = c.load(data)
-        self.assertEqual(result.valid_data['nums'], [1, 2, 3])
-
-        data['nums'] = [1, 'x', 3]
-
-        result = c.dump(data)
-        self.assertFalse(result.is_valid)
-        self.assertEqual(result.valid_data['nums'], [1, 3])
-        self.assertEqual(result.invalid_data['nums'][1], 'x')
-        self.assertIsInstance(result.errors['nums'][1], ValueError)
-
-        result = c.load(data)
-        self.assertFalse(result.is_valid)
-        self.assertEqual(result.valid_data['nums'], [1, 3])
-        self.assertEqual(result.invalid_data['nums'][1], 'x')
-        self.assertIsInstance(result.errors['nums'][1], ValueError)
-
-    def test_nested_field(self):
-        class User(Catalyst):
-            uid = IntegerField()
-            name = StringField()
-
-        user_catalyst = User()
-
-        class Article(Catalyst):
-            title = StringField()
-            content = StringField()
-            author = NestedField(user_catalyst)
-
-        catalyst = Article()
-
-        data = {
-            'title': 'x',
-            'content': 'x',
-            'author': {
-                'uid': 1,
-                'name': 'x'
-            }
-        }
-        r = catalyst.dump(data)
-        self.assertEqual(data, r.valid_data)
-        r = catalyst.load(data)
-        self.assertEqual(data, r.valid_data)
-
-        invalid_data = {
-            'title': 'x',
-            'content': 'x',
-            'author': {
-                'uid': 'x',
-                'name': 'x'
-            }
-        }
-        r = catalyst.load(invalid_data)
-        self.assertDictEqual(r.valid_data, {'author': {'name': 'x'}, 'content': 'x', 'title': 'x'})
-        self.assertDictEqual(r.invalid_data, {'author': {'uid': 'x'}})
-        self.assertEqual(set(r.errors['author']), {'uid'})
 
     def test_except_exception(self):
         catalyst = Catalyst(
