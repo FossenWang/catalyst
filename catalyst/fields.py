@@ -1,6 +1,9 @@
 """Field classes for various types of data."""
 
 import decimal
+import inspect
+from functools import partial
+
 from typing import (
     Any, Iterable, Union, Mapping, Hashable, Dict,
     Callable as CallableType,
@@ -19,8 +22,6 @@ from .validators import (
 )
 from .exceptions import ValidationError, ExceptionType
 
-
-FormatterType = ParserType = CallableType[[Any], Any]
 
 ValidatorType = CallableType[[Any], None]
 
@@ -69,8 +70,8 @@ class Field(ErrorMessageMixin):
             self,
             name: str = None,
             key: str = None,
-            formatter: FormatterType = None,
-            parser: ParserType = None,
+            formatter: CallableType = None,
+            parser: CallableType = None,
             format_none: bool = None,
             parse_none: bool = None,
             dump_required: bool = None,
@@ -107,17 +108,30 @@ class Field(ErrorMessageMixin):
         self.set_validators(validators if validators else self.validators)
         self.collect_error_messages(error_messages)
 
-    def set_formatter(self, formatter: FormatterType):
-        if not callable(formatter):
-            raise TypeError('Argument `formatter` must be Callable.')
-        setattr(self, 'formatter', formatter)
-        return formatter
+    def override_method(self, func, attr):
+        """Override a method of the field instance. Inject field instance or covered method
+        as argments into the function according to argument name.
 
-    def set_parser(self, parser: ParserType):
-        if not callable(parser):
-            raise TypeError('Argument `parser` must be Callable.')
-        setattr(self, 'parser', parser)
-        return parser
+        :param func: The function to override.
+        :param attr: The attribute to be overrided.
+        """
+        sig = inspect.signature(func)
+        kwargs = {}
+        if 'field' in sig.parameters:
+            kwargs['field'] = self
+        if 'original_method' in sig.parameters:
+            kwargs['original_method'] = getattr(self, attr)
+        if kwargs:
+            func = partial(func, **kwargs)
+
+        setattr(self, attr, func)
+        return func
+
+    def set_formatter(self, func: CallableType):
+        return self.override_method(func, 'formatter')
+
+    def set_parser(self, func: CallableType):
+        return self.override_method(func, 'parser')
 
     @staticmethod
     def ensure_validators(validators: MultiValidator) -> list:

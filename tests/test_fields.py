@@ -25,8 +25,9 @@ class FieldTest(TestCase):
 
             @staticmethod
             @fixed_value.set_parser
-            def fixed_value_add_1(value):
-                return value + 1
+            def fixed_value_add_1(value, field, original_method):
+                assert field is A.fixed_value
+                return original_method(value) + 1
 
             @staticmethod
             @fixed_value.set_validators
@@ -77,7 +78,7 @@ class FieldTest(TestCase):
             formatter=A.fixed_value_formatter,
             parser=a.fixed_value.parser)
         self.assertEqual(field.formatter, A.fixed_value_formatter)
-        self.assertEqual(field.parser, A.fixed_value_add_1)
+        self.assertEqual(field.parser.func, A.fixed_value_add_1.func)
 
         # test error msg
         field = Field(key='a', allow_none=False, error_messages={'none': '666'})
