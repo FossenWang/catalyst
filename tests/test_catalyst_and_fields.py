@@ -1,13 +1,15 @@
 from unittest import TestCase
 
 from catalyst.core import Catalyst
-from catalyst.fields import Field, StringField, IntegerField, \
-    ListField, NestedField
 from catalyst.exceptions import ValidationError
 from catalyst.utils import snake_to_camel
+from catalyst.fields import Field, StringField, IntegerField, ListField, NestedField
+from catalyst.groups import FieldGroup
 
 
 class CatalystAndFieldsTest(TestCase):
+    """Integration tests for Catalyst and Field and FieldGroup."""
+
     def test_field_naming_style(self):
         # change field key naming style
         class A(Catalyst):
@@ -203,3 +205,31 @@ class CatalystAndFieldsTest(TestCase):
         self.assertDictEqual(r.valid_data, {'author': {'name': 'x'}, 'content': 'x', 'title': 'x'})
         self.assertDictEqual(r.invalid_data, {'author': {'uid': 'x'}})
         self.assertEqual(set(r.errors['author']), {'uid'})
+
+    def test_field_group(self):
+        class C(Catalyst):
+            num = IntegerField()
+            no_extra = FieldGroup(declared_fields=['num'])
+
+            @staticmethod
+            @no_extra.set_load
+            def check_no_extra(data, original_data, field: FieldGroup = None):
+                extra_fields = set(original_data) - set(field.declared_fields)
+                if extra_fields:
+                    extra_fields = "', '".join(extra_fields)
+                    raise ValidationError(f"Invalid fields: '{extra_fields}'.")
+                return data
+
+        self.assertEqual(set(C.no_extra.fields), {'num'})
+        self.assertEqual(C.no_extra.fields['num'], C.num)
+
+        c = C(all_errors=False)
+
+        data = {'num': 1}
+        result = c.load(data)
+        self.assertTrue(result.is_valid)
+
+        invalid_data = {'num': 1, 'x': 2, 'y': 3}
+        result = c.load(invalid_data)
+        self.assertFalse(result.is_valid)
+        self.assertIn('no_extra', result.errors)

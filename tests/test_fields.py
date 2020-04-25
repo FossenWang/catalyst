@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from catalyst import Catalyst
 from catalyst.fields import (
-    Field, StringField, IntegerField, FloatField,
+    BaseField, Field, StringField, IntegerField, FloatField,
     BooleanField, ListField, CallableField,
     DatetimeField, TimeField, DateField,
     NestedField, DecimalField,
@@ -14,6 +14,12 @@ from catalyst.exceptions import ValidationError
 
 class FieldTest(TestCase):
     def test_field(self):
+        field = BaseField()
+        with self.assertRaises(NotImplementedError):
+            field.load()
+        with self.assertRaises(NotImplementedError):
+            field.dump()
+
         # test set field opts in class
         class A:
             fixed_value = Field(validators=[])

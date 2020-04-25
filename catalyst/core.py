@@ -2,11 +2,12 @@
 
 import inspect
 
-from typing import Dict, Iterable, Callable, Sequence, Any, Mapping
+from typing import Iterable, Callable, Sequence, Any, Mapping
 from functools import wraps, partial
 
 from .base import CatalystABC
-from .fields import Field
+from .fields import BaseField, FieldDict
+from .groups import FieldGroup
 from .exceptions import ValidationError, ExceptionType
 from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,
@@ -14,19 +15,16 @@ from .utils import (
 )
 
 
-FieldDict = Dict[str, Field]
-
-
 def _get_fields(fields: dict):
     """Collect fields from dict."""
     new_fields: FieldDict = {}
     for name, field in fields.items():
-        if isinstance(field, type) and issubclass(field, Field):
+        if isinstance(field, type) and issubclass(field, BaseField):
             raise TypeError(
                 f'Field for "{name}" must be declared as a Field instance, '
                 f'not a class. Did you mean "{field.__name__}()"?')
 
-        if isinstance(field, Field):
+        if isinstance(field, BaseField):
             new_fields[name] = field
     return new_fields
 
@@ -61,6 +59,11 @@ def _set_fields(cls_or_obj, fields: FieldDict):
             field.name = cls_or_obj._format_field_name(attr)
         if field.key is None:
             field.key = cls_or_obj._format_field_key(attr)
+
+        # inject fields that FieldGroup declared
+        if isinstance(field, FieldGroup):
+            field.set_fields(fields)
+
     cls_or_obj.fields = fields
 
 
@@ -238,6 +241,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             all_errors: bool,
             assign_getter: Callable,
             partial_fields: Iterable[tuple],
+            partial_groups: Iterable[tuple],
             except_exception: ExceptionType):
         """Process one object using fields and catalyst options."""
         # According to the type of `data`, assign a function to get field value from `data`
@@ -245,7 +249,8 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
 
         valid_data, errors, invalid_data = {}, {}, {}
 
-        for field, source, target, required, default, field_handle in partial_fields:
+        # process data for each fields
+        for field, source, target, required, default, field_method in partial_fields:
             raw_value = missing
             try:
                 if callable(default):
@@ -254,10 +259,9 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                 if raw_value is missing:
                     if required:
                         field.error('required')
-                    else:
-                        continue
+                    continue
 
-                valid_data[target] = field_handle(raw_value)
+                valid_data[target] = field_method(raw_value)
             except except_exception as e:
                 # collect errors and invalid data
                 if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
@@ -272,6 +276,22 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                 if not all_errors:
                     break
 
+        # field groups depend on fields, if error occurs, do not continue
+        if errors:
+            return valid_data, errors, invalid_data
+
+        # process data for each field groups
+        for group_method, error_key, source_target_pairs in partial_groups:
+            try:
+                valid_data = group_method(valid_data, data)
+            except except_exception as e:
+                # set error and move invalid data
+                errors[error_key] = e
+                for source, target in source_target_pairs:
+                    if target in valid_data:
+                        invalid_data[source] = valid_data.pop(target)
+                if not all_errors:
+                    break
         return valid_data, errors, invalid_data
 
     @staticmethod
@@ -313,7 +333,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             if name == 'dump':
                 assign_getter = self._assign_dump_getter
                 field_dict = self._dump_fields
-                field_method = self.dump_method
+                field_method_name = self.dump_method
                 source_attr = 'name'
                 target_attr = 'key'
                 default_attr = 'dump_default'
@@ -321,25 +341,38 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             else:
                 assign_getter = self._assign_load_getter
                 field_dict = self._load_fields
-                field_method = self.load_method
+                field_method_name = self.load_method
                 source_attr = 'key'
                 target_attr = 'name'
                 default_attr = 'load_default'
                 required_attr = 'load_required'
 
-            partial_fields = []
+            partial_fields, partial_groups = [], []
             for field in field_dict.values():
+                if isinstance(field, FieldGroup):
+                    group: FieldGroup = field
+                    group_method = getattr(group, method_name)
+                    error_key = getattr(group, source_attr)
+                    source_target_pairs = []
+                    for f in group.fields.values():
+                        source = getattr(f, source_attr)
+                        target = getattr(f, target_attr)
+                        source_target_pairs.append((source, target))
+                    partial_groups.append((group_method, error_key, source_target_pairs))
+                    continue
+
                 source = getattr(field, source_attr)
                 target = getattr(field, target_attr)
                 required = getattr(field, required_attr)
                 default = getattr(field, default_attr)
-                field_handle = getattr(field, field_method)
-                partial_fields.append((field, source, target, required, default, field_handle))
+                field_method = getattr(field, field_method_name)
+                partial_fields.append((field, source, target, required, default, field_method))
             main_process = partial(
                 self._process_one,
                 all_errors=all_errors,
                 assign_getter=assign_getter,
                 partial_fields=partial_fields,
+                partial_groups=partial_groups,
                 except_exception=except_exception)
 
         # assign params as closure variables for processor

@@ -28,84 +28,23 @@ ValidatorType = CallableType[[Any], None]
 MultiValidator = Union[ValidatorType, Iterable[ValidatorType]]
 
 
-class Field(ErrorMessageMixin):
-    """Basic field class for converting objects.
-
-    Instantiation params can set default values by class variables.
-
-    :param name:
-    :param key:
-    :param formatter:
-    :param parser:
-    :param format_none:
-    :param parse_none:
-    :param dump_required:
-    :param load_required:
-    :param dump_default: If set, `dumo_required` has no effect.
-    :param load_default: Similar to `dump_default`
-    :param no_dump:
-    :param no_load:
-    :param validators:
-    :param allow_none:
-    :param error_messages: Keys {'required', 'none'}.
-    """
-    formatter = staticmethod(no_processing)
-    parser = staticmethod(no_processing)
-    format_none = False
-    parse_none = False
-    dump_required = True
-    load_required = False
-    dump_default = missing
-    load_default = missing
+class BaseField(ErrorMessageMixin):
+    name: str
+    key: str
     no_dump = False
     no_load = False
-    validators = []
-    allow_none = True
-    error_messages = {
-        'required': 'Missing data for required field.',
-        'none': 'Field may not be None.',
-    }
 
     def __init__(
             self,
             name: str = None,
             key: str = None,
-            formatter: CallableType = None,
-            parser: CallableType = None,
-            format_none: bool = None,
-            parse_none: bool = None,
-            dump_required: bool = None,
-            load_required: bool = None,
-            dump_default: Any = missing,
-            load_default: Any = missing,
             no_dump: bool = None,
             no_load: bool = None,
-            validators: MultiValidator = None,
-            allow_none: bool = None,
             error_messages: Dict[str, str] = None,
             **kwargs):
         self.name = name
         self.key = key
-        bind_attrs(
-            self,
-            format_none=format_none,
-            parse_none=parse_none,
-            dump_required=dump_required,
-            load_required=load_required,
-            no_dump=no_dump,
-            no_load=no_load,
-            allow_none=allow_none,
-            **kwargs,
-        )
-        if dump_default is not missing:
-            self.dump_default = dump_default
-        if load_default is not missing:
-            self.load_default = load_default
-        if formatter is not None:
-            self.set_formatter(formatter)
-        if parser is not None:
-            self.set_parser(parser)
-        self.set_validators(validators if validators else self.validators)
+        bind_attrs(self, no_dump=no_dump, no_load=no_load, **kwargs)
         self.collect_error_messages(error_messages)
 
     def override_method(self, func, attr):
@@ -126,6 +65,96 @@ class Field(ErrorMessageMixin):
 
         setattr(self, attr, func)
         return func
+
+    def dump(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def load(self, *args, **kwargs):
+        raise NotImplementedError()
+
+
+class Field(BaseField):
+    """Basic field class for converting objects.
+
+    Instantiation params can set default values by class variables.
+
+    :param name:
+    :param key:
+    :param formatter:
+    :param parser:
+    :param format_none:
+    :param parse_none:
+    :param dump_required:
+    :param load_required:
+    :param dump_default: If set, `dump_required` has no effect.
+    :param load_default: Similar to `dump_default`
+    :param no_dump:
+    :param no_load:
+    :param validators:
+    :param allow_none:
+    :param error_messages: Keys {'required', 'none'}.
+    """
+    formatter = staticmethod(no_processing)
+    parser = staticmethod(no_processing)
+    format_none = False
+    parse_none = False
+    dump_required = True
+    load_required = False
+    dump_default = missing
+    load_default = missing
+    validators = []
+    allow_none = True
+    error_messages = {
+        'required': 'Missing data for required field.',
+        'none': 'Field may not be None.',
+    }
+
+    dump_source = property(lambda self: self.name)
+    dump_target = property(lambda self: self.key)
+    load_source = property(lambda self: self.key)
+    load_target = property(lambda self: self.name)
+
+    def __init__(
+            self,
+            name: str = None,
+            key: str = None,
+            formatter: CallableType = None,
+            parser: CallableType = None,
+            format_none: bool = None,
+            parse_none: bool = None,
+            dump_required: bool = None,
+            load_required: bool = None,
+            dump_default: Any = missing,
+            load_default: Any = missing,
+            no_dump: bool = None,
+            no_load: bool = None,
+            validators: MultiValidator = None,
+            allow_none: bool = None,
+            error_messages: Dict[str, str] = None,
+            **kwargs):
+        super().__init__(
+            name=name,
+            key=key,
+            format_none=format_none,
+            parse_none=parse_none,
+            dump_required=dump_required,
+            load_required=load_required,
+            no_dump=no_dump,
+            no_load=no_load,
+            allow_none=allow_none,
+            **kwargs,
+        )
+
+        if dump_default is not missing:
+            self.dump_default = dump_default
+        if load_default is not missing:
+            self.load_default = load_default
+        if formatter is not None:
+            self.set_formatter(formatter)
+        if parser is not None:
+            self.set_parser(parser)
+        self.set_validators(validators if validators else self.validators)
+        self.collect_error_messages(error_messages)
 
     def set_formatter(self, func: CallableType):
         return self.override_method(func, 'formatter')
@@ -501,6 +530,10 @@ class NestedField(Field):
 
     def parser(self, value):
         return self._do_load(value, raise_error=True).valid_data
+
+
+# typing hint
+FieldDict = Dict[str, BaseField]
 
 
 # Aliases
