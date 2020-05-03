@@ -1,7 +1,7 @@
 from typing import Callable
 
 from .fields import BaseField, Field, FieldDict
-from .utils import copy_keys
+from .utils import copy_keys, bind_attrs
 
 
 class FieldGroup(BaseField):
@@ -9,7 +9,8 @@ class FieldGroup(BaseField):
     declared_fields = []
 
     def __init__(self, declared_fields: list = None, **kwargs):
-        super().__init__(declared_fields=declared_fields, **kwargs)
+        super().__init__(**kwargs)
+        bind_attrs(self, declared_fields=declared_fields)
 
     def set_fields(self, fields: FieldDict):
         new_fields = {}

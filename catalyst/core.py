@@ -158,8 +158,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             dump_include: Iterable[str] = None,
             dump_exclude: Iterable[str] = None,
             load_include: Iterable[str] = None,
-            load_exclude: Iterable[str] = None,
-            **kwargs):
+            load_exclude: Iterable[str] = None):
         bind_attrs(
             self,
             schema=schema,
@@ -169,7 +168,6 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             all_errors=all_errors,
             process_aliases=process_aliases,
             except_exception=except_exception,
-            **kwargs,
         )
 
         if self.dump_method not in {'dump', 'format', 'validate'}:

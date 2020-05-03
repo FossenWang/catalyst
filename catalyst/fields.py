@@ -40,12 +40,11 @@ class BaseField(ErrorMessageMixin):
             key: str = None,
             no_dump: bool = None,
             no_load: bool = None,
-            error_messages: Dict[str, str] = None,
-            **kwargs):
+            error_messages: Dict[str, str] = None):
         self.name = name
         self.key = key
-        bind_attrs(self, no_dump=no_dump, no_load=no_load, **kwargs)
         self.collect_error_messages(error_messages)
+        bind_attrs(self, no_dump=no_dump, no_load=no_load)
 
     def override_method(self, func, attr):
         """Override a method of the field instance. Inject field instance or covered method
@@ -116,8 +115,6 @@ class Field(BaseField):
 
     def __init__(
             self,
-            name: str = None,
-            key: str = None,
             formatter: CallableType = None,
             parser: CallableType = None,
             format_none: bool = None,
@@ -126,23 +123,17 @@ class Field(BaseField):
             load_required: bool = None,
             dump_default: Any = missing,
             load_default: Any = missing,
-            no_dump: bool = None,
-            no_load: bool = None,
             validators: MultiValidator = None,
             allow_none: bool = None,
-            error_messages: Dict[str, str] = None,
             **kwargs):
-        super().__init__(
-            name=name,
-            key=key,
+        super().__init__(**kwargs)
+        bind_attrs(
+            self,
             format_none=format_none,
             parse_none=parse_none,
             dump_required=dump_required,
             load_required=load_required,
-            no_dump=no_dump,
-            no_load=no_load,
             allow_none=allow_none,
-            **kwargs,
         )
 
         if dump_default is not missing:
@@ -154,7 +145,6 @@ class Field(BaseField):
         if parser is not None:
             self.set_parser(parser)
         self.set_validators(validators if validators else self.validators)
-        self.collect_error_messages(error_messages)
 
     def set_formatter(self, func: CallableType):
         return self.override_method(func, 'formatter')
@@ -235,6 +225,10 @@ class StringField(Field):
             regex: str = None,
             **kwargs):
         super().__init__(**kwargs)
+        self.min_length = min_length
+        self.max_length = max_length
+        self.regex = regex
+
         if min_length is not None or max_length is not None:
             msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
             self.add_validator(LengthValidator(min_length, max_length, msg_dict))
@@ -256,6 +250,9 @@ class NumberField(Field):
 
     def __init__(self, minimum=None, maximum=None, **kwargs):
         super().__init__(**kwargs)
+        self.minimum = minimum
+        self.maximum = maximum
+
         if minimum is not None or maximum is not None:
             msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
             self.add_validator(RangeValidator(minimum, maximum, msg_dict))
@@ -298,8 +295,9 @@ class DecimalField(NumberField):
             rounding: str = None,
             dump_as: type = None,
             **kwargs):
-        super().__init__(
-            scale=scale, rounding=rounding, dump_as=dump_as, **kwargs)
+        super().__init__(**kwargs)
+        bind_attrs(self, scale=scale, rounding=rounding, dump_as=dump_as)
+
         if not callable(self.dump_as):
             raise TypeError('`dump_as` must be callable.')
         scale = self.scale
@@ -333,7 +331,8 @@ class BooleanField(Field):
     }
 
     def __init__(self, value_map: dict = None, **kwargs):
-        super().__init__(value_map=value_map, **kwargs)
+        super().__init__(**kwargs)
+        bind_attrs(self, value_map=value_map)
         self.reverse_value_map = {
             raw: parsed
             for parsed, raw_values in self.value_map.items()
@@ -361,7 +360,10 @@ class DatetimeField(Field):
     fmt = r'%Y-%m-%d %H:%M:%S.%f'
 
     def __init__(self, fmt: str = None, minimum=None, maximum=None, **kwargs):
-        super().__init__(fmt=fmt, **kwargs)
+        super().__init__(**kwargs)
+        bind_attrs(self, fmt=fmt)
+        self.minimum = minimum
+        self.maximum = maximum
         if minimum is not None or maximum is not None:
             msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
             self.add_validator(RangeValidator(minimum, maximum, msg_dict))
@@ -452,12 +454,14 @@ class ListField(Field):
             load_method: str = None,
             all_errors: bool = None,
             **kwargs):
-        super().__init__(
+        super().__init__(**kwargs)
+        bind_attrs(
+            self,
             item_field=item_field,
             dump_method=dump_method,
             load_method=load_method,
             all_errors=all_errors,
-            **kwargs)
+        )
         item_field = self.item_field
         if not isinstance(item_field, Field):
             raise TypeError(
@@ -514,7 +518,9 @@ class NestedField(Field):
     parse_none = True
 
     def __init__(self, catalyst: CatalystABC = None, many: bool = None, **kwargs):
-        super().__init__(catalyst=catalyst, many=many, **kwargs)
+        super().__init__(**kwargs)
+        bind_attrs(self, catalyst=catalyst, many=many)
+
         catalyst = self.catalyst
         if not isinstance(catalyst, CatalystABC):
             raise TypeError(f'Argument `catalyst` must be a `Catalyst` instance, not {catalyst}.')
