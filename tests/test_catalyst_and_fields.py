@@ -212,11 +212,16 @@ class CatalystAndFieldsTest(TestCase):
             no_extra = FieldGroup(declared_fields=['num'])
 
             @staticmethod
+            @no_extra.set_dump
+            def no_inject_args(data, **kwargs):
+                assert not kwargs
+                return data
+
+            @staticmethod
             @no_extra.set_load
             def check_no_extra(data, original_data, field: FieldGroup = None):
                 extra_fields = set(original_data) - set(field.declared_fields)
                 if extra_fields:
-                    extra_fields = "', '".join(extra_fields)
                     raise ValidationError(f"Invalid fields: '{extra_fields}'.")
                 return data
 
@@ -225,8 +230,10 @@ class CatalystAndFieldsTest(TestCase):
 
         c = C(all_errors=False)
 
-        data = {'num': 1}
-        result = c.load(data)
+        valid_data = {'num': 1}
+        result = c.load(valid_data)
+        self.assertTrue(result.is_valid)
+        result = c.dump(valid_data)
         self.assertTrue(result.is_valid)
 
         invalid_data = {'num': 1, 'x': 2, 'y': 3}

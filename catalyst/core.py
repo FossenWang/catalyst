@@ -352,6 +352,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                 if isinstance(field, FieldGroup):
                     group: FieldGroup = field
                     group_method = getattr(group, method_name)
+                    group_method = self._modify_processer_parameters(group_method)
                     error_key = getattr(group, source_attr)
                     source_target_pairs = []
                     for f in group.fields.values():
@@ -380,6 +381,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         post_process_name = f'post_{method_name}'
         pre_process = getattr(self, pre_process_name)
         post_process = getattr(self, post_process_name)
+        post_process = self._modify_processer_parameters(post_process)
         process_aliases = self.process_aliases
         default_raise_error = self.raise_error
 
@@ -416,6 +418,18 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             return result
 
         return integrated_process
+
+    def _modify_processer_parameters(self, func):
+        """Modify the parameters of the processer function.
+        Ignore `original_data` if it's not one of the parameters.
+        """
+        sig = inspect.signature(func)
+        if 'original_data' not in sig.parameters:
+            @wraps(func)
+            def wrapper(data, original_data=None):
+                return func(data)
+            return wrapper
+        return func
 
     def _process_args(self, func: Callable, processor: Callable) -> Callable:
         """Decorator for handling args by catalyst before function is called.

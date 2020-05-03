@@ -24,7 +24,7 @@ class GroupsTest(TestCase):
 
         @group.set_dump
         @group.set_load
-        def test_override(data, original_data=None):
+        def test_override(data):
             data['xxx'] = 1
             return data
 

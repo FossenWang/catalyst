@@ -495,7 +495,8 @@ class CatalystTest(TestCase):
                 return self.pre_load(obj)
 
             def post_dump(self, data, original_data):
-                return self.post_load(data, original_data)
+                assert original_data is not None
+                return self.post_load(data)
 
             def pre_load(self, data):
                 keys = {field.key for field in self._load_fields.values()}
@@ -504,7 +505,7 @@ class CatalystTest(TestCase):
                     raise ValidationError(f'This keys should not be present: {extra_keys}.')
                 return data
 
-            def post_load(self, data, original_data):
+            def post_load(self, data):
                 if data['max_value'] < data['min_value']:
                     raise ValidationError('"max_value" must be larger than "min_value".')
                 return data
