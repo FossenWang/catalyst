@@ -5,6 +5,7 @@ from .utils import copy_keys, bind_attrs
 
 
 class FieldGroup(BaseField):
+    """Field group."""
     fields: FieldDict
     declared_fields = []
 
@@ -35,6 +36,7 @@ class FieldGroup(BaseField):
 
 
 class ComparisonFieldGroup(FieldGroup):
+    """Compare the values of two fields."""
     no_dump = True
     error_messages = {
         '>': '"{a}" must be greater than "{b}".',

@@ -93,8 +93,6 @@ class Field(BaseField):
     :param allow_none:
     :param error_messages: Keys {'required', 'none'}.
     """
-    formatter = staticmethod(no_processing)
-    parser = staticmethod(no_processing)
     format_none = False
     parse_none = False
     dump_required = True
@@ -141,16 +139,16 @@ class Field(BaseField):
         if load_default is not missing:
             self.load_default = load_default
         if formatter is not None:
-            self.set_formatter(formatter)
+            self.set_format(formatter)
         if parser is not None:
-            self.set_parser(parser)
+            self.set_parse(parser)
         self.set_validators(validators if validators else self.validators)
 
-    def set_formatter(self, func: CallableType):
-        return self.override_method(func, 'formatter')
+    def set_format(self, func: CallableType):
+        return self.override_method(func, 'format')
 
-    def set_parser(self, func: CallableType):
-        return self.override_method(func, 'parser')
+    def set_parse(self, func: CallableType):
+        return self.override_method(func, 'parse')
 
     @staticmethod
     def ensure_validators(validators: MultiValidator) -> list:
@@ -183,26 +181,27 @@ class Field(BaseField):
             validator(value)
         return value
 
+    validate_dump = staticmethod(no_processing)
+    validate_load = validate
+
     def format(self, value):
-        if value is None and not self.format_none:
-            return None
-        value = self.formatter(value)
         return value
 
     def dump(self, value):
-        self.validate(value)
-        value = self.format(value)
+        self.validate_dump(value)
+
+        if value is not None or self.format_none:
+            value = self.format(value)
         return value
 
     def parse(self, value):
-        if value is None and not self.parse_none:
-            return None
-        value = self.parser(value)
         return value
 
     def load(self, value):
-        value = self.parse(value)
-        self.validate(value)
+        if value is not None or self.parse_none:
+            value = self.parse(value)
+
+        self.validate_load(value)
         return value
 
 
@@ -215,8 +214,8 @@ class StringField(Field):
     :param error_messages: Keys {'too_small', 'too_large', 'not_between',
         'no_match', 'required', 'none'}.
     """
-    formatter = str
-    parser = str
+    format = str
+    parse = str
 
     def __init__(
             self,
@@ -245,8 +244,8 @@ class NumberField(Field):
     :param error_messages: Keys {'too_small', 'too_large', 'not_between',
         'required', 'none'}.
     """
-    formatter = float
-    parser = float
+    format = float
+    parse = float
 
     def __init__(self, minimum=None, maximum=None, **kwargs):
         super().__init__(**kwargs)
@@ -270,8 +269,8 @@ class IntegerField(NumberField):
 
     :param kwargs: Same as `Number` field.
     """
-    formatter = int
-    parser = int
+    format = int
+    parse = int
 
 
 class DecimalField(NumberField):
@@ -312,11 +311,11 @@ class DecimalField(NumberField):
             value = value.quantize(self.exponent, rounding=self.rounding)
         return value
 
-    def formatter(self, value):
+    def format(self, value):
         num = self.to_decimal(value)
         return self.dump_as(num)
 
-    parser = to_decimal
+    parse = to_decimal
 
 
 class BooleanField(Field):
@@ -338,13 +337,13 @@ class BooleanField(Field):
             for parsed, raw_values in self.value_map.items()
             for raw in raw_values}
 
-    def formatter(self, value):
+    def format(self, value):
         if isinstance(value, Hashable):
             value = self.reverse_value_map.get(value, value)
         value = bool(value)
         return value
 
-    parser = formatter
+    parse = format
 
 
 class DatetimeField(Field):
@@ -368,10 +367,10 @@ class DatetimeField(Field):
             msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
             self.add_validator(RangeValidator(minimum, maximum, msg_dict))
 
-    def formatter(self, dt):
+    def format(self, dt):
         return self.type_.strftime(dt, self.fmt)
 
-    def parser(self, value: str):
+    def parse(self, value: str):
         return datetime.strptime(value, self.fmt)
 
 
@@ -383,7 +382,7 @@ class TimeField(DatetimeField):
     type_ = time
     fmt = r'%H:%M:%S.%f'
 
-    def parser(self, value: str):
+    def parse(self, value: str):
         return datetime.strptime(value, self.fmt).time()
 
 
@@ -395,7 +394,7 @@ class DateField(DatetimeField):
     type_ = date
     fmt = r'%Y-%m-%d'
 
-    def parser(self, value: str):
+    def parse(self, value: str):
         return datetime.strptime(value, self.fmt).date()
 
 
@@ -423,7 +422,7 @@ class CallableField(Field):
         self.func_args = args
         self.func_kwargs = kwargs
 
-    def formatter(self, func: CallableType):
+    def format(self, func: CallableType):
         return func(*self.func_args, **self.func_kwargs)
 
 
@@ -432,16 +431,11 @@ class ListField(Field):
     In order to ensure proper data structure, `format_none` and `parse_none`
     are set to True by default.
 
-    :param item_field: A `Field` class or instance. Its "dump_method" is used to
-        format each list item, and "load_method" is used to parse item.
-    :param dump_method: The method name of `item_field`.
-    :param load_method: Same as `dump_method`.
+    :param item_field: A `Field` class or instance.
     :param all_errors: Whether to collect errors for every list elements.
     :param except_exception: Which types of errors should be collected.
     """
     item_field: Field = None
-    dump_method = 'format'
-    load_method = 'load'
     all_errors = True
     except_exception = Exception
     format_none = True
@@ -450,30 +444,26 @@ class ListField(Field):
     def __init__(
             self,
             item_field: Field = None,
-            dump_method: str = None,
-            load_method: str = None,
             all_errors: bool = None,
             **kwargs):
         super().__init__(**kwargs)
         bind_attrs(
             self,
             item_field=item_field,
-            dump_method=dump_method,
-            load_method=load_method,
             all_errors=all_errors,
         )
         item_field = self.item_field
         if not isinstance(item_field, Field):
             raise TypeError(
                 f'Argument `item_field` must be a `Field` instance, not {item_field}.')
-        self.format_item = getattr(item_field, self.dump_method)
-        self.parse_item = getattr(item_field, self.load_method)
+        self.format_item = getattr(item_field, 'dump')
+        self.parse_item = getattr(item_field, 'load')
 
-    def formatter(self, value):
+    def format(self, value):
         return self._process_many(
             value, self.all_errors, self.format_item, self.except_exception)
 
-    def parser(self, value):
+    def parse(self, value):
         return self._process_many(
             value, self.all_errors, self.parse_item, self.except_exception)
 
@@ -531,10 +521,10 @@ class NestedField(Field):
             self._do_dump = catalyst.dump
             self._do_load = catalyst.load
 
-    def formatter(self, value):
+    def format(self, value):
         return self._do_dump(value, raise_error=True).valid_data
 
-    def parser(self, value):
+    def parse(self, value):
         return self._do_load(value, raise_error=True).valid_data
 
 

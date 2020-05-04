@@ -83,17 +83,12 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     native Python datatypes.
 
     Some instantiation params can set default values by class variables.
-    The available params are `schema`, `dump_method`, `load_method`,
-    `raise_error`, `all_errors`, `except_exception` and `process_aliases`.
+    The available params are `schema`, `raise_error`, `all_errors`,
+    `except_exception`, `process_aliases`, `DumpResult` and `LoadResult`.
 
     :param schema: A dict or instance or class which contains fields. This
         is a convenient way to avoid name clashes when fields are Python
         keywords or conflict with other attributes.
-    :param dump_method: The method name of `Field`. The method is used to
-        handle each field value when dumping data.
-        Available values are 'dump', 'format' and 'validate'.
-    :param load_method: Similar to `dump_method`.
-        Available values are 'load', 'parse' and 'validate'.
     :param raise_error: Whether to raise error if error occurs when
         processing data. Errors are collected into a error dict, which key
         is field name, index of item of iterable or process name.
@@ -124,8 +119,6 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     :param load_exclude: The fields to exclude from dump fields.
     """
     schema: Any = None
-    dump_method = 'format'
-    load_method = 'load'
     raise_error = False
     all_errors = True
     except_exception: ExceptionType = Exception
@@ -147,8 +140,6 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     def __init__(
             self,
             schema: Any = None,
-            dump_method: str = None,
-            load_method: str = None,
             raise_error: bool = None,
             all_errors: bool = None,
             except_exception: ExceptionType = None,
@@ -162,21 +153,11 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         bind_attrs(
             self,
             schema=schema,
-            dump_method=dump_method,
-            load_method=load_method,
             raise_error=raise_error,
             all_errors=all_errors,
             process_aliases=process_aliases,
             except_exception=except_exception,
         )
-
-        if self.dump_method not in {'dump', 'format', 'validate'}:
-            raise ValueError(
-                "Attribute `dump_method` must be in ('dump', 'format', 'validate').")
-        if self.load_method not in {'load', 'parse', 'validate'}:
-            raise ValueError(
-                "Attribute `load_method` must be in ('load', 'parse', 'validate').")
-
         # set fields from a dict or instance or class
         schema = self.schema
         if schema:
@@ -281,7 +262,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         # process data for each field groups
         for group_method, error_key, source_target_pairs in partial_groups:
             try:
-                valid_data = group_method(valid_data, data)
+                valid_data = group_method(valid_data, original_data=data)
             except except_exception as e:
                 # set error and move invalid data
                 errors[error_key] = e
@@ -331,7 +312,6 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             if name == 'dump':
                 assign_getter = self._assign_dump_getter
                 field_dict = self._dump_fields
-                field_method_name = self.dump_method
                 source_attr = 'name'
                 target_attr = 'key'
                 default_attr = 'dump_default'
@@ -339,7 +319,6 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             else:
                 assign_getter = self._assign_load_getter
                 field_dict = self._load_fields
-                field_method_name = self.load_method
                 source_attr = 'key'
                 target_attr = 'name'
                 default_attr = 'load_default'
@@ -348,6 +327,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             partial_fields, partial_groups = [], []
             for field in field_dict.values():
                 if isinstance(field, FieldGroup):
+                    # get partial arguments from field groups
                     group: FieldGroup = field
                     group_method = getattr(group, method_name)
                     group_method = self._modify_processer_parameters(group_method)
@@ -358,14 +338,14 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                         target = getattr(f, target_attr)
                         source_target_pairs.append((source, target))
                     partial_groups.append((group_method, error_key, source_target_pairs))
-                    continue
-
-                source = getattr(field, source_attr)
-                target = getattr(field, target_attr)
-                required = getattr(field, required_attr)
-                default = getattr(field, default_attr)
-                field_method = getattr(field, field_method_name)
-                partial_fields.append((field, source, target, required, default, field_method))
+                else:
+                    # get partial arguments from fields
+                    source = getattr(field, source_attr)
+                    target = getattr(field, target_attr)
+                    required = getattr(field, required_attr)
+                    default = getattr(field, default_attr)
+                    field_method = getattr(field, method_name)
+                    partial_fields.append((field, source, target, required, default, field_method))
             main_process = partial(
                 self._process_one,
                 all_errors=all_errors,
@@ -384,6 +364,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         default_raise_error = self.raise_error
 
         def integrated_process(data, raise_error):
+            """The actual execution function to do dumping and loading."""
             if raise_error is None:
                 raise_error = default_raise_error
 

@@ -22,69 +22,67 @@ class FieldTest(TestCase):
 
         # test set field opts in class
         class A:
-            fixed_value = Field(validators=[])
+            field = Field()
 
             @staticmethod
-            @fixed_value.set_formatter
-            def fixed_value_formatter(value):
+            @field.set_format
+            def return_1(value):
                 return 1
 
             @staticmethod
-            @fixed_value.set_parser
-            def fixed_value_add_1(value, field, original_method):
-                assert field is A.fixed_value
+            @field.set_parse
+            def field_add_1(value, field, original_method):
+                assert isinstance(field, Field)
                 return original_method(value) + 1
 
             @staticmethod
-            @fixed_value.set_validators
+            @field.set_validators
             def large_than(value):
                 assert value > 0
                 return value + 1  # useless return
 
             @staticmethod
-            @fixed_value.add_validator
+            @field.add_validator
             def less_than(value):
                 assert value < 100
 
         a = A()
+        self.assertEqual(a.field.parse.keywords['field'], a.field)
 
         # test dump
-        self.assertEqual(a.fixed_value.format(1000), 1)
-        with self.assertRaises(AssertionError):
-            a.fixed_value.dump(1000)
-        self.assertEqual(a.fixed_value.format('asd'), 1)
-        with self.assertRaises(TypeError):
-            a.fixed_value.dump('asd')
+        self.assertEqual(a.field.dump(1000), 1)
+        self.assertEqual(a.field.dump('asd'), 1)
 
         # test load
-        self.assertEqual(a.fixed_value.load(0), 1)
-        self.assertEqual(a.fixed_value.load(None), None)
+        self.assertEqual(a.field.load(0), 1)
+        self.assertEqual(a.field.load(None), None)
         with self.assertRaises(TypeError):
-            a.fixed_value.load('0')
+            a.field.load('asd')
         with self.assertRaises(AssertionError):
-            a.fixed_value.load(-1)
+            a.field.load(-1)
         with self.assertRaises(AssertionError):
-            a.fixed_value.load(100)
+            a.field.load(100)
 
         # test validators
-        self.assertEqual(len(a.fixed_value.validators), 2)
+        self.assertEqual(len(a.field.validators), 2)
 
         # test wrong args
         with self.assertRaises(TypeError):
-            a.fixed_value.set_validators(1)
+            a.field.set_validators(1)
         with self.assertRaises(TypeError):
-            a.fixed_value.add_validator(1)
+            a.field.add_validator(1)
         with self.assertRaises(TypeError):
-            a.fixed_value.set_formatter(1)
+            a.field.set_format(1)
         with self.assertRaises(TypeError):
-            a.fixed_value.set_parser(1)
+            a.field.set_parse(1)
 
-        # test set opts when init field
+        # test set functions when init field
         field = Field(
-            formatter=A.fixed_value_formatter,
-            parser=a.fixed_value.parser)
-        self.assertEqual(field.formatter, A.fixed_value_formatter)
-        self.assertEqual(field.parser.func, A.fixed_value_add_1.func)
+            formatter=A.return_1,
+            parser=a.field.parse)
+        self.assertEqual(field.format, A.return_1)
+        self.assertEqual(field.parse.func, A.field_add_1.func)
+        self.assertEqual(field.parse.keywords['field'], field)
 
         # test error msg
         field = Field(key='a', allow_none=False, error_messages={'none': '666'})
@@ -99,11 +97,9 @@ class FieldTest(TestCase):
 
         # dump
         self.assertEqual(field.dump('xxx'), 'xxx')
-        with self.assertRaises(TypeError):
-            field.dump(1)
-        self.assertEqual(field.format(1), '1')
-        self.assertEqual(field.format([]), '[]')
-        self.assertEqual(field.format(None), None)
+        self.assertEqual(field.dump(1), '1')
+        self.assertEqual(field.dump([]), '[]')
+        self.assertEqual(field.dump(None), None)
 
         # load
         self.assertEqual(field.load('xxx'), 'xxx')
@@ -140,8 +136,8 @@ class FieldTest(TestCase):
 
         # dump
         self.assertEqual(field.dump(1), 1)
-        self.assertEqual(field.format(1.6), 1)
-        self.assertEqual(field.format('10'), 10)
+        self.assertEqual(field.dump(1.6), 1)
+        self.assertEqual(field.dump('10'), 10)
 
         # load
         self.assertEqual(field.load(0), 0)
@@ -164,10 +160,10 @@ class FieldTest(TestCase):
 
         # dump
         self.assertEqual(field.dump(5.5), 5.5)
-        self.assertEqual(field.format(1), 1.0)
-        self.assertEqual(field.format(0), 0.0)
-        self.assertEqual(field.format('10'), 10.0)
-        self.assertEqual(field.format(None), None)
+        self.assertEqual(field.dump(1), 1.0)
+        self.assertEqual(field.dump(0), 0.0)
+        self.assertEqual(field.dump('10'), 10.0)
+        self.assertEqual(field.dump(None), None)
 
         # load
         self.assertEqual(field.load(0), 0.0)
@@ -187,24 +183,24 @@ class FieldTest(TestCase):
     def test_decimal_field(self):
         field = DecimalField()
 
-        self.assertEqual(field.format(1), '1')
-        self.assertEqual(field.format(1.1), '1.1')
-        self.assertEqual(field.format('1.1'), '1.1')
-        self.assertEqual(field.format('nan'), 'NaN')
-        self.assertEqual(field.format('inf'), 'Infinity')
+        self.assertEqual(field.dump(1), '1')
+        self.assertEqual(field.dump(1.1), '1.1')
+        self.assertEqual(field.dump('1.1'), '1.1')
+        self.assertEqual(field.dump('nan'), 'NaN')
+        self.assertEqual(field.dump('inf'), 'Infinity')
 
-        self.assertEqual(field.parse(1), Decimal('1'))
-        self.assertEqual(field.parse(1.1), Decimal('1.1'))
-        self.assertEqual(field.parse('1.1'), Decimal('1.1'))
-        self.assertEqual(str(field.parse('nan')), 'NaN')
-        self.assertEqual(str(field.parse('inf')), 'Infinity')
+        self.assertEqual(field.load(1), Decimal('1'))
+        self.assertEqual(field.load(1.1), Decimal('1.1'))
+        self.assertEqual(field.load('1.1'), Decimal('1.1'))
+        self.assertEqual(str(field.load('nan')), 'NaN')
+        self.assertEqual(str(field.load('inf')), 'Infinity')
 
         field = DecimalField(dump_as=float, scale=2, rounding=ROUND_CEILING)
-        self.assertEqual(field.format(1.1), 1.1)
-        self.assertEqual(field.format(1), 1.0)
-        self.assertEqual(field.format('inf'), float('inf'))
-        self.assertEqual(field.format(1.111), 1.12)
-        self.assertEqual(field.format(-1.111), -1.11)
+        self.assertEqual(field.dump(1.1), 1.1)
+        self.assertEqual(field.dump(1), 1.0)
+        self.assertEqual(field.dump('inf'), float('inf'))
+        self.assertEqual(field.dump(1.111), 1.12)
+        self.assertEqual(field.dump(-1.111), -1.11)
 
         with self.assertRaises(TypeError):
             DecimalField(dump_as=1)
@@ -281,8 +277,6 @@ class FieldTest(TestCase):
         self.assertEqual(field.load(dt_str), dt)
         with self.assertRaises(ValueError):
             field.load('2018Y')
-        with self.assertRaises(ValidationError):
-            field.dump(invalid_dt)
 
     def test_list_field(self):
         with self.assertRaises(TypeError):

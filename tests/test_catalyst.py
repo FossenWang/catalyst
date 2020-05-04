@@ -120,7 +120,7 @@ class CatalystTest(TestCase):
             a = FloatField()
 
             @staticmethod
-            @a.set_formatter
+            @a.set_format
             def test(value):
                 return value + 1
 
@@ -129,7 +129,7 @@ class CatalystTest(TestCase):
         self.assertIs(catalyst.fields['a'], A.a)
         # setting opts of field works
         self.assertEqual(A.a.dump(1), 2)
-        self.assertIs(A.a.formatter, A.test)
+        self.assertIs(A.a.format, A.test)
 
         # set fields from FieldDict
         catalyst = Catalyst({'a': A.a})
@@ -353,37 +353,6 @@ class CatalystTest(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             catalyst_2.load(invalid_data, raise_error=True)
         self.assertEqual(len(ctx.exception.msg.errors), 1)
-
-        # test field method
-        invalid_dump_data = {
-            'float_': 1.1, 'integer': '1', 'string': 'xxx',
-            'bool_': True, 'func': dump_data.func, 'list_': ['a', 'b']
-        }
-        # both parse and validate
-        result = TestDataCatalyst(dump_method='dump').dump(invalid_dump_data)
-        self.assertFalse(result.is_valid)
-        self.assertEqual(set(result.invalid_data), {'integer'})
-        # only validate, no format
-        result = TestDataCatalyst(dump_method='validate').dump(invalid_dump_data)
-        self.assertFalse(result.is_valid)
-        self.assertEqual(set(result.invalid_data), {'integer'})
-
-        invalid_load_data = {
-            'string': 'xxx', 'integer': '1', 'float': 1.1,
-            'bool': True, 'list_': ['a', 'b']}
-        # only validate, no parse
-        result = TestDataCatalyst(load_method='validate').load(invalid_load_data)
-        self.assertFalse(result.is_valid)
-        self.assertEqual(set(result.invalid_data), {'integer'})
-        # only parse, no validate, can force to change type
-        result = TestDataCatalyst(load_method='parse').load(invalid_load_data)
-        self.assertTrue(result.is_valid)
-
-        with self.assertRaises(ValueError):
-            TestDataCatalyst(dump_method=1)
-
-        with self.assertRaises(ValueError):
-            TestDataCatalyst(load_method=1)
 
         # wrong process name
         with self.assertRaises(ValueError):
