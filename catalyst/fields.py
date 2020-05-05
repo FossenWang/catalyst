@@ -29,10 +29,30 @@ MultiValidator = Union[ValidatorType, Iterable[ValidatorType]]
 
 
 class BaseField(ErrorMessageMixin):
-    name: str
-    key: str
+    """Basic field class for converting objects.
+
+    Instantiation params can set default values by class variables.
+
+    :param name: The source field to get the value from when dumping data.
+        The target field to set the value to when loading data. For example,
+        ``result[key] = field.dump(data[field.name])``, and
+        ``result[name] = field.load(data[field.key])``.
+    :param key: The source field to get the value from when loading data.
+        The target field to set the value to when dumping data.
+    :param no_dump: Whether to skip this field during dumping.
+    :param no_load: Whether to skip this field during loading.
+    :param error_messages: A dict of error messages.
+    """
     no_dump = False
     no_load = False
+
+    name: str
+    key: str
+    # Aliases for `name` and `key`
+    dump_source = property(lambda self: self.name)
+    dump_target = property(lambda self: self.key)
+    load_source = property(lambda self: self.key)
+    load_target = property(lambda self: self.name)
 
     def __init__(
             self,
@@ -55,10 +75,18 @@ class BaseField(ErrorMessageMixin):
         """
         sig = inspect.signature(func)
         kwargs = {}
-        if 'field' in sig.parameters:
-            kwargs['field'] = self
-        if 'original_method' in sig.parameters:
-            kwargs['original_method'] = getattr(self, attr)
+        # inject args if the last parameter is keyword arguments
+        for param in reversed(sig.parameters.values()):
+            if param.kind is inspect._VAR_KEYWORD:
+                kwargs['field'] = self
+                kwargs['original_method'] = getattr(self, attr)
+            break
+        # inject args if parameter name matches
+        if not kwargs:
+            if 'field' in sig.parameters:
+                kwargs['field'] = self
+            if 'original_method' in sig.parameters:
+                kwargs['original_method'] = getattr(self, attr)
         if kwargs:
             func = partial(func, **kwargs)
 
@@ -66,32 +94,35 @@ class BaseField(ErrorMessageMixin):
         return func
 
     def dump(self, *args, **kwargs):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def load(self, *args, **kwargs):
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class Field(BaseField):
-    """Basic field class for converting objects.
+    """Handles only a single field value of the input data, and can not access
+    the other field values. This does not process the value by default.
 
-    Instantiation params can set default values by class variables.
-
-    :param name:
-    :param key:
-    :param formatter:
-    :param parser:
-    :param format_none:
-    :param parse_none:
-    :param dump_required:
-    :param load_required:
-    :param dump_default: If set, `dump_required` has no effect.
-    :param load_default: Similar to `dump_default`
-    :param no_dump:
-    :param no_load:
-    :param validators:
-    :param allow_none:
+    :param formatter: The function that formats the field value during dumping,
+        and which will override `Field.format`.
+    :param parser: The function that parses the field value during loading,
+        and which will override `Field.parse`.
+    :param format_none: Whether to format the field value if it is `None`.
+    :param parse_none: Whether to parse the field value if it is `None`.
+    :param dump_required: Raise error if the field value doesn't exist;.
+    :param load_required: Similar to `dump_required`.
+    :param dump_default: The default value when the field value doesn't exist.
+        If set, `dump_required` has no effect.
+    :param load_default: Similar to `dump_default`.
+    :param validators: Validator or collection of validators. The validator
+        function is not required to return value, and should raise error
+        directly if invalid.
+        By default, validators are called during loading.
+    :param allow_none: Whether the field value are allowed to be `None`.
+        By default, this takes effect during loading.
     :param error_messages: Keys {'required', 'none'}.
+    :param kwargs: Same as :class:`BaseField`.
     """
     format_none = False
     parse_none = False
@@ -105,11 +136,6 @@ class Field(BaseField):
         'required': 'Missing data for required field.',
         'none': 'Field may not be None.',
     }
-
-    dump_source = property(lambda self: self.name)
-    dump_target = property(lambda self: self.key)
-    load_source = property(lambda self: self.key)
-    load_target = property(lambda self: self.name)
 
     def __init__(
             self,
@@ -145,13 +171,35 @@ class Field(BaseField):
         self.set_validators(validators if validators else self.validators)
 
     def set_format(self, func: CallableType):
+        """Override `Field.format` method which will be called during dumping.
+
+        Example:
+
+            field.set_format(function)
+
+            @field.set_format
+            def function(value):
+                return value
+
+            @field.set_format
+            def function(value, field, original_method):
+                return original_method(value)
+
+        :param func: The field value will be passed to the first argument, and
+            the field instance or covered method will be passed, if argments
+            like "field", "original_method" or "**kwargs" exist.
+        """
         return self.override_method(func, 'format')
 
     def set_parse(self, func: CallableType):
+        """Override `Field.parse` method which will be called during loading.
+        See `Field.set_format` for more details.
+        """
         return self.override_method(func, 'parse')
 
     @staticmethod
     def ensure_validators(validators: MultiValidator) -> list:
+        """Make sure validators are callables."""
         if not isinstance(validators, Iterable):
             validators = [validators]
 
@@ -163,16 +211,19 @@ class Field(BaseField):
         return list(validators)
 
     def set_validators(self, validators: MultiValidator):
+        """Replace all validators."""
         self.validators = self.ensure_validators(validators)
         return validators
 
     def add_validator(self, validator: ValidatorType):
+        """Append a validator to list."""
         if not callable(validator):
             raise TypeError('Argument `validator` must be Callable.')
         self.validators.append(validator)
         return validator
 
     def validate(self, value):
+        """Validate `value`, raise error if it is invalid."""
         if value is None:
             if self.allow_none:
                 return None
@@ -188,6 +239,10 @@ class Field(BaseField):
         return value
 
     def dump(self, value):
+        """Serialize `value` as native Python data type by validatiing and
+        formatting. By default, it doesn't validate `value` during dumping,
+        but you can override `validate_dump` method to perform validation.
+        """
         self.validate_dump(value)
 
         if value is not None or self.format_none:
@@ -198,6 +253,7 @@ class Field(BaseField):
         return value
 
     def load(self, value):
+        """Deserialize `value` to an object by parsing and validatiing."""
         if value is not None or self.parse_none:
             value = self.parse(value)
 

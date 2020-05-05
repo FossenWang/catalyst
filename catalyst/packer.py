@@ -1,4 +1,4 @@
-from typing import Sequence, Callable
+from typing import Iterable, Callable
 from functools import partial
 
 from .utils import LoadResult, DumpResult, bind_attrs
@@ -12,7 +12,7 @@ class CatalystPacker:
 
     def __init__(
             self,
-            catalysts: Sequence = None,
+            catalysts: Iterable = None,
             raise_error: bool = None,
             all_errors: bool = None):
         bind_attrs(
@@ -29,7 +29,7 @@ class CatalystPacker:
         self._do_load_many = self._make_processor('load', True)
 
     @staticmethod
-    def _process_one(data: Sequence, all_errors: bool, processors: Sequence[Callable]):
+    def _process_one(data: Iterable, all_errors: bool, processors: Iterable[Callable]):
         valid_data, errors, invalid_data = {}, {}, {}
         for processor, item in zip(processors, data):
             result = processor(item, raise_error=False)
@@ -43,7 +43,7 @@ class CatalystPacker:
         return valid_data, errors, invalid_data
 
     @staticmethod
-    def _process_many(data: Sequence[Sequence], all_errors: bool, process_one: Callable):
+    def _process_many(data: Iterable[Iterable], all_errors: bool, process_one: Callable):
         valid_data, errors, invalid_data = [], {}, {}
         for i, items in enumerate(zip(*data)):
             result = process_one(items, raise_error=False)
@@ -92,14 +92,14 @@ class CatalystPacker:
 
         return integrated_process
 
-    def dump(self, data: Sequence, raise_error: bool = None) -> DumpResult:
+    def dump(self, data: Iterable, raise_error: bool = None) -> DumpResult:
         return self._do_dump(data, raise_error)
 
-    def load(self, data: Sequence, raise_error: bool = None) -> LoadResult:
+    def load(self, data: Iterable, raise_error: bool = None) -> LoadResult:
         return self._do_load(data, raise_error)
 
-    def dump_many(self, data: Sequence, raise_error: bool = None) -> DumpResult:
+    def dump_many(self, data: Iterable, raise_error: bool = None) -> DumpResult:
         return self._do_dump_many(data, raise_error)
 
-    def load_many(self, data: Sequence, raise_error: bool = None) -> LoadResult:
+    def load_many(self, data: Iterable, raise_error: bool = None) -> LoadResult:
         return self._do_load_many(data, raise_error)

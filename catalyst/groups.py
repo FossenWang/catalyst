@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Iterable
 
 from .fields import BaseField, Field, FieldDict
 from .utils import copy_keys, bind_attrs
@@ -7,9 +7,9 @@ from .utils import copy_keys, bind_attrs
 class FieldGroup(BaseField):
     """Field group."""
     fields: FieldDict
-    declared_fields = []
+    declared_fields: Iterable[str] = tuple()
 
-    def __init__(self, declared_fields: list = None, **kwargs):
+    def __init__(self, declared_fields: Iterable[str] = None, **kwargs):
         super().__init__(**kwargs)
         bind_attrs(self, declared_fields=declared_fields)
 
@@ -54,37 +54,40 @@ class ComparisonFieldGroup(FieldGroup):
         '==': lambda a, b: a == b,
         '!=': lambda a, b: a != b,
     }
+    field_a: Field
+    field_b: Field
 
-    def __init__(self, a, op, b, **kwargs):
+    def __init__(self, a: str, op: str, b: str, **kwargs):
         if op not in self.comparison_dict:
             raise ValueError(
                 f'Argument `op` must be one of '
                 f"{list(self.comparison_dict.keys())}, not '{op}'.")
-        self.compare = self.comparison_dict.get(op)
+        self.compare = self.comparison_dict[op]
         self.op = op
-        self.a: Field = a
-        self.b: Field = b
-        declared_fields = [name for name in (a, b) if not isinstance(name, Field)]
-        super().__init__(declared_fields=declared_fields, **kwargs)
+        self.a = a
+        self.b = b
+        super().__init__(declared_fields=(a, b), **kwargs)
 
     def set_fields(self, fields: FieldDict):
+        """After fields are injected, bind them to `self.field_a` and `self.field_b`."""
         super().set_fields(fields)
         for attr in ('a', 'b'):
-            value = getattr(self, attr)
-            if value not in self.fields:
-                raise ValueError(f'The field "{value}" not found.')
-            setattr(self, attr, self.fields[value])
+            key = getattr(self, attr)
+            if key not in self.fields:
+                raise ValueError(f'The field "{key}" not found.')
+            field = self.fields[key]
+            setattr(self, f'field_{attr}', field)
 
     def load(self, data, original_data=None):
-        a, b = data.get(self.a.load_target), data.get(self.b.load_target)
+        a, b = data.get(self.field_a.name), data.get(self.field_b.name)
         if a is not None and b is not None and not self.compare(a, b):
-            self.error(self.op, a=self.a.load_source, b=self.b.load_source)
+            self.error(self.op, a=self.field_a.key, b=self.field_b.key)
         return data
 
     def dump(self, data, original_data=None):
-        a, b = data.get(self.a.dump_target), data.get(self.b.dump_target)
+        a, b = data.get(self.field_a.key), data.get(self.field_b.key)
         if a is not None and b is not None and not self.compare(a, b):
-            self.error(self.op, a=self.a.dump_source, b=self.b.dump_source)
+            self.error(self.op, a=self.field_a.name, b=self.field_b.name)
         return data
 
 

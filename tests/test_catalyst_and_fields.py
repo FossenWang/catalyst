@@ -213,8 +213,8 @@ class CatalystAndFieldsTest(TestCase):
 
             @staticmethod
             @no_extra.set_dump
-            def no_inject_args(data, **kwargs):
-                assert not kwargs
+            def inject_kwargs(data, **kwargs):
+                assert set(kwargs) == {'field', 'original_method'}
                 return data
 
             @staticmethod

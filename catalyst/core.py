@@ -2,7 +2,7 @@
 
 import inspect
 
-from typing import Iterable, Callable, Sequence, Any, Mapping
+from typing import Iterable, Callable, Any, Mapping
 from functools import wraps, partial
 
 from .base import CatalystABC
@@ -274,7 +274,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         return valid_data, errors, invalid_data
 
     @staticmethod
-    def _process_many(data: Sequence, all_errors: bool, process_one: Callable):
+    def _process_many(data: Iterable, all_errors: bool, process_one: Callable):
         """Process multiple objects using fields and catalyst options."""
         valid_data, errors, invalid_data = [], {}, {}
         for i, item in enumerate(data):
@@ -426,21 +426,27 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         return wrapper
 
     def dump(self, data: Any, raise_error: bool = None) -> DumpResult:
+        """Serialize `data` according to defined fields."""
         return self._do_dump(data, raise_error)
 
     def load(self, data: Any, raise_error: bool = None) -> LoadResult:
+        """Deserialize `data` according to defined fields."""
         return self._do_load(data, raise_error)
 
-    def dump_many(self, data: Sequence, raise_error: bool = None) -> DumpResult:
+    def dump_many(self, data: Iterable, raise_error: bool = None) -> DumpResult:
+        """Serialize multiple objects."""
         return self._do_dump_many(data, raise_error)
 
-    def load_many(self, data: Sequence, raise_error: bool = None) -> LoadResult:
+    def load_many(self, data: Iterable, raise_error: bool = None) -> LoadResult:
+        """Deserialize multiple objects."""
         return self._do_load_many(data, raise_error)
 
     def dump_args(self, func: Callable) -> Callable:
+        """Decorator for serializing arguments of the function."""
         return self._process_args(func, self.dump)
 
     def load_args(self, func: Callable = None) -> Callable:
+        """Decorator for deserializing arguments of the function."""
         return self._process_args(func, self.load)
 
     # pre and post processes
