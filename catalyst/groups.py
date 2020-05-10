@@ -81,13 +81,13 @@ class ComparisonFieldGroup(FieldGroup):
     def load(self, data, original_data=None):
         a, b = data.get(self.field_a.name), data.get(self.field_b.name)
         if a is not None and b is not None and not self.compare(a, b):
-            self.error(self.op, a=self.field_a.key, b=self.field_b.key)
+            raise self.error(self.op, a=self.field_a.key, b=self.field_b.key)
         return data
 
     def dump(self, data, original_data=None):
         a, b = data.get(self.field_a.key), data.get(self.field_b.key)
         if a is not None and b is not None and not self.compare(a, b):
-            self.error(self.op, a=self.field_a.name, b=self.field_b.name)
+            raise self.error(self.op, a=self.field_a.name, b=self.field_b.name)
         return data
 
 

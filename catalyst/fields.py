@@ -227,7 +227,7 @@ class Field(BaseField):
         if value is None:
             if self.allow_none:
                 return None
-            self.error('none')
+            raise self.error('none')
         for validator in self.validators:
             validator(value)
         return value

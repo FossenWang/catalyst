@@ -232,23 +232,23 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         for field, source, target, required, default, field_method in partial_fields:
             raw_value = missing
             try:
-                if callable(default):
-                    default = default()
-                raw_value = get_value(data, source, default)
+                raw_value = get_value(data, source, missing)
                 if raw_value is missing:
-                    if required:
-                        field.error('required')
-                    continue
+                    raw_value = default() if callable(default) else default
+                    if raw_value is missing:
+                        if required:
+                            raise field.error('required')
+                        continue
 
                 valid_data[target] = field_method(raw_value)
             except except_exception as e:
-                # collect errors and invalid data
                 if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
                     # distribute nested data in BaseResult
                     valid_data[target] = e.msg.valid_data
                     errors[source] = e.msg.errors
                     invalid_data[source] = e.msg.invalid_data
                 else:
+                    # collect errors and invalid data
                     errors[source] = e
                     if raw_value is not missing:
                         invalid_data[source] = raw_value

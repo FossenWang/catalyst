@@ -67,8 +67,8 @@ class ErrorMessageMixin:
         self.error_messages: Dict[str, str] = messages
 
     def get_error_message(self, error_key: str, **kwargs):
-        """Get formated error message by key.
-        Can be interpolated with `{self}` and other kwargs.
+        """Get formated error message according to `error_key`.
+        Can be interpolated with `self` and other `kwargs`.
 
         :param error_key: Key of `self.error_messages`.
         :param kwargs: Passed to `str.format` method.
@@ -81,8 +81,8 @@ class ErrorMessageMixin:
         return msg.format(self=self, **kwargs)
 
     def error(self, error_key: str, **kwargs):
-        """Raise `ValidationError` with message by key."""
-        raise self.error_cls(self.get_error_message(error_key, **kwargs))
+        """Return exception with message according to `error_key`."""
+        return self.error_cls(self.get_error_message(error_key, **kwargs))
 
 
 def bind_attrs(obj, **kwargs):
@@ -112,7 +112,7 @@ def assign_attr_or_item_getter(obj):
 def assign_item_getter(obj):
     if isinstance(obj, Mapping):
         return Mapping.get
-    raise TypeError(f'{obj} is not Mapping.')
+    raise TypeError(f'"{obj}" is not Mapping.')
 
 
 def no_processing(value):

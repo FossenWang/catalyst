@@ -29,19 +29,15 @@ class UtilsTest(TestCase):
         b.collect_error_messages({'c': 'c'})
         self.assertDictEqual(b.error_messages, {'a': 'a', 'b': 'b', 'c': 'c'})
 
-        with self.assertRaises(ValidationError) as context:
-            b.error('b')
-        self.assertEqual(str(context.exception), 'b')
+        self.assertEqual(str(b.error('b')), 'b')
 
-        with self.assertRaises(AssertionError) as context:
+        with self.assertRaises(AssertionError) as cm:
             b.error('x')
-        self.assertTrue(str(context.exception).endswith(
+        self.assertTrue(str(cm.exception).endswith(
             'error key `x` does not exist in the `error_messages` dict.'))
 
         b.collect_error_messages({'b': 'bb'})
-        with self.assertRaises(ValidationError) as context:
-            b.error('b')
-        self.assertEqual(str(context.exception), 'bb')
+        self.assertEqual(str(b.error('b')), 'bb')
 
         # test change default `error_messages`
         a = A()
