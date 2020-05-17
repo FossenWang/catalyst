@@ -453,23 +453,23 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     def pre_dump(self, data):
         return data
 
-    def post_dump(self, data, original_data):
+    def post_dump(self, data, original_data=None):
         return data
 
     def pre_load(self, data):
         return data
 
-    def post_load(self, data, original_data):
+    def post_load(self, data, original_data=None):
         return data
 
     def pre_dump_many(self, data):
         return data
 
-    def post_dump_many(self, data, original_data):
+    def post_dump_many(self, data, original_data=None):
         return data
 
     def pre_load_many(self, data):
         return data
 
-    def post_load_many(self, data, original_data):
+    def post_load_many(self, data, original_data=None):
         return data

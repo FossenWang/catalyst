@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from catalyst.core import Catalyst
 from catalyst.fields import IntegerField
-from catalyst.groups import FieldGroup, ComparisonFieldGroup
+from catalyst.groups import FieldGroup, CompareFields
 from catalyst.exceptions import ValidationError
 
 
@@ -33,11 +33,11 @@ class GroupsTest(TestCase):
         self.assertEqual(group.dump({})['xxx'], 1)
         self.assertEqual(group.load({})['xxx'], 1)
 
-    def test_comparison_field_group(self):
+    def test_compare_fields(self):
         class ComparisonCatalyst(Catalyst):
             lower_limit = IntegerField()
             upper_limit = IntegerField()
-            comparison = ComparisonFieldGroup('upper_limit', '>', 'lower_limit')
+            comparison = CompareFields('upper_limit', '>', 'lower_limit')
 
         catalyst = ComparisonCatalyst()
         self.assertEqual({'lower_limit', 'upper_limit'}, set(catalyst.comparison.fields))
@@ -78,7 +78,7 @@ class GroupsTest(TestCase):
             catalyst.comparison.dump(invalid_data)
 
         with self.assertRaises(ValueError):
-            ComparisonFieldGroup('', 'xxx', '')
+            CompareFields('', 'xxx', '')
 
         with self.assertRaises(ValueError):
             catalyst.comparison.set_fields({})

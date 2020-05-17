@@ -1,4 +1,5 @@
 from typing import Callable, Iterable
+from functools import partial
 
 from .fields import BaseField, Field, FieldDict
 from .utils import copy_keys, bind_attrs
@@ -35,8 +36,9 @@ class FieldGroup(BaseField):
         return data
 
 
-class ComparisonFieldGroup(FieldGroup):
+class CompareFields(FieldGroup):
     """Compare the values of two fields."""
+
     no_dump = True
     error_messages = {
         '>': '"{a}" must be greater than "{b}".',
@@ -69,7 +71,8 @@ class ComparisonFieldGroup(FieldGroup):
         super().__init__(declared_fields=(a, b), **kwargs)
 
     def set_fields(self, fields: FieldDict):
-        """After fields are injected, bind them to `self.field_a` and `self.field_b`."""
+        """After fields are injected, bind them to `self.field_a` and `self.field_b`,
+        format error messages, and create validate functions."""
         super().set_fields(fields)
         for attr in ('a', 'b'):
             key = getattr(self, attr)
@@ -78,18 +81,32 @@ class ComparisonFieldGroup(FieldGroup):
             field = self.fields[key]
             setattr(self, f'field_{attr}', field)
 
-    def load(self, data, original_data=None):
-        a, b = data.get(self.field_a.name), data.get(self.field_b.name)
+        # get error messages
+        dump_error = self.error_cls(self.get_error_message(
+            self.op, a=self.field_a.dump_source, b=self.field_b.dump_source))
+        load_error = self.error_cls(self.get_error_message(
+            self.op, a=self.field_a.load_source, b=self.field_b.load_source))
+        # set partial arguments for `validate`
+        self.validate_dump = partial(
+            self.validate,
+            a_key=self.field_a.dump_target,
+            b_key=self.field_b.dump_target,
+            error=dump_error)
+        self.validate_load = partial(
+            self.validate,
+            a_key=self.field_a.load_target,
+            b_key=self.field_b.load_target,
+            error=load_error)
+
+    def validate(self, data, a_key, b_key, error):
+        a, b = data.get(a_key), data.get(b_key)
         if a is not None and b is not None and not self.compare(a, b):
-            raise self.error(self.op, a=self.field_a.key, b=self.field_b.key)
+            raise error
+
+    def load(self, data, original_data=None):
+        self.validate_load(data)
         return data
 
     def dump(self, data, original_data=None):
-        a, b = data.get(self.field_a.key), data.get(self.field_b.key)
-        if a is not None and b is not None and not self.compare(a, b):
-            raise self.error(self.op, a=self.field_a.name, b=self.field_b.name)
+        self.validate_dump(data)
         return data
-
-
-# Aliases
-Comparison = ComparisonFieldGroup
