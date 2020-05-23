@@ -2,7 +2,7 @@ from typing import Callable, Iterable
 from functools import partial
 
 from .fields import BaseField, Field, FieldDict
-from .utils import copy_keys, bind_attrs
+from .utils import bind_attrs
 
 
 class FieldGroup(BaseField):
@@ -15,13 +15,17 @@ class FieldGroup(BaseField):
         bind_attrs(self, declared_fields=declared_fields)
 
     def set_fields(self, fields: FieldDict):
+        """Inject fields according to `declared_fields`."""
         new_fields = {}
-        fields = copy_keys(fields, self.declared_fields)
-        for name, value in fields.items():
+        for key in self.declared_fields:
+            if key not in fields:
+                raise ValueError(f'The field "{key}" is not found.')
+            value = fields[key]
             if not isinstance(value, Field):
-                raise TypeError(f'The value of fields must be an instance of Field, not {value}.')
-            new_fields[name] = value
-        self.fields = new_fields
+                raise TypeError(
+                    f'The field "{key}" must be an instance of Field, not "{value}".')
+            new_fields[key] = value
+        self.fields: FieldDict = new_fields
 
     def set_dump(self, func: Callable = None, **kwargs):
         return self.override_method(func, 'dump', **kwargs)
@@ -74,13 +78,9 @@ class CompareFields(FieldGroup):
         """After fields are injected, bind them to `self.field_a` and `self.field_b`,
         format error messages, and create validate functions."""
         super().set_fields(fields)
+        # bind fields to attrs
         for attr in ('a', 'b'):
-            key = getattr(self, attr)
-            if key not in self.fields:
-                raise ValueError(f'The field "{key}" not found.')
-            field = self.fields[key]
-            setattr(self, f'field_{attr}', field)
-
+            setattr(self, f'field_{attr}', self.fields[getattr(self, attr)])
         # get error messages
         dump_error = self.error_cls(self.get_error_message(
             self.op, a=self.field_a.dump_source, b=self.field_b.dump_source))

@@ -16,6 +16,9 @@ class GroupsTest(TestCase):
         group.set_fields(fields)
         self.assertEqual(set(group.fields), {'num'})
 
+        with self.assertRaises(ValueError):
+            group.set_fields({})
+
         with self.assertRaises(TypeError):
             group.set_fields({'num': None})
 
