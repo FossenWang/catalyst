@@ -1,8 +1,8 @@
 from unittest import TestCase
 
 from catalyst.core import Catalyst
-from catalyst.fields import IntegerField
-from catalyst.groups import FieldGroup, CompareFields
+from catalyst.fields import IntegerField, NestedField
+from catalyst.groups import FieldGroup, CompareFields, TransformNested
 from catalyst.exceptions import ValidationError
 
 
@@ -85,3 +85,50 @@ class GroupsTest(TestCase):
 
         with self.assertRaises(ValueError):
             catalyst.comparison.set_fields({})
+
+    def test_transform_nested(self):
+        coordinate_catalyst = Catalyst({'x': IntegerField(), 'y': IntegerField()})
+        class TransformCatalyst(Catalyst):
+            a = IntegerField()
+            coordinate = NestedField(coordinate_catalyst)
+            transform = TransformNested('coordinate')
+
+        catalyst = TransformCatalyst()
+
+        # test wrong fields
+        with self.assertRaises(ValueError):
+            catalyst.transform.set_fields(fields={})
+
+        with self.assertRaises(TypeError) as cm:
+            catalyst.transform.set_fields(fields={'coordinate': IntegerField()})
+        self.assertIn('NestedField', str(cm.exception))
+
+        with self.assertRaises(ValueError) as cm:
+            catalyst.transform.set_fields(fields={
+                'coordinate': NestedField(coordinate_catalyst, many=True)})
+        self.assertIn('many=True', str(cm.exception))
+
+        # test valid
+        loading_data = {'a': 0, 'x': 1, 'y': -1}
+        dumping_data = {'a': 0, 'coordinate': {'x': 1, 'y': -1}}
+
+        result = catalyst.load(loading_data)
+        self.assertTrue(result.is_valid)
+        self.assertDictEqual(result.valid_data, dumping_data)
+
+        result = catalyst.dump(dumping_data)
+        self.assertTrue(result.is_valid)
+        self.assertDictEqual(result.valid_data, loading_data)
+
+        # test invalid
+        invalid_loading_data = {'a': 0, 'x': 'x', 'y': -1}
+        result = catalyst.load(invalid_loading_data)
+        self.assertFalse(result.is_valid)
+        self.assertSetEqual(set(result.errors), {'x'})
+        self.assertDictEqual(result.invalid_data, {'x': 'x'})
+
+        invalid_dumping_data = {'a': 0, 'coordinate': {'x': 'x', 'y': -1}}
+        result = catalyst.dump(invalid_dumping_data)
+        self.assertFalse(result.is_valid)
+        self.assertSetEqual(set(result.errors), {'coordinate'})
+        self.assertDictEqual(result.invalid_data, {'coordinate': {'x': 'x'}})

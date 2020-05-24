@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from catalyst.core import Catalyst
 from catalyst.exceptions import ValidationError
-from catalyst.utils import snake_to_camel
+from catalyst.utils import snake_to_camel, LoadResult
 from catalyst.fields import Field, StringField, IntegerField, ListField, NestedField
 from catalyst.groups import FieldGroup
 
@@ -208,8 +208,9 @@ class CatalystAndFieldsTest(TestCase):
 
     def test_field_group(self):
         class C(Catalyst):
-            num = IntegerField()
-            no_extra = FieldGroup(declared_fields=['num'])
+            a = IntegerField()
+            b = IntegerField()
+            no_extra = FieldGroup(declared_fields=('a', 'b'))
 
             @staticmethod
             @no_extra.set_dump
@@ -225,18 +226,47 @@ class CatalystAndFieldsTest(TestCase):
                     raise ValidationError(f"Invalid fields: '{extra_fields}'.")
                 return data
 
-        self.assertEqual(set(C.no_extra.fields), {'num'})
-        self.assertEqual(C.no_extra.fields['num'], C.num)
+        # test fields injection
+        self.assertSetEqual(set(C.no_extra.fields), {'a', 'b'})
+        self.assertEqual(C.no_extra.fields['a'], C.a)
 
         c = C(all_errors=False)
 
-        valid_data = {'num': 1}
+        # test invoking groups
+        valid_data = {'a': 1, 'b': 2}
         result = c.load(valid_data)
         self.assertTrue(result.is_valid)
         result = c.dump(valid_data)
         self.assertTrue(result.is_valid)
 
-        invalid_data = {'num': 1, 'x': 2, 'y': 3}
+        # test error handling
+        invalid_data = {'a': 1, 'b': 2, 'c': 3}
         result = c.load(invalid_data)
         self.assertFalse(result.is_valid)
-        self.assertIn('no_extra', result.errors)
+        self.assertSetEqual(set(result.errors), {'no_extra'})
+        self.assertDictEqual(result.invalid_data, {'a': 1, 'b': 2})
+
+        # test data in BaseResult
+        @C.no_extra.set_load
+        def raise_error(data):
+            raise ValidationError(LoadResult({}, {'x': 'x'}, {}))
+
+        c = C()
+        self.assertEqual(c.no_extra.load, raise_error)
+
+        result = c.load(valid_data)
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.errors, {'x': 'x'})
+        self.assertDictEqual(result.invalid_data, {})
+
+        # test non dict data in BaseResult
+        @C.no_extra.set_load
+        def raise_error_2(data):
+            raise ValidationError(LoadResult(0, 0, 0))
+
+        c = C()
+        self.assertEqual(c.no_extra.load, raise_error_2)
+
+        result = c.load(valid_data)
+        self.assertFalse(result.is_valid)
+        self.assertDictEqual(result.errors, {'no_extra': '0'})

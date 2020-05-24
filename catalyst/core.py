@@ -264,11 +264,20 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             try:
                 valid_data = group_method(valid_data, original_data=data)
             except except_exception as e:
-                # set error and move invalid data
-                errors[error_key] = e
-                for source, target in source_target_pairs:
-                    if target in valid_data:
-                        invalid_data[source] = valid_data.pop(target)
+                if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
+                    # distribute nested data in BaseResult
+                    try:
+                        valid_data.update(e.msg.valid_data)
+                        errors.update(e.msg.errors)
+                        invalid_data.update(e.msg.invalid_data)
+                    except (ValueError, TypeError):
+                        errors[error_key] = e.msg.format_errors()
+                else:
+                    # collect errors and invalid data
+                    errors[error_key] = e
+                    for source, target in source_target_pairs:
+                        if target in valid_data:
+                            invalid_data[source] = valid_data.pop(target)
                 if not all_errors:
                     break
         return valid_data, errors, invalid_data

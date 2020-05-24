@@ -1,7 +1,7 @@
 from typing import Callable, Iterable
 from functools import partial
 
-from .fields import BaseField, Field, FieldDict
+from .fields import BaseField, Field, FieldDict, NestedField
 from .utils import bind_attrs
 
 
@@ -23,7 +23,7 @@ class FieldGroup(BaseField):
             value = fields[key]
             if not isinstance(value, Field):
                 raise TypeError(
-                    f'The field "{key}" must be an instance of Field, not "{value}".')
+                    f'The field "{key}" must be a Field, not "{type(value)}".')
             new_fields[key] = value
         self.fields: FieldDict = new_fields
 
@@ -33,10 +33,10 @@ class FieldGroup(BaseField):
     def set_load(self, func: Callable = None, **kwargs):
         return self.override_method(func, 'load', **kwargs)
 
-    def dump(self, data, original_data=None):
+    def dump(self, data: dict, original_data=None):
         return data
 
-    def load(self, data, original_data=None):
+    def load(self, data: dict, original_data=None):
         return data
 
 
@@ -98,15 +98,44 @@ class CompareFields(FieldGroup):
             b_key=self.field_b.load_target,
             error=load_error)
 
-    def validate(self, data, a_key, b_key, error):
+    def validate(self, data: dict, a_key, b_key, error):
         a, b = data.get(a_key), data.get(b_key)
         if a is not None and b is not None and not self.compare(a, b):
             raise error
 
-    def load(self, data, original_data=None):
+    def load(self, data: dict, original_data=None):
         self.validate_load(data)
         return data
 
-    def dump(self, data, original_data=None):
+    def dump(self, data: dict, original_data=None):
         self.validate_dump(data)
+        return data
+
+
+class TransformNested(FieldGroup):
+    """Update fields of outer data from nested data, or collect fields into nested data."""
+
+    nested_field: NestedField
+
+    def __init__(self, nested: str, **kwargs):
+        self.nested = nested
+        super().__init__(declared_fields=(nested,), **kwargs)
+
+    def set_fields(self, fields: FieldDict):
+        """Set `self.nested_field`."""
+        super().set_fields(fields)
+        nested_field: NestedField = self.fields[self.nested]
+        if not isinstance(nested_field, NestedField):
+            raise TypeError(
+                f'The field "{self.nested}" must be a NestedField, not "{type(nested_field)}".')
+        if nested_field.many:
+            raise ValueError(f'The field "{self.nested}" can not be set as `many=True`.')
+        self.nested_field = nested_field
+
+    def load(self, data: dict, original_data=None):
+        data[self.nested_field.load_target] = self.nested_field.load(original_data)
+        return data
+
+    def dump(self, data: dict):
+        data.update(data.pop(self.nested_field.dump_target, {}))
         return data
