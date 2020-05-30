@@ -6,7 +6,14 @@ from .utils import bind_attrs
 
 
 class FieldGroup(BaseField):
-    """Field group."""
+    """Process multiple fields of the data, after all single fields being handled.
+    The `FieldGroup` can directly modify the whole data, while `Field` can only modify
+    one field value of the data.
+
+    :param declared_fields: The fields that need to be injected by `Catalyst`.
+        A list of field names, or character "*" which means all fields.
+    :param kwargs: Same as `BaseField`.
+    """
     fields: FieldDict
     declared_fields: Iterable[str] = tuple()
 
@@ -17,7 +24,12 @@ class FieldGroup(BaseField):
     def set_fields(self, fields: FieldDict):
         """Inject fields according to `declared_fields`."""
         new_fields = {}
-        for key in self.declared_fields:
+        # character '*' means to inject all fields
+        declared_fields = self.declared_fields
+        if declared_fields == '*':
+            declared_fields = fields.keys()
+        # check fields
+        for key in declared_fields:
             if key not in fields:
                 raise ValueError(f'The field "{key}" is not found.')
             value = fields[key]
@@ -27,16 +39,20 @@ class FieldGroup(BaseField):
             new_fields[key] = value
         self.fields: FieldDict = new_fields
 
-    def set_dump(self, func: Callable = None, **kwargs):
-        return self.override_method(func, 'dump', **kwargs)
+    def set_dump(self, func: Callable):
+        """Override `FieldGroup.dump` method. See `BaseField.override_method` for more details."""
+        return self.override_method(func, 'dump')
 
-    def set_load(self, func: Callable = None, **kwargs):
-        return self.override_method(func, 'load', **kwargs)
+    def set_load(self, func: Callable):
+        """Override `FieldGroup.load` method. See `BaseField.override_method` for more details."""
+        return self.override_method(func, 'load')
 
     def dump(self, data: dict, original_data=None):
+        """Serialize multiple fields of the data."""
         return data
 
     def load(self, data: dict, original_data=None):
+        """Deserialize multiple fields of the data."""
         return data
 
 

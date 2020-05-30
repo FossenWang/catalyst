@@ -36,6 +36,12 @@ class GroupsTest(TestCase):
         self.assertEqual(group.dump({})['xxx'], 1)
         self.assertEqual(group.load({})['xxx'], 1)
 
+        # test "*" all fields
+        group = FieldGroup(declared_fields='*')
+        group.set_fields(fields)
+        self.assertDictEqual(group.fields, fields)
+
+
     def test_compare_fields(self):
         class ComparisonCatalyst(Catalyst):
             lower_limit = IntegerField()

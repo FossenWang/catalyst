@@ -9,6 +9,7 @@ from catalyst.fields import (
     DatetimeField, TimeField, DateField,
     NestedField, DecimalField,
 )
+from catalyst.utils import no_processing
 from catalyst.exceptions import ValidationError
 
 
@@ -19,6 +20,13 @@ class FieldTest(TestCase):
             field.load()
         with self.assertRaises(NotImplementedError):
             field.dump()
+
+        field.override_method(no_processing, 'dump')
+        self.assertEqual(field.dump, no_processing)
+        self.assertEqual(field.dump(1), 1)
+        field.override_method(attr='load')(no_processing)
+        self.assertEqual(field.load, no_processing)
+        self.assertEqual(field.load(1), 1)
 
         # test set field opts in class
         class A:

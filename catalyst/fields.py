@@ -66,13 +66,36 @@ class BaseField(ErrorMessageMixin):
         self.collect_error_messages(error_messages)
         bind_attrs(self, no_dump=no_dump, no_load=no_load)
 
-    def override_method(self, func, attr):
+    def override_method(self, func: CallableType = None, attr: str = None):
         """Override a method of the field instance. Inject field instance or covered method
         as argments into the function according to argument name.
 
-        :param func: The function to override.
+        Example:
+
+            field.override_method(function, 'format')
+
+            @field.override_method(attr='format')
+            def function(value):
+                return value
+
+            @field.override_method(attr='format')
+            def function(value, field, original_method):
+                return original_method(value)
+
+            field.set_format = field.override_method(attr='format')
+
+            @field.set_format
+            def function(value, field, original_method):
+                return original_method(value)
+
+        :param func: The function to override. The value will be passed to the first argument,
+            and the field instance or covered method will be passed, if argments like "field",
+            "original_method" or "**kwargs" exist.
         :param attr: The attribute to be overrided.
         """
+        if func is None:
+            return partial(self.override_method, attr=attr)
+
         sig = inspect.signature(func)
         kwargs = {}
         # inject args if the last parameter is keyword arguments
@@ -172,28 +195,13 @@ class Field(BaseField):
 
     def set_format(self, func: CallableType):
         """Override `Field.format` method which will be called during dumping.
-
-        Example:
-
-            field.set_format(function)
-
-            @field.set_format
-            def function(value):
-                return value
-
-            @field.set_format
-            def function(value, field, original_method):
-                return original_method(value)
-
-        :param func: The field value will be passed to the first argument, and
-            the field instance or covered method will be passed, if argments
-            like "field", "original_method" or "**kwargs" exist.
+        See `BaseField.override_method` for more details.
         """
         return self.override_method(func, 'format')
 
     def set_parse(self, func: CallableType):
         """Override `Field.parse` method which will be called during loading.
-        See `Field.set_format` for more details.
+        See `BaseField.override_method` for more details.
         """
         return self.override_method(func, 'parse')
 
@@ -239,7 +247,7 @@ class Field(BaseField):
         return value
 
     def dump(self, value):
-        """Serialize `value` as native Python data type by validatiing and
+        """Serialize `value` as native Python data type by validating and
         formatting. By default, it doesn't validate `value` during dumping,
         but you can override `validate_dump` method to perform validation.
         """
@@ -253,7 +261,7 @@ class Field(BaseField):
         return value
 
     def load(self, value):
-        """Deserialize `value` to an object by parsing and validatiing."""
+        """Deserialize `value` to an object by parsing and validating."""
         if value is not None or self.parse_none:
             value = self.parse(value)
 
