@@ -132,3 +132,29 @@ class GroupsTest(TestCase):
         self.assertFalse(result.is_valid)
         self.assertSetEqual(set(result.errors), {'coordinate'})
         self.assertDictEqual(result.invalid_data, {'coordinate': {'x': 'x'}})
+
+        # test change process methods
+        fields = {'x': catalyst.coordinate}
+
+        with self.assertRaises(AttributeError):
+            TransformNested('x', dump_method='wrong').set_fields(fields)
+        with self.assertRaises(AttributeError):
+            TransformNested('x', load_method='wrong').set_fields(fields)
+
+        class ReversedTransformCatalyst(TransformCatalyst):
+            coordinate = NestedField(coordinate_catalyst, dump_required=False)
+            transform = TransformNested(
+                'coordinate', dump_method='flat_to_nested', load_method='nested_to_flat')
+
+        reversed_catalyst = ReversedTransformCatalyst()
+
+        dumping_data = {'a': 0, 'x': 1, 'y': -1}
+        loading_data = {'a': 0, 'coordinate': {'x': 1, 'y': -1}}
+
+        result = reversed_catalyst.dump(dumping_data)
+        self.assertTrue(result.is_valid)
+        self.assertDictEqual(result.valid_data, loading_data)
+
+        result = reversed_catalyst.load(loading_data)
+        self.assertTrue(result.is_valid)
+        self.assertDictEqual(result.valid_data, dumping_data)

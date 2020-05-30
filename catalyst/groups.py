@@ -113,16 +113,28 @@ class CompareFields(FieldGroup):
 
 
 class TransformNested(FieldGroup):
-    """Update fields of outer data from nested data, or collect fields into nested data."""
+    """Convert flat data to and from nested data.
+
+    :param nested: The field name of NestedField.
+    :param dump_method: The method name to dump data,
+        choose one of `nested_to_flat`, `flat_to_nested` to handle data.
+        The default value is `nested_to_flat`.
+    :param load_method: The method name to load data,
+        choose one of `nested_to_flat`, `flat_to_nested` to handle data.
+        The default value is `flat_to_nested`.
+    """
 
     nested_field: NestedField
+    dump_method = 'nested_to_flat'
+    load_method = 'flat_to_nested'
 
-    def __init__(self, nested: str, **kwargs):
+    def __init__(self, nested: str, dump_method: str = None, load_method: str = None, **kwargs):
         self.nested = nested
         super().__init__(declared_fields=(nested,), **kwargs)
+        bind_attrs(self, dump_method=dump_method, load_method=load_method)
 
     def set_fields(self, fields: FieldDict):
-        """Set `self.nested_field`."""
+        """Set `self.nested_field`, and create partial load and dump methods."""
         super().set_fields(fields)
         nested_field: NestedField = self.fields[self.nested]
         if not isinstance(nested_field, NestedField):
@@ -131,11 +143,30 @@ class TransformNested(FieldGroup):
         if nested_field.many:
             raise ValueError(f'The field "{self.nested}" can not be set as `many=True`.')
         self.nested_field = nested_field
+        # create partial methods
+        self._do_dump = partial(
+            getattr(self, self.dump_method),
+            target=nested_field.dump_target,
+            method=nested_field.dump,
+        )
+        self._do_load = partial(
+            getattr(self, self.load_method),
+            target=nested_field.load_target,
+            method=nested_field.load,
+        )
+
+    def flat_to_nested(self, data: dict, original_data, target, method):
+        """Collect fields from the flat data, and set them to a nested field."""
+        data[target] = method(original_data)
+        return data
+
+    def nested_to_flat(self, data: dict, target: str, **kwargs):
+        """Update the flat data with the nested data."""
+        data.update(data.pop(target, {}))
+        return data
+
+    def dump(self, data: dict, original_data=None):
+        return self._do_dump(data=data, original_data=original_data)
 
     def load(self, data: dict, original_data=None):
-        data[self.nested_field.load_target] = self.nested_field.load(original_data)
-        return data
-
-    def dump(self, data: dict):
-        data.update(data.pop(self.nested_field.dump_target, {}))
-        return data
+        return self._do_load(data=data, original_data=original_data)
