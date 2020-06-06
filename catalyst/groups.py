@@ -14,30 +14,32 @@ class FieldGroup(BaseField):
         A list of field names, or character "*" which means all fields.
     :param kwargs: Same as `BaseField`.
     """
-    fields: FieldDict
+
     declared_fields: Iterable[str] = tuple()
+    fields: FieldDict
 
     def __init__(self, declared_fields: Iterable[str] = None, **kwargs):
         super().__init__(**kwargs)
         bind_attrs(self, declared_fields=declared_fields)
 
     def set_fields(self, fields: FieldDict):
-        """Inject fields according to `declared_fields`."""
-        new_fields = {}
+        """Inject fields according to `declared_fields`, exclude `FieldGroup`."""
+        new_fields: FieldDict = {}
         # character '*' means to inject all fields
-        declared_fields = self.declared_fields
-        if declared_fields == '*':
-            declared_fields = fields.keys()
-        # check fields
-        for key in declared_fields:
-            if key not in fields:
-                raise ValueError(f'The field "{key}" is not found.')
-            value = fields[key]
-            if not isinstance(value, Field):
-                raise TypeError(
-                    f'The field "{key}" must be a Field, not "{type(value)}".')
-            new_fields[key] = value
-        self.fields: FieldDict = new_fields
+        if self.declared_fields == '*':
+            for key, value in fields.items():
+                if isinstance(value, Field):
+                    new_fields[key] = value
+        else:
+            # collect and check fields
+            for key in self.declared_fields:
+                if key not in fields:
+                    raise ValueError(f'The field "{key}" is not found.')
+                value = fields[key]
+                if not isinstance(value, Field):
+                    raise TypeError(f'The field "{key}" must be a Field, not "{value}".')
+                new_fields[key] = value
+        self.fields = new_fields
 
     def set_dump(self, func: Callable):
         """Override `FieldGroup.dump` method. See `BaseField.override_method` for more details."""
@@ -57,7 +59,14 @@ class FieldGroup(BaseField):
 
 
 class CompareFields(FieldGroup):
-    """Compare the values of two fields."""
+    """Compare the values of two fields.
+
+    :param a: The name of field on the left of the comparison operator.
+    :param b: The name of field on the right of the comparison operator.
+    :param op: The string of comparison operator, which must be a key in
+        `CompareFields.comparison_dict`.
+    :param kwargs: Same as `FieldGroup`.
+    """
 
     no_dump = True
     error_messages = {
@@ -82,8 +91,7 @@ class CompareFields(FieldGroup):
     def __init__(self, a: str, op: str, b: str, **kwargs):
         if op not in self.comparison_dict:
             raise ValueError(
-                f'Argument `op` must be one of '
-                f"{list(self.comparison_dict.keys())}, not '{op}'.")
+                f'Argument "op" must be one of {list(self.comparison_dict)}, not "{op}".')
         self.compare = self.comparison_dict[op]
         self.op = op
         self.a = a
@@ -138,6 +146,7 @@ class TransformNested(FieldGroup):
     :param load_method: The method name to load data,
         choose one of `nested_to_flat`, `flat_to_nested` to handle data.
         The default value is `flat_to_nested`.
+    :param kwargs: Same as `FieldGroup`.
     """
 
     nested_field: NestedField
@@ -155,9 +164,9 @@ class TransformNested(FieldGroup):
         nested_field: NestedField = self.fields[self.nested]
         if not isinstance(nested_field, NestedField):
             raise TypeError(
-                f'The field "{self.nested}" must be a NestedField, not "{type(nested_field)}".')
+                f'The field "{self.nested}" must be a NestedField, not "{nested_field}".')
         if nested_field.many:
-            raise ValueError(f'The field "{self.nested}" can not be set as `many=True`.')
+            raise ValueError(f'The field "{self.nested}" can not be set as "many=True".')
         self.nested_field = nested_field
         # create partial methods
         self._do_dump = partial(

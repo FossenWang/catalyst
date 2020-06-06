@@ -36,11 +36,11 @@ class GroupsTest(TestCase):
         self.assertEqual(group.dump({})['xxx'], 1)
         self.assertEqual(group.load({})['xxx'], 1)
 
-        # test "*" all fields
+        # test "*" all fields, exclude FieldGroup
         group = FieldGroup(declared_fields='*')
+        fields['group'] = group
         group.set_fields(fields)
-        self.assertDictEqual(group.fields, fields)
-
+        self.assertSetEqual(set(group.fields), {'xxx', 'num'})
 
     def test_compare_fields(self):
         class ComparisonCatalyst(Catalyst):

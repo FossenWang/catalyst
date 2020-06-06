@@ -61,7 +61,7 @@ class CatalystPacker:
         elif name == 'load':
             ResultClass = LoadResult
         else:
-            raise ValueError("Argment 'name' must be 'dump' or 'load'.")
+            raise ValueError('Argment "name" must be "dump" or "load".')
 
         all_errors = self.all_errors
         if many:

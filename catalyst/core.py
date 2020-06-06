@@ -52,7 +52,7 @@ def _get_fields_from_instance(obj):
 
 def _set_fields(cls_or_obj, fields: FieldDict):
     """Set fields for `Catalyst` class or its instance.
-    Generate "field.name" or "field.key" if it is None.
+    Generate `Field.name` or `Field.key` if it is None.
     """
     for attr, field in fields.items():
         if field.name is None:
@@ -60,7 +60,8 @@ def _set_fields(cls_or_obj, fields: FieldDict):
         if field.key is None:
             field.key = cls_or_obj._format_field_key(attr)
 
-        # inject fields that FieldGroup declared
+    # inject fields that FieldGroup declared, after all fields are formatted
+    for attr, field in fields.items():
         if isinstance(field, FieldGroup):
             field.set_fields(fields)
 
@@ -118,6 +119,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     :param load_include: The fields to include in load fields.
     :param load_exclude: The fields to exclude from dump fields.
     """
+
     schema: Any = None
     raise_error = False
     all_errors = True
@@ -196,7 +198,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                 self.fields, load_include,
                 lambda key: not self.fields[key].no_load)
         except KeyError as error:
-            raise ValueError(f"Field '{error.args[0]}' does not exist.") from error
+            raise ValueError(f'Field "{error.args[0]}" does not exist.') from error
 
         # make processors when initializing for shorter run time
         self._do_dump = self._make_processor('dump', False)
@@ -306,7 +308,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         elif name == 'load':
             ResultClass = self.LoadResult
         else:
-            raise ValueError("Argument `name` must be 'dump' or 'load'.")
+            raise ValueError('Argument "name" must be "dump" or "load".')
 
         all_errors = self.all_errors
         except_exception = self.except_exception

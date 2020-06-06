@@ -112,7 +112,7 @@ class RangeValidator(ErrorMessageMixin, Validator):
 
         elif minimum is not None and maximum is not None:
             if minimum > maximum:
-                raise ValueError("`minimum` can't be greater than `maximum`.")
+                raise ValueError('"minimum" cannot be greater than "maximum".')
 
             validate = self.check_between
             error_message = self.error_messages['not_between']

@@ -40,8 +40,8 @@ class LoadResult(BaseResult):
 
 
 UNKNOWN_ERROR_MESSAGE = (
-    'Exception raised by `{self}`, but error key `{key}` '
-    'does not exist in the `error_messages` dict.'
+    'Exception raised by "{self}", but error key "{key}" '
+    'does not exist in the "error_messages" dict.'
 )
 
 class ErrorMessageMixin:

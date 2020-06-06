@@ -270,3 +270,21 @@ class CatalystAndFieldsTest(TestCase):
         result = c.load(valid_data)
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.errors, {'no_extra': '0'})
+
+        # The catalyst should inject fields into FieldGroup only after
+        # `Field.name` and `Field.key` of every fields are generated
+        class TestSetFields(FieldGroup):
+            def set_fields(self, fields):
+                super().set_fields(fields)
+
+                field = self.fields['field']
+                self.field_name = field.name
+                self.field_key = field.key
+
+        class C2(Catalyst):
+            group = TestSetFields(declared_fields='*')
+            field = IntegerField()
+
+        c = C2()
+        self.assertEqual(c.group.field_key, c.field.key)
+        self.assertEqual(c.group.field_name, c.field.name)

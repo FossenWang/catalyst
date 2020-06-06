@@ -34,7 +34,7 @@ class UtilsTest(TestCase):
         with self.assertRaises(AssertionError) as cm:
             b.error('x')
         self.assertTrue(str(cm.exception).endswith(
-            'error key `x` does not exist in the `error_messages` dict.'))
+            'error key "x" does not exist in the "error_messages" dict.'))
 
         b.collect_error_messages({'b': 'bb'})
         self.assertEqual(str(b.error('b')), 'bb')
