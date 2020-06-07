@@ -1,8 +1,8 @@
 from unittest import TestCase
 
 from catalyst.core import Catalyst
-from catalyst.fields import IntegerField, NestedField
-from catalyst.groups import FieldGroup, CompareFields, TransformNested
+from catalyst.fields import NestedField, IntegerField, DecimalField, StringField
+from catalyst.groups import FieldGroup, CompareFields, TransformNested, SumFields
 from catalyst.exceptions import ValidationError
 
 
@@ -164,3 +164,31 @@ class GroupsTest(TestCase):
         result = reversed_catalyst.load(loading_data)
         self.assertTrue(result.is_valid)
         self.assertDictEqual(result.valid_data, dumping_data)
+
+    def test_sum_fields(self):
+        decimal_field = DecimalField()
+
+        class SumCatalyst(Catalyst):
+            a = IntegerField()
+            b = IntegerField()
+            total = SumFields(decimal_field, declared_fields='*')
+
+        catalyst = SumCatalyst()
+        self.assertSetEqual(set(catalyst.total.fields), {'a', 'b'})
+
+        data = {'a': 1, 'b': 2}
+
+        result = catalyst.dump(data)
+        self.assertTrue(result.is_valid)
+        self.assertEqual(result.valid_data['total'], '3')
+
+        result = catalyst.load(data)
+        self.assertTrue(result.is_valid)
+        self.assertEqual(result.valid_data['total'], decimal_field.to_decimal(3))
+
+        # wrong type
+        with self.assertRaises(TypeError):
+            SumFields('xxx')
+
+        with self.assertRaises(TypeError):
+            SumCatalyst.total.set_fields({'x': StringField()})

@@ -1,7 +1,7 @@
 from typing import Callable, Iterable
 from functools import partial
 
-from .fields import BaseField, Field, FieldDict, NestedField
+from .fields import BaseField, Field, FieldDict, NestedField, NumberField
 from .utils import bind_attrs
 
 
@@ -195,3 +195,52 @@ class TransformNested(FieldGroup):
 
     def load(self, data: dict, original_data=None):
         return self._do_load(data=data, original_data=original_data)
+
+
+class SumFields(FieldGroup):
+    """Calculate the sum of values of the fields.
+
+    :param result_field: A field to convert the sum result. If None, don't convert the sum.
+    :param declared_fields: The name of fields which to collect values from data.
+    :param kwargs: Same as `FieldGroup`.
+    """
+    dump_data_keys: Iterable[str]
+    load_data_keys: Iterable[str]
+
+    def __init__(self, result_field: Field = None, **kwargs):
+        if result_field and not isinstance(result_field, Field):
+            raise TypeError(
+                f'Argument "result_field" must be a Field, not "{result_field}".')
+        self.result_field = result_field
+        super().__init__(**kwargs)
+
+    def set_fields(self, fields: FieldDict):
+        """Check if the injected fields are `NumberField`."""
+        super().set_fields(fields)
+        for key, value in self.fields.items():
+            if not isinstance(value, NumberField):
+                raise TypeError(
+                    f'The field "{key}" must be a NumberField, not "{value}".')
+        # collect data keys from fields
+        self.dump_data_keys = tuple(field.dump_target for field in self.fields.values())
+        self.load_data_keys = tuple(field.load_target for field in self.fields.values())
+
+    def iter_data(self, data: dict, data_keys: Iterable):
+        for key in data_keys:
+            value = data.get(key)
+            if value is not None:
+                yield value
+
+    def dump(self, data: dict, original_data=None):
+        total = sum(self.iter_data(data, self.dump_data_keys))
+        if self.result_field:
+            total = self.result_field.dump(total)
+        data[self.dump_target] = total
+        return data
+
+    def load(self, data: dict, original_data=None):
+        total = sum(self.iter_data(data, self.load_data_keys))
+        if self.result_field:
+            total = self.result_field.load(total)
+        data[self.load_target] = total
+        return data

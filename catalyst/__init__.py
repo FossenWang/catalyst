@@ -37,3 +37,9 @@ from .fields import (
     Nested,
     NestedField,
 )
+from .groups import (
+    FieldGroup,
+    CompareFields,
+    TransformNested,
+    SumFields,
+)
