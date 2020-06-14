@@ -1,5 +1,6 @@
 from setuptools import setup
 
+
 setup(
     name='catalyst',
     version='0.1',

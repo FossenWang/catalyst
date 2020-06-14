@@ -79,6 +79,7 @@ class CatalystTest(TestCase):
         self.assertEqual(b.all_errors, False)
         self.assertEqual(b.raise_error, True)
 
+        # the order of fields follows mro
         class C:
             c = StringField()
 
@@ -94,22 +95,29 @@ class CatalystTest(TestCase):
         self.assertListEqual(list(BC.fields), ['c', 'a', 'b'])
         self.assertIsInstance(BC.fields['c'], FloatField)
 
-        class D(C):
-            d = FloatField()
+        # remove non fields
+        class ACNone(C):
+            a = None
+            c = None
 
-        class DB(D, B):
+        class NoAC(ACNone, B):
             pass
 
-        self.assertListEqual(list(DB.fields), ['a', 'b', 'c', 'd'])
-        self.assertIsInstance(DB.fields['c'], StringField)
-        self.assertIsInstance(DB.fields['d'], FloatField)
+        self.assertListEqual(list(NoAC.fields), ['b'])
+        self.assertListEqual(list(B.fields), ['a', 'b', 'c'])
 
-        class BD(B, D):
-            pass
+        # set `a` as `Field` again, and `a` is behind `b`
+        class BA_1(ACNone, B):
+            a = StringField()
 
-        self.assertListEqual(list(BD.fields), ['c', 'd', 'a', 'b'])
-        self.assertIsInstance(BD.fields['c'], FloatField)
-        self.assertIsInstance(BD.fields['d'], FloatField)
+        self.assertListEqual(list(BA_1.fields), ['b', 'a'])
+        self.assertIsInstance(BA_1.fields['a'], StringField)
+
+        class BA_2(NoAC):
+            a = StringField()
+
+        self.assertListEqual(list(BA_2.fields), ['b', 'a'])
+        self.assertIsInstance(BA_2.fields['a'], StringField)
 
     def test_set_fields_by_schema(self):
         # wrong type
@@ -187,6 +195,18 @@ class CatalystTest(TestCase):
         # fields following alphabetic order
         self.assertListEqual(list(fields), ['a', 'b', 'base'])
         self.assertIsInstance(fields['a'], IntegerField)
+
+        # remove non fields
+        class NoA(AB):
+            a = None
+
+        catalyst = Catalyst(NoA)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'b'])
+
+        catalyst = BABase(NoA)
+        fields = catalyst.fields
+        self.assertListEqual(list(fields), ['base', 'b'])
 
     def test_init(self):
         dump_data = TestData(

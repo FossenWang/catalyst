@@ -6,7 +6,7 @@ from typing import Iterable, Callable, Any, Mapping
 from functools import wraps, partial
 
 from .base import CatalystABC
-from .fields import BaseField, FieldDict
+from .fields import BaseField, FieldDict, Field
 from .groups import FieldGroup
 from .exceptions import ValidationError, ExceptionType
 from .utils import (
@@ -15,53 +15,54 @@ from .utils import (
 )
 
 
-def _get_fields(fields: dict):
-    """Collect fields from dict."""
-    new_fields: FieldDict = {}
-    for name, field in fields.items():
-        if isinstance(field, type) and issubclass(field, BaseField):
+def _override_fields(fields: FieldDict, attrs: dict):
+    """Collect fields from dict, override fields and remove non fields."""
+    for name, obj in attrs.items():
+        if isinstance(obj, type) and issubclass(obj, BaseField):
             raise TypeError(
                 f'Field for "{name}" must be declared as a Field instance, '
-                f'not a class. Did you mean "{field.__name__}()"?')
+                f'not a class. Did you mean "{obj.__name__}()"?')
 
-        if isinstance(field, BaseField):
-            new_fields[name] = field
-    return new_fields
-
-
-def _get_fields_from_classes(classes: Iterable[type]):
-    """Collect fields from base classes, following method resolution order."""
-    fields = {}
-    for klass in reversed(classes):
-        if issubclass(klass, CatalystABC):
-            fields.update(_get_fields(klass.fields))
-        else:
-            for base in klass.mro()[-2::-1]:
-                fields.update(_get_fields(base.__dict__))
+        if isinstance(obj, BaseField):
+            fields[name] = obj  # override Field
+        elif name in fields:
+            del fields[name]  # remove non Field
     return fields
 
 
-def _get_fields_from_instance(obj):
+def _get_fields_from_classes(fields: FieldDict, classes: Iterable[type]):
+    """Collect fields from base classes, following method resolution order."""
+    for klass in reversed(classes):
+        if issubclass(klass, CatalystABC):
+            _override_fields(fields, klass.fields)
+        else:
+            # reverse and ignore <class 'object'>
+            for base in klass.mro()[-2::-1]:
+                _override_fields(fields, base.__dict__)
+    return fields
+
+
+def _get_fields_from_instance(fields: FieldDict, obj):
     """Collect fields from instance."""
     if isinstance(obj, CatalystABC):
-        fields = obj.fields
+        attrs = obj.fields
     else:
-        fields = {attr: getattr(obj, attr) for attr in dir(obj)}
-    return _get_fields(fields)
+        attrs = {attr: getattr(obj, attr) for attr in dir(obj)}
+    return _override_fields(fields, attrs)
 
 
 def _set_fields(cls_or_obj, fields: FieldDict):
     """Set fields for `Catalyst` class or its instance.
     Generate `Field.name` or `Field.key` if it is None.
     """
-    for attr, field in fields.items():
+    for name, field in fields.items():
         if field.name is None:
-            field.name = cls_or_obj._format_field_name(attr)
+            field.name = cls_or_obj._format_field_name(name)
         if field.key is None:
-            field.key = cls_or_obj._format_field_key(attr)
+            field.key = cls_or_obj._format_field_key(name)
 
     # inject fields that FieldGroup declared, after all fields are formatted
-    for attr, field in fields.items():
+    for field in fields.values():
         if isinstance(field, FieldGroup):
             field.set_fields(fields)
 
@@ -73,8 +74,9 @@ class CatalystMeta(type):
 
     def __new__(cls, name, bases, attrs):
         new_cls = super().__new__(cls, name, bases, attrs)
-        fields = _get_fields_from_classes(bases)
-        fields.update(_get_fields(attrs))
+        fields = {}
+        _get_fields_from_classes(fields, bases)
+        _override_fields(fields, attrs)
         _set_fields(new_cls, fields)
         return new_cls
 
@@ -165,12 +167,11 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         if schema:
             fields = self.fields.copy()
             if isinstance(schema, Mapping):
-                new_fields = _get_fields(schema)
+                _override_fields(fields, schema)
             elif isinstance(schema, type):
-                new_fields = _get_fields_from_classes([schema])
+                _get_fields_from_classes(fields, [schema])
             else:
-                new_fields = _get_fields_from_instance(schema)
-            fields.update(new_fields)
+                _get_fields_from_instance(fields, schema)
             _set_fields(self, fields)
 
         # include fields
@@ -338,7 +339,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             partial_fields, partial_groups = [], []
             for field in field_dict.values():
                 if isinstance(field, FieldGroup):
-                    # get partial arguments from field groups
+                    # get partial arguments from FieldGroup
                     group: FieldGroup = field
                     group_method = getattr(group, method_name)
                     group_method = self._modify_processer_parameters(group_method)
@@ -349,8 +350,8 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                         target = getattr(f, target_attr)
                         source_target_pairs.append((source, target))
                     partial_groups.append((group_method, error_key, source_target_pairs))
-                else:
-                    # get partial arguments from fields
+                elif isinstance(field, Field):
+                    # get partial arguments from Field
                     source = getattr(field, source_attr)
                     target = getattr(field, target_attr)
                     required = getattr(field, required_attr)
