@@ -340,7 +340,7 @@ class IntegerField(NumberField):
 class DecimalField(NumberField):
     """Field for converting `decimal.Decimal` object.
 
-    :param scale: The number of digits to the right of the decimal point.
+    :param places: The number of digits to the right of the decimal point.
         If `None`, does not quantize the value.
     :param rounding: The rounding mode, for example `decimal.ROUND_UP`.
         If `None`, the rounding mode of the current thread's context is used.
@@ -348,24 +348,23 @@ class DecimalField(NumberField):
     :param kwargs: Same as `Number` field.
     """
     dump_as = str
-    scale = None
+    places = None
     rounding = None
     exponent = None
 
     def __init__(
             self,
-            scale: int = None,
+            places: int = None,
             rounding: str = None,
             dump_as: type = None,
             **kwargs):
         super().__init__(**kwargs)
-        bind_attrs(self, scale=scale, rounding=rounding, dump_as=dump_as)
+        bind_attrs(self, places=places, rounding=rounding, dump_as=dump_as)
 
         if not callable(self.dump_as):
             raise TypeError('Argument "dump_as" must be callable.')
-        scale = self.scale
-        if scale is not None:
-            self.exponent = decimal.Decimal((0, (), -int(scale)))
+        if self.places is not None:
+            self.exponent = decimal.Decimal((0, (), -int(self.places)))
 
     def to_decimal(self, value):
         if isinstance(value, float):

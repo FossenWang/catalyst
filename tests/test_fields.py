@@ -203,7 +203,7 @@ class FieldTest(TestCase):
         self.assertEqual(str(field.load('nan')), 'NaN')
         self.assertEqual(str(field.load('inf')), 'Infinity')
 
-        field = DecimalField(dump_as=float, scale=2, rounding=ROUND_CEILING)
+        field = DecimalField(dump_as=float, places=2, rounding=ROUND_CEILING)
         self.assertEqual(field.dump(1.1), 1.1)
         self.assertEqual(field.dump(1), 1.0)
         self.assertEqual(field.dump('inf'), float('inf'))
