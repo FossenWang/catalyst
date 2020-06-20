@@ -121,15 +121,14 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     :param load_include: The fields to include in load fields.
     :param load_exclude: The fields to exclude from dump fields.
     """
-
     schema: Any = None
     raise_error = False
     all_errors = True
     except_exception: ExceptionType = Exception
     process_aliases = {}
 
-    DumpResult = DumpResult
-    LoadResult = LoadResult
+    dump_result_class = DumpResult
+    load_result_class = LoadResult
 
     fields: FieldDict = {}
 
@@ -305,9 +304,9 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         different processes in advance to reduce processing time.
         """
         if name == 'dump':
-            ResultClass = self.DumpResult
+            ResultClass = self.dump_result_class
         elif name == 'load':
-            ResultClass = self.LoadResult
+            ResultClass = self.load_result_class
         else:
             raise ValueError('Argument "name" must be "dump" or "load".')
 

@@ -260,14 +260,14 @@ class FieldTest(TestCase):
             CallableField(func_kwargs=0)
 
     def test_datetime_field(self):
-        dt = datetime(2019, 1, 1)
+        dt = datetime(2019, 11, 11, 11, 11, 11)
         invalid_dt = dt + timedelta(days=1, seconds=1)
         self.base_test_datetime_field(dt, invalid_dt, DatetimeField, '%Y%m%d%H%M%S')
         self.base_test_datetime_field(dt.time(), invalid_dt.time(), TimeField, '%H%M%S')
         self.base_test_datetime_field(dt.date(), invalid_dt.date(), DateField, '%Y%m%d')
 
     def base_test_datetime_field(self, dt, invalid_dt, FieldClass, fmt):
-        # dump
+        # test dump
         field = FieldClass()
         dt_str = field.dump(dt)
         self.assertEqual(dt_str, dt.strftime(field.fmt))
@@ -279,12 +279,17 @@ class FieldTest(TestCase):
         with self.assertRaises(TypeError):
             field.dump(1)
 
-        # load & dump
+        # test load
         field = FieldClass(maximum=dt)
         dt_str = field.dump(dt)
         self.assertEqual(field.load(dt_str), dt)
+        # `load_default` might be a datetime object
+        self.assertEqual(field.load(dt), dt)
+
         with self.assertRaises(ValueError):
             field.load('2018Y')
+        with self.assertRaises(ValidationError):
+            field.load(invalid_dt)
 
     def test_list_field(self):
         with self.assertRaises(TypeError):

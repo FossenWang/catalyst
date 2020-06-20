@@ -1,6 +1,7 @@
 """Field classes for various types of data."""
 
 import decimal
+import datetime
 import inspect
 from functools import partial
 
@@ -8,7 +9,6 @@ from typing import (
     Any, Iterable, Union, Mapping, Hashable, Dict,
     Callable as CallableType,
 )
-from datetime import datetime, time, date
 
 from .base import CatalystABC
 from .utils import (
@@ -308,8 +308,7 @@ class NumberField(Field):
     :param error_messages: Keys {'too_small', 'too_large', 'not_between',
         'required', 'none'}.
     """
-    format = float
-    parse = float
+    obj_type = float
 
     def __init__(self, minimum=None, maximum=None, **kwargs):
         super().__init__(**kwargs)
@@ -320,21 +319,32 @@ class NumberField(Field):
             msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
             self.add_validator(RangeValidator(minimum, maximum, msg_dict))
 
+    def format(self, value):
+        return self.obj_type(value)
+
+    def parse(self, value):
+        return self.obj_type(value)
+
 
 class FloatField(NumberField):
     """Float field.
 
-    :param kwargs: Same as `Number` field.
+    :param minimum: Value must >= minimum, and `None` is equal to -∞.
+    :param maximum: Value must <= maximum, and `None` is equal to +∞.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
+        'required', 'none'}.
     """
 
 
 class IntegerField(NumberField):
     """Integer field.
 
-    :param kwargs: Same as `Number` field.
+    :param minimum: Value must >= minimum, and `None` is equal to -∞.
+    :param maximum: Value must <= maximum, and `None` is equal to +∞.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
+        'required', 'none'}.
     """
-    format = int
-    parse = int
+    obj_type = int
 
 
 class DecimalField(NumberField):
@@ -345,8 +355,12 @@ class DecimalField(NumberField):
     :param rounding: The rounding mode, for example `decimal.ROUND_UP`.
         If `None`, the rounding mode of the current thread's context is used.
     :param dump_as: Data type that the value is serialized to.
-    :param kwargs: Same as `Number` field.
+    :param minimum: Value must >= minimum, and `None` is equal to -∞.
+    :param maximum: Value must <= maximum, and `None` is equal to +∞.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
+        'required', 'none'}.
     """
+    obj_type = decimal.Decimal
     dump_as = str
     places = None
     rounding = None
@@ -411,6 +425,17 @@ class BooleanField(Field):
 
 class DatetimeField(Field):
     """Field for converting `datetime.datetime` object.
+    Only native formats of `datetime.strftime()` and `datetime.strptime()` are supported.
+
+    Example:
+
+        # Aware datetime
+        field = DatetimeField(fmt=r'%Y-%m-%d %H:%M:%S%z')
+        field.load('2000-01-01 00:00:00+0000')
+
+        # Naive datetime
+        field = DatetimeField(fmt=r'%Y-%m-%d %H:%M:%S.%f')
+        field.load('2000-01-01 00:00:00.000000')
 
     :param fmt: Format of the value. See `datetime` module for details.
     :param minimum: The minimum value.
@@ -418,8 +443,8 @@ class DatetimeField(Field):
     :param error_messages: Keys {'too_small', 'too_large', 'not_between',
         'required', 'none'}.
     """
-    type_ = datetime
-    fmt = r'%Y-%m-%d %H:%M:%S.%f'
+    obj_type = datetime.datetime
+    fmt = r'%Y-%m-%d %H:%M:%S'
 
     def __init__(self, fmt: str = None, minimum=None, maximum=None, **kwargs):
         super().__init__(**kwargs)
@@ -431,10 +456,13 @@ class DatetimeField(Field):
             self.add_validator(RangeValidator(minimum, maximum, msg_dict))
 
     def format(self, dt):
-        return self.type_.strftime(dt, self.fmt)
+        return self.obj_type.strftime(dt, self.fmt)
 
     def parse(self, value: str):
-        return datetime.strptime(value, self.fmt)
+        # `load_default` might be a datetime object
+        if isinstance(value, self.obj_type):
+            return value
+        return datetime.datetime.strptime(value, self.fmt)
 
 
 class TimeField(DatetimeField):
@@ -442,11 +470,13 @@ class TimeField(DatetimeField):
 
     :param kwargs: Same as `DatetimeField` field.
     """
-    type_ = time
-    fmt = r'%H:%M:%S.%f'
+    obj_type = datetime.time
+    fmt = r'%H:%M:%S'
 
     def parse(self, value: str):
-        return datetime.strptime(value, self.fmt).time()
+        if isinstance(value, self.obj_type):
+            return value
+        return datetime.datetime.strptime(value, self.fmt).time()
 
 
 class DateField(DatetimeField):
@@ -454,11 +484,13 @@ class DateField(DatetimeField):
 
     :param kwargs: Same as `DatetimeField` field.
     """
-    type_ = date
+    obj_type = datetime.date
     fmt = r'%Y-%m-%d'
 
     def parse(self, value: str):
-        return datetime.strptime(value, self.fmt).date()
+        if isinstance(value, self.obj_type):
+            return value
+        return datetime.datetime.strptime(value, self.fmt).date()
 
 
 class CallableField(Field):

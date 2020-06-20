@@ -14,7 +14,6 @@ class FieldGroup(BaseField):
         A list of field names, or character "*" which means all fields.
     :param kwargs: Same as `BaseField`.
     """
-
     declared_fields: Iterable[str] = tuple()
     fields: FieldDict
 
@@ -67,7 +66,6 @@ class CompareFields(FieldGroup):
         `CompareFields.comparison_dict`.
     :param kwargs: Same as `FieldGroup`.
     """
-
     no_dump = True
     error_messages = {
         '>': '"{a}" must be greater than "{b}".',
@@ -148,7 +146,6 @@ class TransformNested(FieldGroup):
         The default value is `flat_to_nested`.
     :param kwargs: Same as `FieldGroup`.
     """
-
     nested_field: NestedField
     dump_method = 'nested_to_flat'
     load_method = 'flat_to_nested'
