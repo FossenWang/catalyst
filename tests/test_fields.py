@@ -7,7 +7,7 @@ from catalyst.fields import (
     BaseField, Field, StringField, IntegerField, FloatField,
     BooleanField, ListField, CallableField,
     DatetimeField, TimeField, DateField,
-    NestedField, DecimalField,
+    NestedField, DecimalField, ConstantField,
 )
 from catalyst.utils import no_processing
 from catalyst.exceptions import ValidationError
@@ -410,3 +410,9 @@ class FieldTest(TestCase):
             field.load(data)
         result = cm.exception.msg
         self.assertIsInstance(result.errors[1]['load'], TypeError)
+
+    def test_constant_field(self):
+        CONSTANT = 'x'
+        field = ConstantField(CONSTANT)
+        self.assertEqual(field.load(1), CONSTANT)
+        self.assertEqual(field.dump(2), CONSTANT)

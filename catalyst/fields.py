@@ -622,6 +622,22 @@ class NestedField(Field):
         return self._do_load(value, raise_error=True).valid_data
 
 
+class ConstantField(Field):
+    """Constant Field."""
+
+    def __init__(self, constant, **kwargs):
+        super().__init__(**kwargs)
+        self.constant = constant
+        self.dump_default = constant
+        self.load_default = constant
+
+    def format(self, value):
+        return self.constant
+
+    def parse(self, value):
+        return self.constant
+
+
 # typing hint
 FieldDict = Dict[str, BaseField]
 
@@ -639,3 +655,4 @@ Time = TimeField
 Callable = CallableField
 List = ListField
 Nested = NestedField
+Constant = ConstantField
