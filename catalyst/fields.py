@@ -131,8 +131,6 @@ class Field(BaseField):
         and which will override `Field.format`.
     :param parser: The function that parses the field value during loading,
         and which will override `Field.parse`.
-    :param format_none: Whether to format the field value if it is `None`.
-    :param parse_none: Whether to parse the field value if it is `None`.
     :param dump_required: Raise error if the field value doesn't exist;.
     :param load_required: Similar to `dump_required`.
     :param dump_default: The default value when the field value doesn't exist.
@@ -147,8 +145,6 @@ class Field(BaseField):
     :param error_messages: Keys {'required', 'none'}.
     :param kwargs: Same as :class:`BaseField`.
     """
-    format_none = False
-    parse_none = False
     dump_required = True
     load_required = False
     dump_default = missing
@@ -164,8 +160,6 @@ class Field(BaseField):
             self,
             formatter: CallableType = None,
             parser: CallableType = None,
-            format_none: bool = None,
-            parse_none: bool = None,
             dump_required: bool = None,
             load_required: bool = None,
             dump_default: Any = missing,
@@ -176,8 +170,6 @@ class Field(BaseField):
         super().__init__(**kwargs)
         bind_attrs(
             self,
-            format_none=format_none,
-            parse_none=parse_none,
             dump_required=dump_required,
             load_required=load_required,
             allow_none=allow_none,
@@ -252,9 +244,7 @@ class Field(BaseField):
         but you can override `validate_dump` method to perform validation.
         """
         self.validate_dump(value)
-
-        if value is not None or self.format_none:
-            value = self.format(value)
+        value = self.format(value)
         return value
 
     def parse(self, value):
@@ -262,9 +252,7 @@ class Field(BaseField):
 
     def load(self, value):
         """Deserialize `value` to an object by parsing and validating."""
-        if value is not None or self.parse_none:
-            value = self.parse(value)
-
+        value = self.parse(value)
         self.validate_load(value)
         return value
 
@@ -278,8 +266,6 @@ class StringField(Field):
     :param error_messages: Keys {'too_small', 'too_large', 'not_between',
         'no_match', 'required', 'none'}.
     """
-    format = str
-    parse = str
 
     def __init__(
             self,
@@ -298,6 +284,13 @@ class StringField(Field):
         if regex:
             msg = self.error_messages.get('no_match')
             self.add_validator(RegexValidator(regex, msg))
+
+    def format(self, value):
+        if value is None:
+            return value
+        return str(value)
+
+    parse = format
 
 
 class NumberField(Field):
@@ -320,10 +313,11 @@ class NumberField(Field):
             self.add_validator(RangeValidator(minimum, maximum, msg_dict))
 
     def format(self, value):
+        if value is None:
+            return value
         return self.obj_type(value)
 
-    def parse(self, value):
-        return self.obj_type(value)
+    parse = format
 
 
 class FloatField(NumberField):
@@ -389,10 +383,15 @@ class DecimalField(NumberField):
         return value
 
     def format(self, value):
+        if value is None:
+            return value
         num = self.to_decimal(value)
         return self.dump_as(num)
 
-    parse = to_decimal
+    def parse(self, value):
+        if value is None:
+            return value
+        return self.to_decimal(value)
 
 
 class BooleanField(Field):
@@ -415,10 +414,11 @@ class BooleanField(Field):
             for raw in raw_values}
 
     def format(self, value):
+        if value is None:
+            return value
         if isinstance(value, Hashable):
             value = self.reverse_value_map.get(value, value)
-        value = bool(value)
-        return value
+        return bool(value)
 
     parse = format
 
@@ -455,12 +455,14 @@ class DatetimeField(Field):
             msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
             self.add_validator(RangeValidator(minimum, maximum, msg_dict))
 
-    def format(self, dt):
-        return self.obj_type.strftime(dt, self.fmt)
+    def format(self, value):
+        if value is None:
+            return value
+        return self.obj_type.strftime(value, self.fmt)
 
-    def parse(self, value: str):
+    def parse(self, value):
         # `load_default` might be a datetime object
-        if isinstance(value, self.obj_type):
+        if value is None or isinstance(value, self.obj_type):
             return value
         return datetime.datetime.strptime(value, self.fmt)
 
@@ -473,8 +475,8 @@ class TimeField(DatetimeField):
     obj_type = datetime.time
     fmt = r'%H:%M:%S'
 
-    def parse(self, value: str):
-        if isinstance(value, self.obj_type):
+    def parse(self, value):
+        if value is None or isinstance(value, self.obj_type):
             return value
         return datetime.datetime.strptime(value, self.fmt).time()
 
@@ -488,7 +490,7 @@ class DateField(DatetimeField):
     fmt = r'%Y-%m-%d'
 
     def parse(self, value: str):
-        if isinstance(value, self.obj_type):
+        if value is None or isinstance(value, self.obj_type):
             return value
         return datetime.datetime.strptime(value, self.fmt).date()
 
@@ -523,8 +525,7 @@ class CallableField(Field):
 
 class ListField(Field):
     """List field, handle list elements with another `Field`.
-    In order to ensure proper data structure, `format_none` and `parse_none`
-    are set to True by default.
+    In order to ensure proper data structure, `None` is not valid.
 
     :param item_field: A `Field` class or instance.
     :param all_errors: Whether to collect errors for every list elements.
@@ -533,8 +534,7 @@ class ListField(Field):
     item_field: Field = None
     all_errors = True
     except_exception = Exception
-    format_none = True
-    parse_none = True
+    allow_none = False
 
     def __init__(
             self,
@@ -590,16 +590,14 @@ class ListField(Field):
 
 class NestedField(Field):
     """Nested field, handle one or more objects with `Catalyst`.
-    In order to ensure proper data structure, `format_none` and `parse_none`
-    are set to True by default.
+    In order to ensure proper data structure, `None` is not valid.
 
     :param catalyst: A `Catalyst` class or instance.
     :param many: Whether to process multiple objects.
     """
     catalyst: CatalystABC = None
     many = False
-    format_none = True
-    parse_none = True
+    allow_none = False
 
     def __init__(self, catalyst: CatalystABC = None, many: bool = None, **kwargs):
         super().__init__(**kwargs)

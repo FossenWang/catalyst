@@ -1,3 +1,5 @@
+import math
+
 from decimal import Decimal, ROUND_CEILING
 from unittest import TestCase
 from datetime import datetime, timedelta
@@ -63,7 +65,8 @@ class FieldTest(TestCase):
 
         # test load
         self.assertEqual(a.field.load(0), 1)
-        self.assertEqual(a.field.load(None), None)
+        with self.assertRaises(TypeError):
+            a.field.load(None)
         with self.assertRaises(TypeError):
             a.field.load('asd')
         with self.assertRaises(AssertionError):
@@ -164,7 +167,7 @@ class FieldTest(TestCase):
             field.load([])
 
     def test_float_field(self):
-        field = FloatField(name='float_', key='float', minimum=-11.1, maximum=111.1)
+        field = FloatField(minimum=-11.1, maximum=111.1)
 
         # dump
         self.assertEqual(field.dump(5.5), 5.5)
@@ -172,6 +175,8 @@ class FieldTest(TestCase):
         self.assertEqual(field.dump(0), 0.0)
         self.assertEqual(field.dump('10'), 10.0)
         self.assertEqual(field.dump(None), None)
+        self.assertTrue(math.isnan(field.dump('nan')))
+        self.assertTrue(math.isinf(field.dump('inf')))
 
         # load
         self.assertEqual(field.load(0), 0.0)
@@ -183,10 +188,19 @@ class FieldTest(TestCase):
 
         with self.assertRaises(ValueError):
             field.load('')
-        with self.assertRaises(ValidationError):
-            field.load(111.11)
         with self.assertRaises(TypeError):
             field.load([])
+        with self.assertRaises(ValidationError):
+            field.load(111.11)
+        with self.assertRaises(ValidationError):
+            field.load('nan')
+
+        # test nan & inf
+        field = FloatField()
+        self.assertTrue(math.isnan(field.dump('nan')))
+        self.assertTrue(math.isinf(field.dump('inf')))
+        self.assertTrue(math.isnan(field.load('nan')))
+        self.assertTrue(math.isinf(field.load('inf')))
 
     def test_decimal_field(self):
         field = DecimalField()
@@ -196,19 +210,23 @@ class FieldTest(TestCase):
         self.assertEqual(field.dump('1.1'), '1.1')
         self.assertEqual(field.dump('nan'), 'NaN')
         self.assertEqual(field.dump('inf'), 'Infinity')
+        self.assertEqual(field.dump(None), None)
 
         self.assertEqual(field.load(1), Decimal('1'))
         self.assertEqual(field.load(1.1), Decimal('1.1'))
         self.assertEqual(field.load('1.1'), Decimal('1.1'))
-        self.assertEqual(str(field.load('nan')), 'NaN')
-        self.assertEqual(str(field.load('inf')), 'Infinity')
+        self.assertEqual(field.load(None), None)
+        self.assertTrue(field.load('nan').is_nan())
+        self.assertTrue(field.load('inf').is_infinite())
 
         field = DecimalField(dump_as=float, places=2, rounding=ROUND_CEILING)
         self.assertEqual(field.dump(1.1), 1.1)
         self.assertEqual(field.dump(1), 1.0)
-        self.assertEqual(field.dump('inf'), float('inf'))
         self.assertEqual(field.dump(1.111), 1.12)
         self.assertEqual(field.dump(-1.111), -1.11)
+        self.assertTrue(math.isnan(field.dump('nan')))
+        self.assertTrue(math.isinf(field.dump('inf')))
+        self.assertEqual(field.dump(None), None)
 
         with self.assertRaises(TypeError):
             DecimalField(dump_as=1)
@@ -276,6 +294,7 @@ class FieldTest(TestCase):
         dt_str = field.dump(dt)
         self.assertEqual(dt_str, dt.strftime(fmt))
 
+        self.assertEqual(field.dump(None), None)
         with self.assertRaises(TypeError):
             field.dump(1)
 
@@ -285,6 +304,7 @@ class FieldTest(TestCase):
         self.assertEqual(field.load(dt_str), dt)
         # `load_default` might be a datetime object
         self.assertEqual(field.load(dt), dt)
+        self.assertEqual(field.load(None), None)
 
         with self.assertRaises(ValueError):
             field.load('2018Y')

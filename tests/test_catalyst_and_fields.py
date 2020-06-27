@@ -95,11 +95,6 @@ class CatalystAndFieldsTest(TestCase):
         # dump_required has no effect if dump_default is set
         assert_field_dump_args({}, {'s': None}, dump_required=True, dump_default=None)
 
-        # pass None to format
-        assert_field_dump_args({'s': None}, {'s': 'None'}, format_none=True)
-        assert_field_dump_args({}, {'s': 'None'}, format_none=True, dump_default=None)
-        assert_field_dump_args({'s': None}, {'s': 'None'}, format_none=True, allow_none=False)
-
         # no_dump means ignore this field
         assert_field_dump_args({'s': 1}, {}, no_dump=True)
 
@@ -125,11 +120,6 @@ class CatalystAndFieldsTest(TestCase):
 
         # load_required has no effect if load_default is set
         assert_field_load_args({}, {'s': None}, load_required=True, load_default=None)
-
-        # pass None to parse and validate
-        assert_field_load_args({'s': None}, {'s': 'None'}, parse_none=True)
-        assert_field_load_args({}, {'s': 'None'}, parse_none=True, load_default=None)
-        assert_field_load_args({'s': None}, {'s': 'None'}, parse_none=True, allow_none=False)
 
         # always invalid if load_default is None and allow_none is False
         with self.assertRaises(ValidationError):
