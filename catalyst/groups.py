@@ -40,13 +40,13 @@ class FieldGroup(BaseField):
                 new_fields[key] = value
         self.fields = new_fields
 
-    def set_dump(self, func: Callable):
+    def set_dump(self, func: Callable = None, obj_name='group', **kwargs):
         """Override `FieldGroup.dump` method. See `BaseField.override_method` for more details."""
-        return self.override_method(func, 'dump')
+        return self.override_method(func, 'dump', obj_name, **kwargs)
 
-    def set_load(self, func: Callable):
+    def set_load(self, func: Callable = None, obj_name='group', **kwargs):
         """Override `FieldGroup.load` method. See `BaseField.override_method` for more details."""
-        return self.override_method(func, 'load')
+        return self.override_method(func, 'load', obj_name, **kwargs)
 
     def dump(self, data: dict, original_data=None):
         """Serialize multiple fields of the data."""

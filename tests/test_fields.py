@@ -16,19 +16,72 @@ from catalyst.exceptions import ValidationError
 
 
 class FieldTest(TestCase):
+    def test_field_override_method(self):
+        field = Field()
+
+        field.override_method(no_processing, 'dump')
+        self.assertEqual(field.dump, no_processing)
+        self.assertEqual(field.dump(1), 1)
+
+        field.override_method(attr='load')(no_processing)
+        self.assertEqual(field.load, no_processing)
+        self.assertEqual(field.load(1), 1)
+
+        field = Field()
+        @field.set_format
+        def to_str_1(value):
+            return str(value)
+        self.assertEqual(field.format, to_str_1)
+        self.assertEqual(field.format(1), '1')
+
+        @field.set_format
+        def to_str_2(value, field, original_method):
+            assert isinstance(field, Field)
+            return original_method(value)
+        self.assertEqual(field.format, to_str_2)
+        self.assertEqual(field.format(1), '1')
+
+        field = Field()
+        @field.set_format
+        def to_str_3(self, value, field):
+            assert self is field
+            assert isinstance(self, Field)
+            return str(value)
+        self.assertEqual(field.format, to_str_3)
+        self.assertEqual(field.format(1), '1')
+
+        @field.set_format(obj_name='obj', original_name='old')
+        def to_str_4(self, value, obj, old):
+            assert self is obj
+            assert isinstance(obj, Field)
+            return old(value)
+        self.assertEqual(field.format, to_str_4)
+        self.assertEqual(field.format(1), '1')
+
+        field = Field()
+        @field.set_format
+        def to_str_5(value, **kwargs):
+            assert set(kwargs) == {'field', 'original_method'}
+            return str(value)
+        self.assertEqual(field.format, to_str_5)
+        self.assertEqual(field.format(1), '1')
+
+        @field.set_format(obj_name='obj', original_name='old')
+        def to_str_6(value, **kwargs):
+            assert set(kwargs) == {'obj', 'old'}
+            return str(value)
+        self.assertEqual(field.format, to_str_6)
+        self.assertEqual(field.format(1), '1')
+
+        with self.assertRaises(TypeError):
+            field.set_format(lambda field, value: str(value))
+
     def test_field(self):
         field = BaseField()
         with self.assertRaises(NotImplementedError):
             field.load()
         with self.assertRaises(NotImplementedError):
             field.dump()
-
-        field.override_method(no_processing, 'dump')
-        self.assertEqual(field.dump, no_processing)
-        self.assertEqual(field.dump(1), 1)
-        field.override_method(attr='load')(no_processing)
-        self.assertEqual(field.load, no_processing)
-        self.assertEqual(field.load(1), 1)
 
         # test set field opts in class
         class A:
@@ -41,9 +94,8 @@ class FieldTest(TestCase):
 
             @staticmethod
             @field.set_parse
-            def field_add_1(value, field, original_method):
-                assert isinstance(field, Field)
-                return original_method(value) + 1
+            def field_add_1(value):
+                return value + 1
 
             @staticmethod
             @field.set_validators
@@ -57,7 +109,6 @@ class FieldTest(TestCase):
                 assert value < 100
 
         a = A()
-        self.assertEqual(a.field.parse.keywords['field'], a.field)
 
         # test dump
         self.assertEqual(a.field.dump(1000), 1)
@@ -92,8 +143,7 @@ class FieldTest(TestCase):
             formatter=A.return_1,
             parser=a.field.parse)
         self.assertEqual(field.format, A.return_1)
-        self.assertEqual(field.parse.func, A.field_add_1.func)
-        self.assertEqual(field.parse.keywords['field'], field)
+        self.assertEqual(field.parse, A.field_add_1)
 
         # test error msg
         field = Field(key='a', allow_none=False, error_messages={'none': '666'})

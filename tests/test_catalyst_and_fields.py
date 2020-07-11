@@ -205,13 +205,13 @@ class CatalystAndFieldsTest(TestCase):
             @staticmethod
             @no_extra.set_dump
             def inject_kwargs(data, **kwargs):
-                assert set(kwargs) == {'field', 'original_method'}
+                assert set(kwargs) == {'group', 'original_method'}
                 return data
 
             @staticmethod
             @no_extra.set_load
-            def check_no_extra(data, original_data, field: FieldGroup = None):
-                extra_fields = set(original_data) - set(field.declared_fields)
+            def check_no_extra(data, original_data, group: FieldGroup = None):
+                extra_fields = set(original_data) - set(group.declared_fields)
                 if extra_fields:
                     raise ValidationError(f"Invalid fields: '{extra_fields}'.")
                 return data

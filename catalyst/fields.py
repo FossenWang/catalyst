@@ -66,7 +66,9 @@ class BaseField(ErrorMessageMixin):
         self.collect_error_messages(error_messages)
         bind_attrs(self, no_dump=no_dump, no_load=no_load)
 
-    def override_method(self, func: CallableType = None, attr: str = None):
+    def override_method(
+            self, func: CallableType = None, attr: str = None,
+            obj_name='field', original_name='original_method'):
         """Override a method of the field instance. Inject field instance or covered method
         as argments into the function according to argument name.
 
@@ -78,38 +80,61 @@ class BaseField(ErrorMessageMixin):
             def function(value):
                 return value
 
-            @field.override_method(attr='format')
-            def function(value, field, original_method):
-                return original_method(value)
-
             field.set_format = field.override_method(attr='format')
+
+            @field.set_format
+            def function(self, value):
+                return value
 
             @field.set_format
             def function(value, field, original_method):
                 return original_method(value)
 
-        :param func: The function to override. The value will be passed to the first argument,
-            and the field instance or covered method will be passed, if argments like "field",
-            "original_method" or "**kwargs" exist.
+            @field.override_method(attr='format', obj_name='obj', original_name='old')
+            def function(value, obj, old):
+                return old(value)
+
+        :param func: The function to override. The value will be passed to the first argument.
+            Particularly, if the first argument is `self`, the field instance will be injected,
+            and value will be the second argument.
+            If argments like "field", "original_method" or "**kwargs" exist, the field instance
+            or covered method will be passed.
         :param attr: The attribute to be overrided.
+        :param obj_name: The argment name of the instence itself.
+        :param original_name: The argment name of the original method.
         """
         if func is None:
-            return partial(self.override_method, attr=attr)
+            return partial(
+                self.override_method, attr=attr,
+                obj_name=obj_name, original_name=original_name)
 
         sig = inspect.signature(func)
         kwargs = {}
         # inject args if the last parameter is keyword arguments
         for param in reversed(sig.parameters.values()):
             if param.kind is inspect._VAR_KEYWORD:
-                kwargs['field'] = self
-                kwargs['original_method'] = getattr(self, attr)
+                kwargs[obj_name] = self
+                kwargs[original_name] = getattr(self, attr)
             break
         # inject args if parameter name matches
         if not kwargs:
-            if 'field' in sig.parameters:
-                kwargs['field'] = self
-            if 'original_method' in sig.parameters:
-                kwargs['original_method'] = getattr(self, attr)
+            if obj_name in sig.parameters:
+                kwargs[obj_name] = self
+            if original_name in sig.parameters:
+                kwargs[original_name] = getattr(self, attr)
+
+        if sig.parameters:
+            first_arg = next(iter(sig.parameters))
+            # inject `self` if it's the first argment of `func`
+            if first_arg == 'self':
+                kwargs.pop('self', None)
+                func = partial(func, self)
+
+            # kwargs can't be first
+            for arg_name in kwargs:
+                if first_arg == arg_name:
+                    raise TypeError(f'The first argment of "{func}" can not be "{arg_name}".')
+
         if kwargs:
             func = partial(func, **kwargs)
 
@@ -185,17 +210,17 @@ class Field(BaseField):
             self.set_parse(parser)
         self.set_validators(validators if validators else self.validators)
 
-    def set_format(self, func: CallableType):
+    def set_format(self, func: CallableType = None, **kwargs):
         """Override `Field.format` method which will be called during dumping.
         See `BaseField.override_method` for more details.
         """
-        return self.override_method(func, 'format')
+        return self.override_method(func, 'format', **kwargs)
 
-    def set_parse(self, func: CallableType):
+    def set_parse(self, func: CallableType = None, **kwargs):
         """Override `Field.parse` method which will be called during loading.
         See `BaseField.override_method` for more details.
         """
-        return self.override_method(func, 'parse')
+        return self.override_method(func, 'parse', **kwargs)
 
     @staticmethod
     def ensure_validators(validators: MultiValidator) -> list:

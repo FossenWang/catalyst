@@ -25,6 +25,13 @@ class GroupsTest(TestCase):
         self.assertIsNone(group.load(None))
         self.assertIsNone(group.dump(None))
 
+        # test "*" all fields, exclude FieldGroup
+        group = FieldGroup(declared_fields='*')
+        fields['group'] = group
+        group.set_fields(fields)
+        self.assertSetEqual(set(group.fields), {'xxx', 'num'})
+
+        # test override method
         @group.set_dump
         @group.set_load
         def test_override(data):
@@ -36,11 +43,14 @@ class GroupsTest(TestCase):
         self.assertEqual(group.dump({})['xxx'], 1)
         self.assertEqual(group.load({})['xxx'], 1)
 
-        # test "*" all fields, exclude FieldGroup
-        group = FieldGroup(declared_fields='*')
-        fields['group'] = group
-        group.set_fields(fields)
-        self.assertSetEqual(set(group.fields), {'xxx', 'num'})
+        @group.set_dump
+        def self_and_group(self, data, group):
+            assert self is group
+            assert isinstance(self, FieldGroup)
+            data['xxx'] = 1
+            return data
+        self.assertEqual(group.dump, self_and_group)
+        self.assertEqual(group.dump({})['xxx'], 1)
 
     def test_compare_fields(self):
         class ComparisonCatalyst(Catalyst):

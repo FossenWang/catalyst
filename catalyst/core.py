@@ -304,9 +304,9 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         different processes in advance to reduce processing time.
         """
         if name == 'dump':
-            ResultClass = self.dump_result_class
+            result_class = self.dump_result_class
         elif name == 'load':
-            ResultClass = self.load_result_class
+            result_class = self.load_result_class
         else:
             raise ValueError('Argument "name" must be "dump" or "load".')
 
@@ -402,7 +402,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                 else:
                     valid_data = {}
 
-            result = ResultClass(valid_data, errors, invalid_data)
+            result = result_class(valid_data, errors, invalid_data)
             if errors and raise_error:
                 raise ValidationError(result)
             return result
