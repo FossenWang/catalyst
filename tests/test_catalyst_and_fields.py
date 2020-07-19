@@ -64,20 +64,21 @@ class CatalystAndFieldsTest(TestCase):
     def test_field_args_for_dump_and_load(self):
         def create_catalyst(**kwargs):
             class C(Catalyst):
+                raise_error = True
                 s = StringField(**kwargs)
             return C()
 
         def assert_field_dump_args(data, expect=None, **kwargs):
             catalyst = create_catalyst(**kwargs)
-            self.assertEqual(catalyst.dump(data, True).valid_data, expect)
+            self.assertEqual(catalyst.dump(data).valid_data, expect)
 
         # default dump behavior
         # missing field will raise error
         catalyst = create_catalyst()
         with self.assertRaises(ValidationError):
-            catalyst.dump(None, True)
+            catalyst.dump(None)
         with self.assertRaises(ValidationError):
-            catalyst.dump({}, True)
+            catalyst.dump({})
         # allow None
         assert_field_dump_args({'s': None}, {'s': None})
 
@@ -127,6 +128,44 @@ class CatalystAndFieldsTest(TestCase):
 
         # no_load means ignore this field
         assert_field_load_args({'s': 1}, {}, no_load=True)
+
+    def test_required_and_default(self):
+        class A(Catalyst):
+            raise_error = True
+
+            a = IntegerField()
+            b = StringField()
+
+        catalyst = A(dump_required=False, load_required=False)
+        default_result = {}
+        valid_data = catalyst.dump({}).valid_data
+        self.assertDictEqual(valid_data, default_result)
+        valid_data = catalyst.load({}).valid_data
+        self.assertDictEqual(valid_data, default_result)
+
+        catalyst = A(dump_required=True, load_required=True)
+        errors = catalyst.dump({}, False).errors
+        self.assertSetEqual(set(errors), {'a', 'b'})
+        errors = catalyst.load({}, False).errors
+        self.assertSetEqual(set(errors), {'a', 'b'})
+
+        catalyst = A(dump_default=None, load_default=None)
+        default_result = {'a': None, 'b': None}
+        valid_data = catalyst.dump({}).valid_data
+        self.assertDictEqual(valid_data, default_result)
+        valid_data = catalyst.load({}).valid_data
+        self.assertDictEqual(valid_data, default_result)
+
+        A.a.dump_required = False
+        catalyst = A(dump_required=True)
+        errors = catalyst.dump({}, False).errors
+        self.assertSetEqual(set(errors), {'b'})
+
+        A.a.dump_default = '1'
+        catalyst = A(dump_default=None)
+        default_result = {'a': 1, 'b': None}
+        valid_data = catalyst.dump({}).valid_data
+        self.assertDictEqual(valid_data, default_result)
 
     def test_list_field(self):
         class C(Catalyst):

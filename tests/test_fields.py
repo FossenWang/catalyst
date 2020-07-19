@@ -445,7 +445,7 @@ class FieldTest(TestCase):
         with self.assertRaises(TypeError):
             field = NestedField(Catalyst)
 
-        fields = {'name': StringField(max_length=3, load_required=True)}
+        fields = {'name': StringField(max_length=3)}
         field = NestedField(Catalyst(fields), name='a', key='a')
 
         self.assertEqual(field.dump({'name': '1'}), {'name': '1'})
@@ -456,8 +456,7 @@ class FieldTest(TestCase):
             field.dump(1)
 
         self.assertEqual(field.load({'name': '1'}), {'name': '1'})
-        with self.assertRaises(ValidationError):
-            field.load({'n': 'm'})
+        self.assertDictEqual(field.load({'n': 'm'}), {})
         with self.assertRaises(ValidationError):
             field.load({'name': '1234'})
         with self.assertRaises(ValidationError):

@@ -156,10 +156,12 @@ class Field(BaseField):
         and which will override `Field.format`.
     :param parser: The function that parses the field value during loading,
         and which will override `Field.parse`.
-    :param dump_required: Raise error if the field value doesn't exist;.
+    :param dump_required: Raise error if the field value doesn't exist.
     :param load_required: Similar to `dump_required`.
     :param dump_default: The default value when the field value doesn't exist.
         If set, `dump_required` has no effect.
+        Particularly, the `missing` object means that this field will not exist
+        in result, and `None` means that default value is `None`.
     :param load_default: Similar to `dump_default`.
     :param validators: Validator or collection of validators. The validator
         function is not required to return value, and should raise error
@@ -170,8 +172,8 @@ class Field(BaseField):
     :param error_messages: Keys {'required', 'none'}.
     :param kwargs: Same as :class:`BaseField`.
     """
-    dump_required = True
-    load_required = False
+    dump_required = None
+    load_required = None
     dump_default = missing
     load_default = missing
     validators = []

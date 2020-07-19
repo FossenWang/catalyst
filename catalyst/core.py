@@ -92,6 +92,15 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     :param schema: A dict or instance or class which contains fields. This
         is a convenient way to avoid name clashes when fields are Python
         keywords or conflict with other attributes.
+    :param dump_required: Raise error if the field value doesn't exist.
+        The `Field.dump_required` will take priority, if it is not `None`.
+    :param load_required: Similar to `dump_required`.
+    :param dump_default: The default value when the field value doesn't exist.
+        If set, `dump_required` has no effect.
+        Particularly, the `missing` object means that this field will not exist
+        in result, and `None` means that default value is `None`.
+        The `Field.dump_default` will take priority, if it is not `missing`.
+    :param load_default: Similar to `dump_default`.
     :param raise_error: Whether to raise error if error occurs when
         processing data. Errors are collected into a error dict, which key
         is field name, index of item of iterable or process name.
@@ -127,6 +136,11 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
     except_exception: ExceptionType = Exception
     process_aliases = {}
 
+    dump_required = True
+    load_required = False
+    dump_default = missing
+    load_default = missing
+
     dump_result_class = DumpResult
     load_result_class = LoadResult
 
@@ -147,6 +161,10 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             all_errors: bool = None,
             except_exception: ExceptionType = None,
             process_aliases: Mapping[str, str] = None,
+            dump_required: bool = None,
+            load_required: bool = None,
+            dump_default: Any = missing,
+            load_default: Any = missing,
             include: Iterable[str] = None,
             exclude: Iterable[str] = None,
             dump_include: Iterable[str] = None,
@@ -158,8 +176,10 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             schema=schema,
             raise_error=raise_error,
             all_errors=all_errors,
-            process_aliases=process_aliases,
             except_exception=except_exception,
+            process_aliases=process_aliases,
+            dump_required=dump_required,
+            load_required=load_required,
         )
         # set fields from a dict or instance or class
         schema = self.schema
@@ -172,6 +192,11 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             else:
                 _get_fields_from_instance(fields, schema)
             _set_fields(self, fields)
+
+        if dump_default is not missing:
+            self.dump_default = dump_default
+        if load_default is not missing:
+            self.load_default = load_default
 
         # include fields
         if include is None:
@@ -334,6 +359,9 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                 target_attr = 'name'
                 default_attr = 'load_default'
                 required_attr = 'load_required'
+            # the required options for all fields
+            general_required = getattr(self, required_attr)
+            general_default = getattr(self, default_attr)
 
             partial_fields, partial_groups = [], []
             for field in field_dict.values():
@@ -351,11 +379,15 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                     partial_groups.append((group_method, error_key, source_target_pairs))
                 elif isinstance(field, Field):
                     # get partial arguments from Field
+                    field_method = getattr(field, method_name)
                     source = getattr(field, source_attr)
                     target = getattr(field, target_attr)
                     required = getattr(field, required_attr)
+                    if required is None:
+                        required = general_required
                     default = getattr(field, default_attr)
-                    field_method = getattr(field, method_name)
+                    if default is missing:
+                        default = general_default
                     partial_fields.append((field, source, target, required, default, field_method))
             main_process = partial(
                 self._process_one,
