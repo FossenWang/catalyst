@@ -19,6 +19,8 @@ from .validators import (
     LengthValidator,
     RangeValidator,
     RegexValidator,
+    MemberValidator,
+    NonMemberValidator,
 )
 from .exceptions import ValidationError, ExceptionType
 
@@ -169,7 +171,9 @@ class Field(BaseField):
         By default, validators are called during loading.
     :param allow_none: Whether the field value are allowed to be `None`.
         By default, this takes effect during loading.
-    :param error_messages: Keys {'required', 'none'}.
+    :param in_: A collection of valid values.
+    :param not_in: A collection of invalid values.
+    :param error_messages: Keys {'required', 'none', 'in', 'not_in'}.
     :param kwargs: Same as :class:`BaseField`.
     """
     dump_required = None
@@ -193,6 +197,8 @@ class Field(BaseField):
             load_default: Any = missing,
             validators: MultiValidator = None,
             allow_none: bool = None,
+            in_: Iterable = None,
+            not_in: Iterable = None,
             **kwargs):
         super().__init__(**kwargs)
         bind_attrs(
@@ -211,6 +217,12 @@ class Field(BaseField):
         if parser is not None:
             self.set_parse(parser)
         self.set_validators(validators if validators else self.validators)
+        if in_:
+            msg = self.error_messages.get('in')
+            self.add_validator(MemberValidator(in_, msg))
+        if not_in:
+            msg = self.error_messages.get('not_in')
+            self.add_validator(NonMemberValidator(not_in, msg))
 
     def set_format(self, func: CallableType = None, **kwargs):
         """Override `Field.format` method which will be called during dumping.
@@ -290,8 +302,7 @@ class StringField(Field):
     :param min_length: The minimum length of the value.
     :param max_length: The maximum length of the value.
     :param regex: The regular expression that the value must match.
-    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
-        'no_match', 'required', 'none'}.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between', 'no_match', ...}.
     """
 
     def __init__(
@@ -325,8 +336,7 @@ class NumberField(Field):
 
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
-        'required', 'none'}.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between', ...}.
     """
     obj_type = float
 
@@ -352,8 +362,7 @@ class FloatField(NumberField):
 
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
-        'required', 'none'}.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between', ...}.
     """
 
 
@@ -362,8 +371,7 @@ class IntegerField(NumberField):
 
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
-        'required', 'none'}.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between', ...}.
     """
     obj_type = int
 
@@ -378,8 +386,7 @@ class DecimalField(NumberField):
     :param dump_as: Data type that the value is serialized to.
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
-        'required', 'none'}.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between', ...}.
     """
     obj_type = decimal.Decimal
     dump_as = str
@@ -467,8 +474,7 @@ class DatetimeField(Field):
     :param fmt: Format of the value. See `datetime` module for details.
     :param minimum: The minimum value.
     :param maximum: The maximum value.
-    :param error_messages: Keys {'too_small', 'too_large', 'not_between',
-        'required', 'none'}.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between', ...}.
     """
     obj_type = datetime.datetime
     fmt = r'%Y-%m-%d %H:%M:%S'

@@ -151,6 +151,15 @@ class FieldTest(TestCase):
             field.load(None)
         self.assertEqual(cm.exception.msg, '666')
 
+        # test in and not in
+        field = Field(in_='123', not_in='456')
+        self.assertEqual(field.load('1'), '1')
+        self.assertEqual(len(field.validators), 2)
+        with self.assertRaises(ValidationError) as cm:
+            field.load('0')
+        with self.assertRaises(ValidationError) as cm:
+            field.load('4')
+
     def test_string_field(self):
         field = StringField(
             name='string', key='string', min_length=2, max_length=12,
