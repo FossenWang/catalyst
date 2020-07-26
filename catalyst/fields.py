@@ -573,12 +573,14 @@ class ListField(Field):
             self,
             item_field: Field = None,
             all_errors: bool = None,
+            except_exception=None,
             **kwargs):
         super().__init__(**kwargs)
         bind_attrs(
             self,
             item_field=item_field,
             all_errors=all_errors,
+            except_exception=except_exception,
         )
         item_field = self.item_field
         if not isinstance(item_field, Field):
@@ -619,6 +621,34 @@ class ListField(Field):
         if errors:
             raise ValidationError(BaseResult(valid_data, errors, invalid_data))
         return valid_data
+
+
+class SeparatedField(ListField):
+    """Field for convert between a separated string and a list of the words.
+
+    :param separator: Argument for `str.split(sep=separator)` and `separator.join`.
+        If separator is `None`, whitespace will be used to join words.
+    :param maxsplit: Argument for `str.split(maxsplit=maxsplit)`.
+    """
+    separator = None
+    maxsplit = -1
+
+    def __init__(self, item_field: Field = None, separator=missing, maxsplit=None, **kwargs):
+        super().__init__(item_field=item_field, **kwargs)
+        bind_attrs(self, maxsplit=maxsplit)
+        if separator is not missing:  # `None` is a valid value
+            self.separator = separator
+
+    def parse(self, value):
+        value = value.split(self.separator, self.maxsplit)
+        value = super().parse(value)
+        return value
+
+    def format(self, value):
+        value = super().format(value)
+        separator = self.separator or ' '
+        value = separator.join(str(v) for v in value)
+        return value
 
 
 class NestedField(Field):
@@ -687,3 +717,4 @@ Callable = CallableField
 List = ListField
 Nested = NestedField
 Constant = ConstantField
+Separated = SeparatedField

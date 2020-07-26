@@ -34,6 +34,8 @@ from .fields import (
     CallableField,
     List,
     ListField,
+    Separated,
+    SeparatedField,
     Nested,
     NestedField,
     Constant,

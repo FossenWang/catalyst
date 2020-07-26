@@ -10,6 +10,7 @@ from catalyst.fields import (
     BooleanField, ListField, CallableField,
     DatetimeField, TimeField, DateField,
     NestedField, DecimalField, ConstantField,
+    SeparatedField,
 )
 from catalyst.utils import no_processing
 from catalyst.exceptions import ValidationError
@@ -494,3 +495,18 @@ class FieldTest(TestCase):
         field = ConstantField(CONSTANT)
         self.assertEqual(field.load(1), CONSTANT)
         self.assertEqual(field.dump(2), CONSTANT)
+
+    def test_separated_field(self):
+        field = SeparatedField(IntegerField())
+
+        self.assertEqual(field.load('1 2 3'), [1, 2, 3])
+        with self.assertRaises(ValidationError):
+            field.load('1 a 3')
+
+        self.assertEqual(field.dump([1, '2', 3]), '1 2 3')
+        with self.assertRaises(ValidationError):
+            field.dump([1, 'a', 3])
+
+        field = SeparatedField(IntegerField(), separator=',')
+        self.assertEqual(field.load('1,2,3'), [1, 2, 3])
+        self.assertEqual(field.dump([1, '2', 3]), '1,2,3')
