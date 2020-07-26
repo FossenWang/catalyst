@@ -448,6 +448,28 @@ class FieldTest(TestCase):
         result = cm.exception.msg
         self.assertIsInstance(result.errors[1]['load'], TypeError)
 
+        field = ListField(IntegerField(), 2, 3)
+        self.assertListEqual(field.load(['1', '2']), [1, 2])
+        with self.assertRaises(ValidationError):
+            field.load(['1'])
+        with self.assertRaises(ValidationError):
+            field.load(['1', '2', '3', '4'])
+
+    def test_separated_field(self):
+        field = SeparatedField(IntegerField())
+
+        self.assertEqual(field.load('1 2 3'), [1, 2, 3])
+        with self.assertRaises(ValidationError):
+            field.load('1 a 3')
+
+        self.assertEqual(field.dump([1, '2', 3]), '1 2 3')
+        with self.assertRaises(ValidationError):
+            field.dump([1, 'a', 3])
+
+        field = SeparatedField(IntegerField(), separator=',')
+        self.assertEqual(field.load('1,2,3'), [1, 2, 3])
+        self.assertEqual(field.dump([1, '2', 3]), '1,2,3')
+
     def test_nest_field(self):
         with self.assertRaises(TypeError):
             NestedField()
@@ -495,18 +517,3 @@ class FieldTest(TestCase):
         field = ConstantField(CONSTANT)
         self.assertEqual(field.load(1), CONSTANT)
         self.assertEqual(field.dump(2), CONSTANT)
-
-    def test_separated_field(self):
-        field = SeparatedField(IntegerField())
-
-        self.assertEqual(field.load('1 2 3'), [1, 2, 3])
-        with self.assertRaises(ValidationError):
-            field.load('1 a 3')
-
-        self.assertEqual(field.dump([1, '2', 3]), '1 2 3')
-        with self.assertRaises(ValidationError):
-            field.dump([1, 'a', 3])
-
-        field = SeparatedField(IntegerField(), separator=',')
-        self.assertEqual(field.load('1,2,3'), [1, 2, 3])
-        self.assertEqual(field.dump([1, '2', 3]), '1,2,3')

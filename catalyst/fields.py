@@ -296,6 +296,22 @@ class Field(BaseField):
         return value
 
 
+class ConstantField(Field):
+    """Constant Field."""
+
+    def __init__(self, constant, **kwargs):
+        super().__init__(**kwargs)
+        self.constant = constant
+        self.dump_default = constant
+        self.load_default = constant
+
+    def format(self, value):
+        return self.constant
+
+    def parse(self, value):
+        return self.constant
+
+
 class StringField(Field):
     """String Field.
 
@@ -561,8 +577,11 @@ class ListField(Field):
     In order to ensure proper data structure, `None` is not valid.
 
     :param item_field: A `Field` class or instance.
+    :param min_length: The minimum length of the list.
+    :param max_length: The maximum length of the list.
     :param all_errors: Whether to collect errors for every list elements.
     :param except_exception: Which types of errors should be collected.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between', ...}.
     """
     item_field: Field = None
     all_errors = True
@@ -572,6 +591,8 @@ class ListField(Field):
     def __init__(
             self,
             item_field: Field = None,
+            min_length: int = None,
+            max_length: int = None,
             all_errors: bool = None,
             except_exception=None,
             **kwargs):
@@ -582,6 +603,10 @@ class ListField(Field):
             all_errors=all_errors,
             except_exception=except_exception,
         )
+        if min_length is not None or max_length is not None:
+            msg_dict = copy_keys(self.error_messages, ('too_small', 'too_large', 'not_between'))
+            self.add_validator(LengthValidator(min_length, max_length, msg_dict))
+
         item_field = self.item_field
         if not isinstance(item_field, Field):
             raise TypeError(f'Argument "item_field" must be a Field, not "{item_field}".')
@@ -681,22 +706,6 @@ class NestedField(Field):
 
     def parse(self, value):
         return self._do_load(value, raise_error=True).valid_data
-
-
-class ConstantField(Field):
-    """Constant Field."""
-
-    def __init__(self, constant, **kwargs):
-        super().__init__(**kwargs)
-        self.constant = constant
-        self.dump_default = constant
-        self.load_default = constant
-
-    def format(self, value):
-        return self.constant
-
-    def parse(self, value):
-        return self.constant
 
 
 # typing hint
