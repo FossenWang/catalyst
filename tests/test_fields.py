@@ -394,7 +394,7 @@ class FieldTest(TestCase):
 
         with self.assertRaises(ValidationError) as cm:
             field.load([1, 'a', 3])
-        result = cm.exception.msg
+        result = cm.exception.detail
         self.assertIsInstance(result.errors[1], ValueError)
         self.assertEqual(result.invalid_data[1], 'a')
         self.assertEqual(result.valid_data, [1.0, 3.0])
@@ -407,7 +407,7 @@ class FieldTest(TestCase):
         field = ListField(item_field=FloatField(), all_errors=False)
         with self.assertRaises(ValidationError) as cm:
             field.load([1, 'a', 'b'])
-        result = cm.exception.msg
+        result = cm.exception.detail
         self.assertEqual(set(result.errors), {1})
         self.assertEqual(result.invalid_data[1], 'a')
         self.assertEqual(result.valid_data, [1.0])
@@ -421,13 +421,13 @@ class FieldTest(TestCase):
         data = [[1], ['x']]
         with self.assertRaises(ValidationError) as cm:
             field.load(data)
-        result = cm.exception.msg
+        result = cm.exception.detail
         self.assertIsInstance(result.errors[1][0], ValueError)
 
         data = [[1], None]
         with self.assertRaises(ValidationError) as cm:
             field.load(data)
-        result = cm.exception.msg
+        result = cm.exception.detail
         self.assertIsInstance(result.errors[1], TypeError)
 
         # list with dict items
@@ -439,13 +439,13 @@ class FieldTest(TestCase):
         data = [{'x': 1}, {'x': 'x'}]
         with self.assertRaises(ValidationError) as cm:
             field.load(data)
-        result = cm.exception.msg
+        result = cm.exception.detail
         self.assertIsInstance(result.errors[1]['x'], ValueError)
 
         data = [{'x': 1}, None]
         with self.assertRaises(ValidationError) as cm:
             field.load(data)
-        result = cm.exception.msg
+        result = cm.exception.detail
         self.assertIsInstance(result.errors[1]['load'], TypeError)
 
         field = ListField(IntegerField(), 2, 3)
@@ -503,13 +503,13 @@ class FieldTest(TestCase):
         data = [{'x': 1}, {'x': 'x'}]
         with self.assertRaises(ValidationError) as cm:
             field.load(data)
-        result = cm.exception.msg
+        result = cm.exception.detail
         self.assertIsInstance(result.errors[1]['x'], ValueError)
 
         data = [{'x': 1}, None]
         with self.assertRaises(ValidationError) as cm:
             field.load(data)
-        result = cm.exception.msg
+        result = cm.exception.detail
         self.assertIsInstance(result.errors[1]['load'], TypeError)
 
     def test_constant_field(self):

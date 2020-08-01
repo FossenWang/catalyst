@@ -363,7 +363,7 @@ class CatalystTest(TestCase):
 
         with self.assertRaises(ValidationError) as ctx:
             test_catalyst.load(invalid_data, raise_error=True)
-        self.assertEqual(set(ctx.exception.msg.errors), {'string', 'integer', 'float'})
+        self.assertEqual(set(ctx.exception.detail.errors), {'string', 'integer', 'float'})
 
         catalyst_2 = TestDataCatalyst(all_errors=False)
         result = catalyst_2.load(invalid_data, raise_error=False)
@@ -372,7 +372,7 @@ class CatalystTest(TestCase):
 
         with self.assertRaises(ValidationError) as ctx:
             catalyst_2.load(invalid_data, raise_error=True)
-        self.assertEqual(len(ctx.exception.msg.errors), 1)
+        self.assertEqual(len(ctx.exception.detail.errors), 1)
 
         # wrong process name
         with self.assertRaises(ValueError):
@@ -397,7 +397,7 @@ class CatalystTest(TestCase):
         # raise error if kwargs are invalid
         with self.assertRaises(ValidationError) as ctx:
             func_1('x', 'x', b='3', c='x')
-        self.assertEqual(set(ctx.exception.msg.errors), {'a', 'args', 'kwargs'})
+        self.assertEqual(set(ctx.exception.detail.errors), {'a', 'args', 'kwargs'})
 
         @a.dump_args
         def func_3(a, *args, b=1, **kwargs):
@@ -415,7 +415,7 @@ class CatalystTest(TestCase):
         # don't collect error
         with self.assertRaises(ValidationError) as ctx:
             func_2('x', 'x', b='3', c='x')
-        self.assertEqual(len(ctx.exception.msg.errors), 1)
+        self.assertEqual(len(ctx.exception.detail.errors), 1)
 
     def test_load_and_dump_many(self):
         class C(Catalyst):
@@ -447,7 +447,7 @@ class CatalystTest(TestCase):
 
         with self.assertRaises(ValidationError) as ctx:
             c.load_many(data, raise_error=True)
-        result = ctx.exception.msg
+        result = ctx.exception.detail
         self.assertEqual(set(result.errors), {2, 3})
         self.assertDictEqual(result.invalid_data, {2: {'s': ''}, 3: {'s': 'sss'}})
 
@@ -549,7 +549,7 @@ class CatalystTest(TestCase):
         # pre_load raise error
         with self.assertRaises(ValidationError) as ctx:
             c.load(redundant_data, raise_error=True)
-        self.assertTrue('not_allowed_keys' in ctx.exception.msg.errors)
+        self.assertTrue('not_allowed_keys' in ctx.exception.detail.errors)
 
         # post_load invalid
         result = c.load(invalid_data)

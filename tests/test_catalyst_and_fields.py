@@ -278,7 +278,8 @@ class CatalystAndFieldsTest(TestCase):
         # test data in BaseResult
         @C.no_extra.set_load
         def raise_error(data):
-            raise ValidationError(LoadResult({}, {'x': 'x'}, {}))
+            result = LoadResult({}, {'x': 'x'}, {})
+            raise ValidationError(msg=result.format_errors(), detail=result)
 
         c = C()
         self.assertEqual(c.no_extra.load, raise_error)
@@ -291,7 +292,8 @@ class CatalystAndFieldsTest(TestCase):
         # test non dict data in BaseResult
         @C.no_extra.set_load
         def raise_error_2(data):
-            raise ValidationError(LoadResult(0, 0, 0))
+            result = LoadResult(0, 0, 0)
+            raise ValidationError(msg=result.format_errors(), detail=result)
 
         c = C()
         self.assertEqual(c.no_extra.load, raise_error_2)

@@ -269,11 +269,12 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
 
                 valid_data[target] = field_method(raw_value)
             except except_exception as e:
-                if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
+                if isinstance(e, ValidationError) and isinstance(e.detail, BaseResult):
+                    detail: BaseResult = e.detail
                     # distribute nested data in BaseResult
-                    valid_data[target] = e.msg.valid_data
-                    errors[source] = e.msg.errors
-                    invalid_data[source] = e.msg.invalid_data
+                    valid_data[target] = detail.valid_data
+                    errors[source] = detail.errors
+                    invalid_data[source] = detail.invalid_data
                 else:
                     # collect errors and invalid data
                     errors[source] = e
@@ -291,14 +292,15 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             try:
                 valid_data = group_method(valid_data, original_data=data)
             except except_exception as e:
-                if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
+                if isinstance(e, ValidationError) and isinstance(e.detail, BaseResult):
+                    detail: BaseResult = e.detail
                     # distribute nested data in BaseResult
                     try:
-                        valid_data.update(e.msg.valid_data)
-                        errors.update(e.msg.errors)
-                        invalid_data.update(e.msg.invalid_data)
+                        valid_data.update(detail.valid_data)
+                        errors.update(detail.errors)
+                        invalid_data.update(detail.invalid_data)
                     except (ValueError, TypeError):
-                        errors[error_key] = e.msg.format_errors()
+                        errors[error_key] = detail.format_errors()
                 else:
                     # collect errors and invalid data
                     errors[error_key] = e
@@ -436,7 +438,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
 
             result = result_class(valid_data, errors, invalid_data)
             if errors and raise_error:
-                raise ValidationError(result)
+                raise ValidationError(msg=result.format_errors(), detail=result)
             return result
 
         return integrated_process

@@ -49,7 +49,7 @@ class PackerTest(TestCase):
 
         with self.assertRaises(ValidationError) as ctx:
             packer.dump(invalid_data, raise_error=True)
-        result = ctx.exception.msg
+        result = ctx.exception.detail
         self.assertFalse(result.is_valid)
         self.assertEqual(set(result.errors), {'b', 'c', 'a'})
 
@@ -102,7 +102,7 @@ class PackerTest(TestCase):
 
         with self.assertRaises(ValidationError) as ctx:
             packer_2.load_many(invalid_data, raise_error=True)
-        result = ctx.exception.msg
+        result = ctx.exception.detail
         self.assertFalse(result.is_valid)
         self.assertDictEqual(result.invalid_data, {0: {'c': 'c'}})
         self.assertListEqual(result.valid_data, [{'a': 0.0, 'b': 0.0}])

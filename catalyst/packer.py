@@ -87,7 +87,7 @@ class CatalystPacker:
 
             result = ResultClass(valid_data, errors, invalid_data)
             if errors and raise_error:
-                raise ValidationError(result)
+                raise ValidationError(msg=result.format_errors(), detail=result)
             return result
 
         return integrated_process

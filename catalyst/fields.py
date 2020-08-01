@@ -633,18 +633,19 @@ class ListField(Field):
                 result = process_one(item)
                 valid_data.append(result)
             except except_exception as e:
-                if isinstance(e, ValidationError) and isinstance(e.msg, BaseResult):
+                if isinstance(e, ValidationError) and isinstance(e.detail, BaseResult):
                     # distribute nested data in BaseResult
-                    valid_data.append(e.msg.valid_data)
-                    errors[i] = e.msg.errors
-                    invalid_data[i] = e.msg.invalid_data
+                    valid_data.append(e.detail.valid_data)
+                    errors[i] = e.detail.errors
+                    invalid_data[i] = e.detail.invalid_data
                 else:
                     errors[i] = e
                     invalid_data[i] = item
                 if not all_errors:
                     break
         if errors:
-            raise ValidationError(BaseResult(valid_data, errors, invalid_data))
+            result = BaseResult(valid_data, errors, invalid_data)
+            raise ValidationError(msg=result.format_errors(), detail=result)
         return valid_data
 
 
