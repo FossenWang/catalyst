@@ -1,7 +1,7 @@
 """Catalyst class and its metaclass."""
 
 import inspect
-
+from collections import namedtuple
 from typing import Iterable, Callable, Any, Mapping
 from functools import wraps, partial
 
@@ -13,6 +13,13 @@ from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,
     LoadResult, DumpResult, BaseResult, bind_attrs, no_processing
 )
+
+
+# type hints
+PartialFields = namedtuple('PartialFields', [
+    'field', 'source', 'target', 'required', 'default', 'field_method'])
+PartialGroups = namedtuple('PartialGroups', [
+    'group_method', 'error_key', 'source_target_pairs'])
 
 
 def _override_fields(fields: FieldDict, attrs: dict):
@@ -246,8 +253,8 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             data: Any,
             all_errors: bool,
             assign_getter: Callable,
-            partial_fields: Iterable[tuple],
-            partial_groups: Iterable[tuple],
+            partial_fields: Iterable[PartialFields],
+            partial_groups: Iterable[PartialGroups],
             except_exception: ExceptionType):
         """Process one object using fields and catalyst options."""
         # According to the type of `data`, assign a function to get field value from `data`
@@ -378,7 +385,8 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                         source = getattr(f, source_attr)
                         target = getattr(f, target_attr)
                         source_target_pairs.append((source, target))
-                    partial_groups.append((group_method, error_key, source_target_pairs))
+                    partial_groups.append(
+                        PartialGroups(group_method, error_key, source_target_pairs))
                 elif isinstance(field, Field):
                     # get partial arguments from Field
                     field_method = getattr(field, method_name)
@@ -390,7 +398,8 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                     default = getattr(field, default_attr)
                     if default is missing:
                         default = general_default
-                    partial_fields.append((field, source, target, required, default, field_method))
+                    partial_fields.append(
+                        PartialFields(field, source, target, required, default, field_method))
             main_process = partial(
                 self._process_one,
                 all_errors=all_errors,

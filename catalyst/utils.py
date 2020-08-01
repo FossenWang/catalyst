@@ -105,13 +105,13 @@ missing = _Missing()
 
 def assign_attr_or_item_getter(obj):
     if isinstance(obj, Mapping):
-        return Mapping.get
+        return dict.get
     return getattr
 
 
 def assign_item_getter(obj):
     if isinstance(obj, Mapping):
-        return Mapping.get
+        return dict.get
     raise TypeError(f'"{obj}" is not Mapping.')
 
 

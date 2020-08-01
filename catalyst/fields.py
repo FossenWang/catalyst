@@ -709,7 +709,7 @@ class NestedField(Field):
         return self._do_load(value, raise_error=True).valid_data
 
 
-# typing hint
+# type hints
 FieldDict = Dict[str, BaseField]
 
 
