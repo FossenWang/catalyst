@@ -656,6 +656,7 @@ class SeparatedField(ListField):
         If separator is `None`, whitespace will be used to join words.
     :param maxsplit: Argument for `str.split(maxsplit=maxsplit)`.
     """
+    item_field = StringField()
     separator = None
     maxsplit = -1
 
@@ -666,11 +667,15 @@ class SeparatedField(ListField):
             self.separator = separator
 
     def parse(self, value):
-        value = value.split(self.separator, self.maxsplit)
+        if value is None:
+            return value
+        value = str(value).split(self.separator, self.maxsplit)
         value = super().parse(value)
         return value
 
     def format(self, value):
+        if value is None:
+            return value
         value = super().format(value)
         separator = self.separator or ' '
         value = separator.join(str(v) for v in value)

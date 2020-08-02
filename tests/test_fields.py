@@ -456,19 +456,28 @@ class FieldTest(TestCase):
             field.load(['1', '2', '3', '4'])
 
     def test_separated_field(self):
-        field = SeparatedField(IntegerField())
-
-        self.assertEqual(field.load('1 2 3'), [1, 2, 3])
-        with self.assertRaises(ValidationError):
-            field.load('1 a 3')
-
+        field = SeparatedField()
+        self.assertEqual(field.load('1 2 3'), ['1', '2', '3'])
+        self.assertEqual(field.load('1'), ['1'])
+        self.assertEqual(field.load(''), [])
+        self.assertEqual(field.load({}), ['{}'])
         self.assertEqual(field.dump([1, '2', 3]), '1 2 3')
+        self.assertEqual(field.dump([]), '')
+        self.assertEqual(field.dump(None), None)
         with self.assertRaises(ValidationError):
-            field.dump([1, 'a', 3])
+            field.load(None)
 
         field = SeparatedField(IntegerField(), separator=',')
         self.assertEqual(field.load('1,2,3'), [1, 2, 3])
         self.assertEqual(field.dump([1, '2', 3]), '1,2,3')
+        with self.assertRaises(ValidationError):
+            field.load('1,a,3')
+        with self.assertRaises(ValidationError):
+            field.dump([1, 'a', 3])
+        with self.assertRaises(ValidationError) as cm:
+            field.load({})
+        result = cm.exception.detail
+        self.assertEqual(result.invalid_data[0], '{}')
 
     def test_nest_field(self):
         with self.assertRaises(TypeError):
