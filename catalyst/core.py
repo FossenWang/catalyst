@@ -264,17 +264,21 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
 
         # process data for each fields
         for field, source, target, required, default, field_method in partial_fields:
-            raw_value = missing
+            value = missing
             try:
-                raw_value = get_value(data, source, missing)
-                if raw_value is missing:
-                    raw_value = default() if callable(default) else default
-                    if raw_value is missing:
-                        if required:
-                            raise field.error('required')
-                        continue
+                value = get_value(data, source, missing)
 
-                valid_data[target] = field_method(raw_value)
+                if value is missing:
+                    value = default() if callable(default) else default
+
+                if value is not missing:
+                    value = field_method(value)
+
+                if value is missing:
+                    if required:
+                        raise field.error('required')
+                else:
+                    valid_data[target] = value
             except except_exception as e:
                 if isinstance(e, ValidationError) and isinstance(e.detail, BaseResult):
                     detail: BaseResult = e.detail
@@ -285,8 +289,8 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                 else:
                     # collect errors and invalid data
                     errors[source] = e
-                    if raw_value is not missing:
-                        invalid_data[source] = raw_value
+                    if value is not missing:
+                        invalid_data[source] = value
                 if not all_errors:
                     break
 

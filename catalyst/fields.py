@@ -290,9 +290,13 @@ class Field(BaseField):
         return value
 
     def load(self, value):
-        """Deserialize `value` to an object by parsing and validating."""
+        """Deserialize `value` to an object by parsing and validating.
+        The `parse` method can return missing, which means that
+        the field key won't be present in the result.
+        """
         value = self.parse(value)
-        self.validate_load(value)
+        if value is not missing:
+            self.validate_load(value)
         return value
 
 

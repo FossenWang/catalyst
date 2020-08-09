@@ -5,6 +5,7 @@ from catalyst.core import Catalyst
 from catalyst.fields import Field, StringField, IntegerField, \
     FloatField, BooleanField, CallableField, ListField, NestedField
 from catalyst.exceptions import ValidationError
+from catalyst.utils import missing
 
 
 class TestData:
@@ -377,6 +378,19 @@ class CatalystTest(TestCase):
         # wrong process name
         with self.assertRaises(ValueError):
             test_catalyst._make_processor(1, False)
+
+        # test return missing
+        return_missing = lambda v: missing
+        c = Catalyst(
+            {'a': IntegerField(formatter=return_missing, parser=return_missing, minimum=0)},
+            raise_error=True)
+        result = c.load({'a': 1})
+        self.assertEqual(result.valid_data, {})
+
+        with self.assertRaises(ValidationError) as cm:
+            c.dump({'a': 1})
+        result = cm.exception.detail
+        self.assertIn('required', str(result.errors['a']))
 
     def test_load_and_dump_args(self):
         class Kwargs(Catalyst):

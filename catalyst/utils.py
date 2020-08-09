@@ -96,11 +96,13 @@ class _Missing:
     def __repr__(self):
         return '<catalyst.missing>'
 
-# Default value for field args `dump_default` and `load_default`
-# which means that the field does not exist in data.
-# KeyError or AttributeError will be raised if dumping field is missing.
-# Field will be excluded from load result if loading field is missing.
 missing = _Missing()
+# The `missing` object represents that the field does not exist in data.
+# For example, `Catalyst` will consider a dict object
+# `{'a': missing, 'b': 1}` as same as `{'b': 1}`.
+# By default, `KeyError` or `AttributeError` will be raised if dumping
+# field is missing, and field will be excluded from load result if
+# loading field is missing.
 
 
 def assign_attr_or_item_getter(obj):
