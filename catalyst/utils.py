@@ -85,13 +85,6 @@ class ErrorMessageMixin:
         return self.error_cls(self.get_error_message(error_key, **kwargs))
 
 
-def bind_attrs(obj, **kwargs):
-    """Set not None attrbutes."""
-    for key, value in kwargs.items():
-        if value is not None:
-            setattr(obj, key, value)
-
-
 class _Missing:
     def __repr__(self):
         return '<catalyst.missing>'
@@ -103,6 +96,27 @@ missing = _Missing()
 # By default, `KeyError` or `AttributeError` will be raised if dumping
 # field is missing, and field will be excluded from load result if
 # loading field is missing.
+
+
+def make_attrs_setter(none=None):
+    """Make a function to bind attributes.
+
+    :param none: A value that will not be bind to obj.
+    """
+    def setter(obj, **kwargs):
+        """Bind attributes which exist."""
+        for key, value in kwargs.items():
+            if value is not none:
+                setattr(obj, key, value)
+    return setter
+
+
+bind_attrs = make_attrs_setter()
+bind_not_ellipsis_attrs = make_attrs_setter(...)
+# Use `...` to represent that the arguments will not be bind to `obj`,
+# since `None` is meaningful for some attributes.
+# It may be useful to declare an argument with default ellipsis,
+# which can provides type hints without specifying the actual default value.
 
 
 def assign_attr_or_item_getter(obj):

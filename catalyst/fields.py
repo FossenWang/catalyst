@@ -13,7 +13,7 @@ from typing import (
 from .base import CatalystABC
 from .utils import (
     BaseResult, ErrorMessageMixin, copy_keys,
-    missing, no_processing, bind_attrs,
+    missing, no_processing, bind_attrs, bind_not_ellipsis_attrs
 )
 from .validators import (
     LengthValidator,
@@ -193,8 +193,8 @@ class Field(BaseField):
             parser: CallableType = None,
             dump_required: bool = None,
             load_required: bool = None,
-            dump_default: Any = missing,
-            load_default: Any = missing,
+            dump_default: Any = ...,
+            load_default: Any = ...,
             validators: MultiValidator = None,
             allow_none: bool = None,
             in_: Iterable = None,
@@ -207,11 +207,15 @@ class Field(BaseField):
             load_required=load_required,
             allow_none=allow_none,
         )
+        # `None` is meaningful to `dump_default` and `load_default`,
+        # use `...` to represent that the arguments are not given
+        # which also provides type hints.
+        bind_not_ellipsis_attrs(
+            self,
+            dump_default=dump_default,
+            load_default=load_default,
+        )
 
-        if dump_default is not missing:
-            self.dump_default = dump_default
-        if load_default is not missing:
-            self.load_default = load_default
         if formatter is not None:
             self.set_format(formatter)
         if parser is not None:

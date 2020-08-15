@@ -11,7 +11,8 @@ from .groups import FieldGroup
 from .exceptions import ValidationError, ExceptionType
 from .utils import (
     missing, assign_attr_or_item_getter, assign_item_getter,
-    LoadResult, DumpResult, BaseResult, bind_attrs, no_processing
+    LoadResult, DumpResult, BaseResult, no_processing,
+    bind_attrs, bind_not_ellipsis_attrs,
 )
 
 
@@ -170,8 +171,8 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             process_aliases: Mapping[str, str] = None,
             dump_required: bool = None,
             load_required: bool = None,
-            dump_default: Any = missing,
-            load_default: Any = missing,
+            dump_default: Any = ...,
+            load_default: Any = ...,
             include: Iterable[str] = None,
             exclude: Iterable[str] = None,
             dump_include: Iterable[str] = None,
@@ -188,6 +189,15 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             dump_required=dump_required,
             load_required=load_required,
         )
+        # `None` is meaningful to `dump_default` and `load_default`,
+        # use `...` to represent that the arguments are not given
+        # which also provides type hints.
+        bind_not_ellipsis_attrs(
+            self,
+            dump_default=dump_default,
+            load_default=load_default,
+        )
+
         # set fields from a dict or instance or class
         schema = self.schema
         if schema:
@@ -199,11 +209,6 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
             else:
                 _get_fields_from_instance(fields, schema)
             _set_fields(self, fields)
-
-        if dump_default is not missing:
-            self.dump_default = dump_default
-        if load_default is not missing:
-            self.load_default = load_default
 
         # include fields
         if include is None:
