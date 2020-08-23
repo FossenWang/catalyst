@@ -13,7 +13,7 @@ from typing import (
 from .base import CatalystABC
 from .utils import (
     BaseResult, ErrorMessageMixin, copy_keys,
-    missing, no_processing, bind_attrs, bind_not_ellipsis_attrs
+    missing, no_processing, bind_attrs, bind_not_ellipsis_attrs,
 )
 from .validators import (
     LengthValidator,
@@ -171,6 +171,9 @@ class Field(BaseField):
         By default, validators are called during loading.
     :param allow_none: Whether the field value are allowed to be `None`.
         By default, this takes effect during loading.
+    :param as_none: A collection of values that are treated as null.
+    :param dump_none: The value which null values are convert to when dumping.
+    :param load_none: The value which null values are convert to when loading.
     :param in_: A collection of valid values.
     :param not_in: A collection of invalid values.
     :param error_messages: Keys {'required', 'none', 'in', 'not_in'}.
@@ -178,13 +181,16 @@ class Field(BaseField):
     """
     dump_required = None
     load_required = None
-    dump_default = missing
-    load_default = missing
+    dump_default = ...
+    load_default = ...
     validators = []
     allow_none = True
+    as_none = (None,)
+    dump_none = None
+    load_none = None
     error_messages = {
         'required': 'Missing data for required field.',
-        'none': 'Field may not be None.',
+        'none': 'Field may not be null.',
     }
 
     def __init__(
@@ -197,6 +203,9 @@ class Field(BaseField):
             load_default: Any = ...,
             validators: MultiValidator = None,
             allow_none: bool = None,
+            as_none: Iterable = None,
+            dump_none: Any = ...,
+            load_none: Any = ...,
             in_: Iterable = None,
             not_in: Iterable = None,
             **kwargs):
@@ -206,6 +215,7 @@ class Field(BaseField):
             dump_required=dump_required,
             load_required=load_required,
             allow_none=allow_none,
+            as_none=as_none,
         )
         # `None` is meaningful to `dump_default` and `load_default`,
         # use `...` to represent that the arguments are not given
@@ -214,6 +224,8 @@ class Field(BaseField):
             self,
             dump_default=dump_default,
             load_default=load_default,
+            dump_none=dump_none,
+            load_none=load_none,
         )
 
         if formatter is not None:
@@ -267,16 +279,18 @@ class Field(BaseField):
 
     def validate(self, value):
         """Validate `value`, raise error if it is invalid."""
-        if value is None:
+        if self.is_none(value):
             if self.allow_none:
-                return None
+                return
             raise self.error('none')
         for validator in self.validators:
             validator(value)
-        return value
 
     validate_dump = staticmethod(no_processing)
     validate_load = validate
+
+    def is_none(self, value):
+        return any(value == none for none in self.as_none)
 
     def format(self, value):
         return value
@@ -287,7 +301,11 @@ class Field(BaseField):
         but you can override `validate_dump` method to perform validation.
         """
         self.validate_dump(value)
-        value = self.format(value)
+
+        if self.is_none(value):
+            value = self.dump_none
+        else:
+            value = self.format(value)
         return value
 
     def parse(self, value):
@@ -298,7 +316,11 @@ class Field(BaseField):
         The `parse` method can return missing, which means that
         the field key won't be present in the result.
         """
-        value = self.parse(value)
+        if self.is_none(value):
+            value = self.load_none
+        else:
+            value = self.parse(value)
+
         if value is not missing:
             self.validate_load(value)
         return value
@@ -313,10 +335,10 @@ class ConstantField(Field):
         self.dump_default = constant
         self.load_default = constant
 
-    def format(self, value):
+    def dump(self, value):
         return self.constant
 
-    def parse(self, value):
+    def load(self, value):
         return self.constant
 
 
@@ -328,6 +350,7 @@ class StringField(Field):
     :param regex: The regular expression that the value must match.
     :param error_messages: Keys {'too_small', 'too_large', 'not_between', 'no_match', ...}.
     """
+    parse = format = str
 
     def __init__(
             self,
@@ -346,13 +369,6 @@ class StringField(Field):
         if regex:
             msg = self.error_messages.get('no_match')
             self.add_validator(RegexValidator(regex, msg))
-
-    def format(self, value):
-        if value is None:
-            return value
-        return str(value)
-
-    parse = format
 
 
 class NumberField(Field):
@@ -374,8 +390,6 @@ class NumberField(Field):
             self.add_validator(RangeValidator(minimum, maximum, msg_dict))
 
     def format(self, value):
-        if value is None:
-            return value
         return self.obj_type(value)
 
     parse = format
@@ -441,14 +455,10 @@ class DecimalField(NumberField):
         return value
 
     def format(self, value):
-        if value is None:
-            return value
         num = self.to_decimal(value)
         return self.dump_as(num)
 
     def parse(self, value):
-        if value is None:
-            return value
         return self.to_decimal(value)
 
 
@@ -472,8 +482,6 @@ class BooleanField(Field):
             for raw in raw_values}
 
     def format(self, value):
-        if value is None:
-            return value
         if isinstance(value, Hashable):
             value = self.reverse_value_map.get(value, value)
         return bool(value)
@@ -513,13 +521,11 @@ class DatetimeField(Field):
             self.add_validator(RangeValidator(minimum, maximum, msg_dict))
 
     def format(self, value):
-        if value is None:
-            return value
         return self.obj_type.strftime(value, self.fmt)
 
     def parse(self, value):
         # `load_default` might be a datetime object
-        if value is None or isinstance(value, self.obj_type):
+        if isinstance(value, self.obj_type):
             return value
         return datetime.datetime.strptime(value, self.fmt)
 
@@ -533,7 +539,7 @@ class TimeField(DatetimeField):
     fmt = r'%H:%M:%S'
 
     def parse(self, value):
-        if value is None or isinstance(value, self.obj_type):
+        if isinstance(value, self.obj_type):
             return value
         return datetime.datetime.strptime(value, self.fmt).time()
 
@@ -547,7 +553,7 @@ class DateField(DatetimeField):
     fmt = r'%Y-%m-%d'
 
     def parse(self, value: str):
-        if value is None or isinstance(value, self.obj_type):
+        if isinstance(value, self.obj_type):
             return value
         return datetime.datetime.strptime(value, self.fmt).date()
 
@@ -675,15 +681,11 @@ class SeparatedField(ListField):
             self.separator = separator
 
     def parse(self, value):
-        if value is None:
-            return value
         value = str(value).split(self.separator, self.maxsplit)
         value = super().parse(value)
         return value
 
     def format(self, value):
-        if value is None:
-            return value
         value = super().format(value)
         separator = self.separator or ' '
         value = separator.join(str(v) for v in value)

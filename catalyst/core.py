@@ -405,7 +405,7 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
                     if required is None:
                         required = general_required
                     default = getattr(field, default_attr)
-                    if default is missing:
+                    if default is ...:
                         default = general_default
                     partial_fields.append(
                         PartialFields(field, source, target, required, default, field_method))

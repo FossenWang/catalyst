@@ -117,8 +117,7 @@ class FieldTest(TestCase):
 
         # test load
         self.assertEqual(a.field.load(0), 1)
-        with self.assertRaises(TypeError):
-            a.field.load(None)
+        self.assertEqual(a.field.load(None), None)
         with self.assertRaises(TypeError):
             a.field.load('asd')
         with self.assertRaises(AssertionError):
@@ -160,6 +159,15 @@ class FieldTest(TestCase):
             field.load('0')
         with self.assertRaises(ValidationError) as cm:
             field.load('4')
+
+        # test none value
+        field = Field(as_none=('', None), dump_none='', load_none=None)
+        self.assertEqual(field.load(None), None)
+        self.assertEqual(field.load(''), None)
+        self.assertEqual(field.load(0), 0)
+        self.assertEqual(field.dump(None), '')
+        self.assertEqual(field.dump(''), '')
+        self.assertEqual(field.dump(0), 0)
 
     def test_string_field(self):
         field = StringField(
@@ -383,10 +391,9 @@ class FieldTest(TestCase):
         # dump
         self.assertListEqual(field.dump([1.0, 2.0, 3.0]), [1.0, 2.0, 3.0])
         self.assertListEqual(field.dump([]), [])
+        self.assertEqual(field.dump(None), None)
         with self.assertRaises(TypeError):
             field.dump(1)
-        with self.assertRaises(TypeError):
-            field.dump(None)
 
         # load
         self.assertListEqual(field.load([1, 2, 3]), [1.0, 2.0, 3.0])
@@ -401,7 +408,7 @@ class FieldTest(TestCase):
 
         with self.assertRaises(TypeError):
             field.load(1)
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValidationError):
             field.load(None)
 
         field = ListField(item_field=FloatField(), all_errors=False)
@@ -428,7 +435,7 @@ class FieldTest(TestCase):
         with self.assertRaises(ValidationError) as cm:
             field.load(data)
         result = cm.exception.detail
-        self.assertIsInstance(result.errors[1], TypeError)
+        self.assertIsInstance(result.errors[1], ValidationError)
 
         # list with dict items
         field = ListField(NestedField(Catalyst({'x': IntegerField()})))
@@ -446,7 +453,7 @@ class FieldTest(TestCase):
         with self.assertRaises(ValidationError) as cm:
             field.load(data)
         result = cm.exception.detail
-        self.assertIsInstance(result.errors[1]['load'], TypeError)
+        self.assertIsInstance(result.errors[1], ValidationError)
 
         field = ListField(IntegerField(), 2, 3)
         self.assertListEqual(field.load(['1', '2']), [1, 2])
@@ -526,3 +533,5 @@ class FieldTest(TestCase):
         field = ConstantField(CONSTANT)
         self.assertEqual(field.load(1), CONSTANT)
         self.assertEqual(field.dump(2), CONSTANT)
+        self.assertEqual(field.load(None), CONSTANT)
+        self.assertEqual(field.dump(None), CONSTANT)
