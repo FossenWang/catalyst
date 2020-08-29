@@ -235,7 +235,7 @@ class FieldTest(TestCase):
             field.load([])
 
     def test_float_field(self):
-        field = FloatField(minimum=-11.1, maximum=111.1)
+        field = FloatField(minimum=-11.1, maximum=111.1, nan_to_none=False)
 
         # dump
         self.assertEqual(field.dump(5.5), 5.5)
@@ -243,8 +243,6 @@ class FieldTest(TestCase):
         self.assertEqual(field.dump(0), 0.0)
         self.assertEqual(field.dump('10'), 10.0)
         self.assertEqual(field.dump(None), None)
-        self.assertTrue(math.isnan(field.dump('nan')))
-        self.assertTrue(math.isinf(field.dump('inf')))
 
         # load
         self.assertEqual(field.load(0), 0.0)
@@ -264,14 +262,20 @@ class FieldTest(TestCase):
             field.load('nan')
 
         # test nan & inf
-        field = FloatField()
-        self.assertTrue(math.isnan(field.dump('nan')))
-        self.assertTrue(math.isinf(field.dump('inf')))
+        field = FloatField(nan_to_none=False)
+        self.assertEqual(field.dump('NaN'), 'nan')
+        self.assertEqual(field.dump('-Infinity'), '-inf')
         self.assertTrue(math.isnan(field.load('nan')))
         self.assertTrue(math.isinf(field.load('inf')))
 
+        field = FloatField(nan_to_none=True)
+        self.assertEqual(field.dump('NaN'), None)
+        self.assertEqual(field.dump('-Infinity'), None)
+        self.assertEqual(field.load('nan'), None)
+        self.assertEqual(field.load('-inf'), None)
+
     def test_decimal_field(self):
-        field = DecimalField()
+        field = DecimalField(nan_to_none=False)
 
         self.assertEqual(field.dump(1), '1')
         self.assertEqual(field.dump(1.1), '1.1')
@@ -287,14 +291,25 @@ class FieldTest(TestCase):
         self.assertTrue(field.load('nan').is_nan())
         self.assertTrue(field.load('inf').is_infinite())
 
-        field = DecimalField(dump_as=float, places=2, rounding=ROUND_CEILING)
+        field = DecimalField(dump_as=float, places=2, rounding=ROUND_CEILING, nan_to_none=False)
+
         self.assertEqual(field.dump(1.1), 1.1)
         self.assertEqual(field.dump(1), 1.0)
         self.assertEqual(field.dump(1.111), 1.12)
         self.assertEqual(field.dump(-1.111), -1.11)
-        self.assertTrue(math.isnan(field.dump('nan')))
-        self.assertTrue(math.isinf(field.dump('inf')))
+        value = field.dump('nan')
+        self.assertIsInstance(value, float)
+        self.assertTrue(math.isnan(value))
+        value = field.dump('inf')
+        self.assertIsInstance(value, float)
+        self.assertTrue(math.isinf(value))
         self.assertEqual(field.dump(None), None)
+
+        field = DecimalField(nan_to_none=True)
+        self.assertEqual(field.dump('nan'), None)
+        self.assertEqual(field.dump('inf'), None)
+        self.assertEqual(field.load('nan'), None)
+        self.assertEqual(field.load('inf'), None)
 
         with self.assertRaises(TypeError):
             DecimalField(dump_as=1)
@@ -463,7 +478,7 @@ class FieldTest(TestCase):
             field.load(['1', '2', '3', '4'])
 
     def test_separated_field(self):
-        field = SeparatedField()
+        field = SeparatedField(separator=None)
         self.assertEqual(field.load('1 2 3'), ['1', '2', '3'])
         self.assertEqual(field.load('1'), ['1'])
         self.assertEqual(field.load(''), [])
@@ -474,7 +489,7 @@ class FieldTest(TestCase):
         with self.assertRaises(ValidationError):
             field.load(None)
 
-        field = SeparatedField(IntegerField(), separator=',')
+        field = SeparatedField(IntegerField())
         self.assertEqual(field.load('1,2,3'), [1, 2, 3])
         self.assertEqual(field.dump([1, '2', 3]), '1,2,3')
         with self.assertRaises(ValidationError):

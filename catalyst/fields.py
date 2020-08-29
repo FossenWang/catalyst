@@ -1,5 +1,6 @@
 """Field classes for various types of data."""
 
+import math
 import decimal
 import datetime
 import inspect
@@ -395,15 +396,6 @@ class NumberField(Field):
     parse = format
 
 
-class FloatField(NumberField):
-    """Float field.
-
-    :param minimum: Value must >= minimum, and `None` is equal to -∞.
-    :param maximum: Value must <= maximum, and `None` is equal to +∞.
-    :param error_messages: Keys {'too_small', 'too_large', 'not_between', ...}.
-    """
-
-
 class IntegerField(NumberField):
     """Integer field.
 
@@ -414,7 +406,40 @@ class IntegerField(NumberField):
     obj_type = int
 
 
-class DecimalField(NumberField):
+class FloatField(NumberField):
+    """Float field.
+
+    :param nan_to_none: If `True`, `NaN`, `Infinity` and `-Infinity` are converted to
+        `dump_none` or `load_none`.
+        If `False`, the special values are converted to string when dumping.
+    :param minimum: Value must >= minimum, and `None` is equal to -∞.
+    :param maximum: Value must <= maximum, and `None` is equal to +∞.
+    :param error_messages: Keys {'too_small', 'too_large', 'not_between', ...}.
+    """
+    obj_type = float
+    nan_to_none = True
+
+    def __init__(self, nan_to_none: bool = None, **kwargs):
+        super().__init__(**kwargs)
+        bind_attrs(self, nan_to_none=nan_to_none)
+
+    def format(self, value):
+        value = self.obj_type(value)
+        if not math.isfinite(value):
+            if self.nan_to_none:
+                value = self.dump_none
+            else:
+                value = str(value)
+        return value
+
+    def parse(self, value):
+        value = self.obj_type(value)
+        if self.nan_to_none and not math.isfinite(value):
+            value = self.load_none
+        return value
+
+
+class DecimalField(FloatField):
     """Field for converting `decimal.Decimal` object.
 
     :param places: The number of digits to the right of the decimal point.
@@ -422,6 +447,9 @@ class DecimalField(NumberField):
     :param rounding: The rounding mode, for example `decimal.ROUND_UP`.
         If `None`, the rounding mode of the current thread's context is used.
     :param dump_as: Data type that the value is serialized to.
+    :param nan_to_none: If `True`, `NaN`, `Infinity` and `-Infinity` are converted to
+        `dump_none` or `load_none`.
+        If `False`, the special values are converted to string when dumping.
     :param minimum: Value must >= minimum, and `None` is equal to -∞.
     :param maximum: Value must <= maximum, and `None` is equal to +∞.
     :param error_messages: Keys {'too_small', 'too_large', 'not_between', ...}.
@@ -430,7 +458,7 @@ class DecimalField(NumberField):
     dump_as = str
     places = None
     rounding = None
-    exponent = None
+    nan_to_none = True
 
     def __init__(
             self,
@@ -445,21 +473,34 @@ class DecimalField(NumberField):
             raise TypeError('Argument "dump_as" must be callable.')
         if self.places is not None:
             self.exponent = decimal.Decimal((0, (), -int(self.places)))
+        else:
+            self.exponent = None
 
     def to_decimal(self, value):
         if isinstance(value, float):
             value = str(value)
-        value = decimal.Decimal(value)
-        if self.exponent is not None and value.is_finite():
+        return decimal.Decimal(value)
+
+    def quantize(self, value):
+        if self.exponent is not None:
             value = value.quantize(self.exponent, rounding=self.rounding)
         return value
 
     def format(self, value):
-        num = self.to_decimal(value)
-        return self.dump_as(num)
+        value = self.to_decimal(value)
+        if value.is_finite():
+            value = self.quantize(value)
+        elif self.nan_to_none:
+            return self.dump_none
+        return self.dump_as(value)
 
     def parse(self, value):
-        return self.to_decimal(value)
+        value = self.to_decimal(value)
+        if value.is_finite():
+            value = self.quantize(value)
+        elif self.nan_to_none:
+            return self.load_none
+        return value
 
 
 class BooleanField(Field):
@@ -668,16 +709,22 @@ class SeparatedField(ListField):
 
     :param separator: Argument for `str.split(sep=separator)` and `separator.join`.
         If separator is `None`, whitespace will be used to join words.
+        By default, separator is `,`.
     :param maxsplit: Argument for `str.split(maxsplit=maxsplit)`.
     """
     item_field = StringField()
-    separator = None
+    separator = ','
     maxsplit = -1
 
-    def __init__(self, item_field: Field = None, separator=missing, maxsplit=None, **kwargs):
+    def __init__(
+            self,
+            item_field: Field = None,
+            separator: str = ...,
+            maxsplit: int = None,
+            **kwargs):
         super().__init__(item_field=item_field, **kwargs)
         bind_attrs(self, maxsplit=maxsplit)
-        if separator is not missing:  # `None` is a valid value
+        if separator is not ...:  # `None` is a valid value
             self.separator = separator
 
     def parse(self, value):
