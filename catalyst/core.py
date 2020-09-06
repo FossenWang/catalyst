@@ -130,9 +130,11 @@ class Catalyst(CatalystABC, metaclass=CatalystMeta):
         If a field appears in both `include` and `exclude`, it is not used.
         If `dump_exclude` or `load_exclude` is passed, `exclude` will
         not be used for dump or load fields.
-        The fields filtering works like set operation, for example:
-            used_fields = original_fields & include - exclude
         `Field.no_dump` and `Field.no_load` are also used to filter fields.
+        The fields filtering works like set operation, for example::
+
+            used_fields = original_fields & include - exclude
+
     :param dump_include: The fields to include in dump fields.
     :param dump_exclude: The fields to exclude from dump fields.
     :param load_include: The fields to include in load fields.

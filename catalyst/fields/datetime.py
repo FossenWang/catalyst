@@ -10,7 +10,7 @@ class DatetimeField(Field):
     """Field for converting `datetime.datetime` object.
     Only native formats of `datetime.strftime()` and `datetime.strptime()` are supported.
 
-    Example:
+    Example::
 
         # Aware datetime
         field = DatetimeField(fmt=r'%Y-%m-%d %H:%M:%S%z')

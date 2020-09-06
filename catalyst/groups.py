@@ -1,3 +1,5 @@
+"""FieldGroup classes for processing multiple fields."""
+
 from typing import Callable, Iterable
 from functools import partial
 
@@ -7,12 +9,12 @@ from .utils import bind_attrs
 
 class FieldGroup(BaseField):
     """Process multiple fields of the data, after all single fields being handled.
-    The `FieldGroup` can directly modify the whole data, while `Field` can only modify
+    The `FieldGroup` can directly modify the whole data, while :class:`Field` can only modify
     one field value of the data.
 
-    :param declared_fields: The fields that need to be injected by `Catalyst`.
+    :param declared_fields: The fields that need to be injected by :class:`Catalyst`.
         A list of field names, or character "*" which means all fields.
-    :param kwargs: Same as `BaseField`.
+    :param kwargs: Same as :class:`BaseField`.
     """
     declared_fields: Iterable[str] = tuple()
     fields: FieldDict
@@ -22,7 +24,7 @@ class FieldGroup(BaseField):
         bind_attrs(self, declared_fields=declared_fields)
 
     def set_fields(self, fields: FieldDict):
-        """Inject fields according to `declared_fields`, exclude `FieldGroup`."""
+        """Inject fields according to `declared_fields`, exclude :class:`FieldGroup`."""
         new_fields: FieldDict = {}
         # character '*' means to inject all fields
         if self.declared_fields == '*':
@@ -36,16 +38,20 @@ class FieldGroup(BaseField):
                     raise ValueError(f'The field "{key}" is not found.')
                 value = fields[key]
                 if not isinstance(value, Field):
-                    raise TypeError(f'The field "{key}" must be a Field, not "{value}".')
+                    raise TypeError(f'The field "{key}" must be a Field instance, not "{value}".')
                 new_fields[key] = value
         self.fields = new_fields
 
     def set_dump(self, func: Callable = None, obj_name='group', **kwargs):
-        """Override `FieldGroup.dump` method. See `BaseField.override_method` for more details."""
+        """Override :meth:`FieldGroup.dump` method.
+        See :meth:`FieldGroup.override_method` for more details.
+        """
         return self.override_method(func, 'dump', obj_name, **kwargs)
 
     def set_load(self, func: Callable = None, obj_name='group', **kwargs):
-        """Override `FieldGroup.load` method. See `BaseField.override_method` for more details."""
+        """Override :meth:`FieldGroup.load` method.
+        See :meth:`FieldGroup.override_method` for more details.
+        """
         return self.override_method(func, 'load', obj_name, **kwargs)
 
     def dump(self, data: dict, original_data=None):
@@ -64,7 +70,7 @@ class CompareFields(FieldGroup):
     :param b: The name of field on the right of the comparison operator.
     :param op: The string of comparison operator, which must be a key in
         `CompareFields.comparison_dict`.
-    :param kwargs: Same as `FieldGroup`.
+    :param kwargs: Same as :class:`FieldGroup`.
     """
     no_dump = True
     error_messages = {
@@ -97,7 +103,7 @@ class CompareFields(FieldGroup):
         super().__init__(declared_fields=(a, b), **kwargs)
 
     def set_fields(self, fields: FieldDict):
-        """After fields are injected, bind them to `self.field_a` and `self.field_b`,
+        """After fields are injected, bind them to ``self.field_a`` and ``self.field_b``,
         format error messages, and create validate functions."""
         super().set_fields(fields)
         # bind fields to attrs
@@ -139,12 +145,12 @@ class TransformNested(FieldGroup):
 
     :param nested: The field name of NestedField.
     :param dump_method: The method name to dump data,
-        choose one of `nested_to_flat`, `flat_to_nested` to handle data.
-        The default value is `nested_to_flat`.
+        choose one of ``'nested_to_flat'``, ``'flat_to_nested'`` to handle data.
+        The default value is ``'nested_to_flat'``.
     :param load_method: The method name to load data,
-        choose one of `nested_to_flat`, `flat_to_nested` to handle data.
-        The default value is `flat_to_nested`.
-    :param kwargs: Same as `FieldGroup`.
+        choose one of ``'nested_to_flat'``, ``'flat_to_nested'`` to handle data.
+        The default value is ``'flat_to_nested'``.
+    :param kwargs: Same as :class:`FieldGroup`.
     """
     nested_field: NestedField
     dump_method = 'nested_to_flat'
@@ -156,12 +162,12 @@ class TransformNested(FieldGroup):
         bind_attrs(self, dump_method=dump_method, load_method=load_method)
 
     def set_fields(self, fields: FieldDict):
-        """Set `self.nested_field`, and create partial load and dump methods."""
+        """Set ``self.nested_field``, and create partial load and dump methods."""
         super().set_fields(fields)
         nested_field: NestedField = self.fields[self.nested]
         if not isinstance(nested_field, NestedField):
             raise TypeError(
-                f'The field "{self.nested}" must be a NestedField, not "{nested_field}".')
+                f'The field "{self.nested}" must be a NestedField instance, not "{nested_field}".')
         if nested_field.many:
             raise ValueError(f'The field "{self.nested}" can not be set as "many=True".')
         self.nested_field = nested_field
@@ -199,7 +205,7 @@ class SumFields(FieldGroup):
 
     :param result_field: A field to convert the sum result. If None, don't convert the sum.
     :param declared_fields: The name of fields which to collect values from data.
-    :param kwargs: Same as `FieldGroup`.
+    :param kwargs: Same as :class:`FieldGroup`.
     """
     dump_data_keys: Iterable[str]
     load_data_keys: Iterable[str]
@@ -207,17 +213,17 @@ class SumFields(FieldGroup):
     def __init__(self, result_field: Field = None, **kwargs):
         if result_field and not isinstance(result_field, Field):
             raise TypeError(
-                f'Argument "result_field" must be a Field, not "{result_field}".')
+                f'Argument "result_field" must be a Field instance, not "{result_field}".')
         self.result_field = result_field
         super().__init__(**kwargs)
 
     def set_fields(self, fields: FieldDict):
-        """Check if the injected fields are `NumberField`."""
+        """Check if the injected fields are :class:`NumberField`."""
         super().set_fields(fields)
         for key, value in self.fields.items():
             if not isinstance(value, NumberField):
                 raise TypeError(
-                    f'The field "{key}" must be a NumberField, not "{value}".')
+                    f'The field "{key}" must be a NumberField instance, not "{value}".')
         # collect data keys from fields
         self.dump_data_keys = tuple(field.dump_target for field in self.fields.values())
         self.load_data_keys = tuple(field.load_target for field in self.fields.values())

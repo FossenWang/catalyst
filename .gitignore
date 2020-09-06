@@ -1,7 +1,9 @@
+.vscode
 
-*.pyc
-*__pycache__
-*.db
-*.egg-info
-*migrations
+__pycache__/
+
+*.egg-info/
+build/
+dist/
+
 .coverage

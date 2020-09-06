@@ -47,3 +47,5 @@ from .groups import (
     TransformNested,
     SumFields,
 )
+
+__version__ = "0.1.0"

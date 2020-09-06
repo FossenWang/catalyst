@@ -75,11 +75,11 @@ class FloatField(NumberField):
 
 
 class DecimalField(FloatField):
-    """Field for converting `decimal.Decimal` object.
+    """Field for converting ``decimal.Decimal`` object.
 
     :param places: The number of digits to the right of the decimal point.
         If `None`, does not quantize the value.
-    :param rounding: The rounding mode, for example `decimal.ROUND_UP`.
+    :param rounding: The rounding mode, for example ``decimal.ROUND_UP``.
         If `None`, the rounding mode of the current thread's context is used.
     :param dump_as: Data type that the value is serialized to.
     :param nan_to_none: If `True`, `NaN`, `Infinity` and `-Infinity` are converted to

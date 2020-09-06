@@ -90,12 +90,15 @@ class _Missing:
         return '<catalyst.missing>'
 
 missing = _Missing()
-# The `missing` object represents that the field does not exist in data.
-# For example, `Catalyst` will consider a dict object
-# `{'a': missing, 'b': 1}` as same as `{'b': 1}`.
-# By default, `KeyError` or `AttributeError` will be raised if dumping
-# field is missing, and field will be excluded from load result if
-# loading field is missing.
+"""The ``missing`` object represents that the field does not exist in data.
+
+For example, :class:`.Catalyst` will consider a dict object
+``{'a': missing, 'b': 1}`` as same as ``{'b': 1}``.
+
+By default, :exc:`KeyError` or :exc:`AttributeError` will be raised if dumping
+field is missing, and field will be excluded from load result if
+loading field is missing.
+"""
 
 
 def make_attrs_setter(none=None):
@@ -113,10 +116,12 @@ def make_attrs_setter(none=None):
 
 bind_attrs = make_attrs_setter()
 bind_not_ellipsis_attrs = make_attrs_setter(...)
-# Use `...` to represent that the arguments will not be bind to `obj`,
-# since `None` is meaningful for some attributes.
-# It may be useful to declare an argument with default ellipsis,
-# which can provides type hints without specifying the actual default value.
+"""Use `...` to represent that the arguments will not be bind to `obj`,
+since `None` is meaningful for some attributes.
+
+It may be useful to declare an argument with default ellipsis,
+which can provides type hints without specifying the actual default value.
+"""
 
 
 def assign_attr_or_item_getter(obj):

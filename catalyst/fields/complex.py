@@ -46,7 +46,7 @@ class ListField(Field):
 
         item_field = self.item_field
         if not isinstance(item_field, Field):
-            raise TypeError(f'Argument "item_field" must be a Field, not "{item_field}".')
+            raise TypeError(f'Argument "item_field" must be a Field instance, not "{item_field}".')
         self.format_item = getattr(item_field, 'dump')
         self.parse_item = getattr(item_field, 'load')
 
@@ -125,7 +125,7 @@ class NestedField(Field):
     """Nested field, handle one or more objects with `Catalyst`.
     In order to ensure proper data structure, `None` is not valid.
 
-    :param catalyst: A `Catalyst` class or instance.
+    :param Catalyst catalyst: A `Catalyst` class or instance.
     :param many: Whether to process multiple objects.
     """
     catalyst: CatalystABC = None
@@ -138,7 +138,7 @@ class NestedField(Field):
 
         catalyst = self.catalyst
         if not isinstance(catalyst, CatalystABC):
-            raise TypeError(f'Argument "catalyst" must be a Catalyst, not "{catalyst}".')
+            raise TypeError(f'Argument "catalyst" must be a Catalyst instance, not "{catalyst}".')
         if self.many:
             self._do_dump = catalyst.dump_many
             self._do_load = catalyst.load_many

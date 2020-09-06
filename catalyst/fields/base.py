@@ -59,7 +59,7 @@ class BaseField(ErrorMessageMixin):
         """Override a method of the field instance. Inject field instance or covered method
         as argments into the function according to argument name.
 
-        Example:
+        Example::
 
             field.override_method(function, 'format')
 
@@ -84,7 +84,7 @@ class BaseField(ErrorMessageMixin):
         :param func: The function to override. The value will be passed to the first argument.
             Particularly, if the first argument is `self`, the field instance will be injected,
             and value will be the second argument.
-            If argments like "field", "original_method" or "**kwargs" exist, the field instance
+            If argments like "field", "original_method" or "\\**kwargs" exist, the field instance
             or covered method will be passed.
         :param attr: The attribute to be overrided.
         :param obj_name: The argment name of the instence itself.

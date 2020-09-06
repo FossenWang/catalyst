@@ -1,2 +1,4 @@
 coverage==5.0
 pylint==2.5.3
+Sphinx==2.1.2
+alabaster==0.7.12
