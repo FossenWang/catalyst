@@ -1,0 +1,32 @@
+version: 2.1
+
+workflows:
+  main:
+    jobs:
+      - test:
+          filters:
+            branches:
+              only:
+                - circleci
+
+jobs:
+  test:
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - checkout
+      - restore_cache:
+          key: v1-pip-{{ checksum "requirements.dev.txt" }}
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.dev.txt
+      - save_cache:
+          key: v1-pip-{{ checksum "requirements.dev.txt" }}
+          paths:
+            - '/usr/local/bin'
+            - '/usr/local/lib/python3.6/site-packages'
+      - run: pylint catalyst tests
+      - run: |
+          coverage run -m unittest -f
+          coverage report -m
+      - run: bash <(curl -s https://codecov.io/bash)
